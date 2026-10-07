@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ANARCO.EXE 3D</title>
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="rain"></canvas>
+<div id="hud">
+  <h1>ANARCO<span>.EXE</span> 3D</h1>
+  <div class="b" id="lv">NÍVEL 1/5</div>
+  <div class="b"><img id="ic_d" alt="">TORRES <span id="cnt">0/3</span></div>
+  <div class="b"><img id="ic_h" alt="">HACK<i><u id="hk"></u></i></div>
+  <div class="b r"><img id="ic_a" alt="">ALERTA<i><u id="al"></u></i></div>
+  <div class="b" id="bb" hidden><span id="bn">CHEFÃO</span><i><u id="bh"></u></i></div>
+</div>
+<div id="msg"></div>
+<div id="leakcard" hidden><b>VAZAMENTO CAPTURADO</b><span id="lcc"></span><small id="lcd"></small></div>
+<div id="obj"></div>
+<button id="pb" aria-label="Pausar">⏸</button>
+<div id="pz" hidden><div><h2>PAUS<span>A</span></h2><p>P ou Esc para voltar.</p><button id="pzc">Continuar</button> <button id="pzm">Menu</button></div></div>
+<div id="bf" hidden><div><h2 id="bfh"></h2><p id="bft"></p></div></div>
+<div id="mini" hidden><b>BREACH — digite a sequência</b><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
+<div id="tut" hidden><span id="tutx"></span><button id="tuts">pular</button></div>
+<div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul>
+  <button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
+<canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas>
+<button id="snd" aria-label="Som">🔊</button>
+<button id="bz">BREACH · Espaço</button>
+<div id="joy"><b id="nub"></b></div>
+<div id="ov"><div>
+  <h2 id="ot">ANARCO<span>.EXE</span></h2>
+  <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
+  <p>Mova com WASD ou setas, segure Shift para correr (faz barulho!) (joystick no celular). Ao completar o hack, digite a sequência de setas. Pegue energia, keycard e USB. Tudo é ficção.</p>
+  <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
+  <button id="st">Invadir</button>
+  <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button></div>
+</div></div>
+
+
+<!-- Three.js local: o jogo roda 100% offline -->
+<script src="assets/lib/three.min.js"></script>
+<!-- ÂNCORA: dados pesados (modelo, ícones, props, mural) -->
+<script src="assets/dados/modelo.js"></script>
+<script src="assets/dados/icones.js"></script>
+<script src="assets/dados/props.js"></script>
+<script src="assets/dados/cena.js"></script>
+<!-- ÂNCORA: lógica do jogo -->
+<script src="script.js"></script>
+</body>
+</html>
