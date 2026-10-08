@@ -286,6 +286,33 @@ canvas {
   cursor: pointer;
 }
 
+/* ÂNCORA: botão CORRER (só em telas de toque), logo acima do BREACH */
+#rn {
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  bottom: calc(212px + env(safe-area-inset-bottom, 0px));
+  display: none;
+  font: inherit;
+  font-size: 1rem;
+  color: #141414;
+  background: #ece9e1;
+  border: 3px solid #ece9e1;
+  padding: 8px 12px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#rn.on {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+@media (pointer: coarse) {
+  #rn {
+    display: block;
+  }
+}
+
 .mb2 { display: flex; gap: 8px; }
 #ov .mb2 button { background: var(--ink); font-size: 0.95rem; }
 #tut {
@@ -332,3 +359,44 @@ canvas {
 @keyframes leakpop { from { transform: translate(-50%, -50%) rotate(-1.5deg) scale(0.7); opacity: 0; } }
 [hidden]{display:none!important}
 #ch button{background:var(--red,#e0261c)!important;font-size:1rem!important}
+
+/* ÂNCORA: acessibilidade — quem ativa "Reduzir movimento" no sistema não vê animações nem a chuva de código */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  #rain {
+    display: none;
+  }
+}
+
+/* ÂNCORA: aviso de "abra por um servidor" (só aparece em file://) */
+#aviso-local {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  z-index: 99999;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  max-width: min(92vw, 640px);
+  padding: 10px 14px;
+  transform: translateX(-50%);
+  color: #141414;
+  font-size: 0.95rem;
+  background: #ece9e1;
+  border: 3px solid var(--red);
+}
+#aviso-local button {
+  padding: 4px 10px;
+  color: #fff;
+  font: inherit;
+  background: var(--red);
+  border: 0;
+  cursor: pointer;
+}

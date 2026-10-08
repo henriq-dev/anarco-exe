@@ -2,8 +2,41 @@
    ANARCO.EXE 3D — lógica do jogo
    Ordem do arquivo: cena -> torres -> jogador -> drones -> entrada
    -> estado/níveis -> minigame -> itens -> chefão -> loop principal
-   Dados pesados ficam em assets/dados/ (modelo, ícones, props, mural)
+   Imagens ficam em assets/img/ (caminhos em assets/dados/manifesto.js)
    ========================================================== */
+
+// ÂNCORA: armazenamento seguro — se o navegador bloquear o localStorage (modo privado, cookies
+// desligados), o jogo continua funcionando; só não guarda tutorial, finais e vazamentos.
+const guardar = (chave, valor) => {
+  try {
+    localStorage.setItem(chave, valor);
+  } catch (e) {}
+};
+const ler = (chave) => {
+  try {
+    return localStorage.getItem(chave);
+  } catch (e) {
+    return null;
+  }
+};
+const apagar = (chave) => {
+  try {
+    localStorage.removeItem(chave);
+  } catch (e) {}
+};
+
+// ÂNCORA: aviso quando o jogo é aberto com duplo clique (file://). As imagens do cenário são
+// texturas WebGL, e o navegador bloqueia texturas lidas de arquivos locais.
+if (location.protocol === "file:") {
+  const av = document.createElement("div");
+  av.id = "aviso-local";
+  av.setAttribute("role", "alert");
+  av.innerHTML =
+    'Abra o jogo por um servidor para ver tudo (Live Server do VS Code ou <code>python -m http.server</code>). ' +
+    'Na Vercel e na Netlify funciona normal. <button type="button">Entendi</button>';
+  av.querySelector("button").onclick = () => av.remove();
+  document.body.append(av);
+}
 const T = THREE,
   $ = (id) => document.getElementById(id);
 // gerador com semente: o cenário decorativo é sempre igual
@@ -158,7 +191,7 @@ const crates = [
   m.position.set(x, 1.2, z);
   m.add(new T.LineSegments(new T.EdgesGeometry(m.geometry), new T.LineBasicMaterial({ color: 0xe0261c })));
   S.add(m);
-  return { x, z, w: 3, d: 3, rot: 0 };
+  return { x, z, w: 3, d: 3, rot: 0, m, bx: x, bz: z }; // m = malha, bx/bz = posição na cidade
 });
 const solids = [
   ...towers.map((t) => ({ x: t.x, z: t.z, r: 3.9 })),
@@ -453,6 +486,19 @@ const jend = () => {
 joy.addEventListener("pointerup", jend);
 joy.addEventListener("pointercancel", jend);
 
+// ÂNCORA: botão CORRER (celular) — segurar = Shift apertado (mesmo caminho do teclado)
+const btnCorrer = $("rn");
+const correr = (on) => {
+  keys.shift = on ? 1 : 0;
+  btnCorrer.classList.toggle("on", !!on);
+};
+btnCorrer.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  btnCorrer.setPointerCapture(e.pointerId); // continua valendo se o dedo escorregar
+  correr(true);
+});
+["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => btnCorrer.addEventListener(ev, () => correr(false)));
+
 // state
 let state = "menu",
   cnt = 0,
@@ -460,8 +506,11 @@ let state = "menu",
   shake = 0,
   grace = 0,
   endT = 0;
-const vel = new T.Vector3(),
-  calm = matchMedia("(prefers-reduced-motion:reduce)").matches;
+const vel = new T.Vector3();
+// ÂNCORA: calm = true quando o sistema pede menos movimento (acessibilidade); atualiza ao vivo
+const reduzMov = matchMedia("(prefers-reduced-motion:reduce)");
+let calm = reduzMov.matches;
+reduzMov.addEventListener("change", (e) => (calm = e.matches));
 function reset(keep) {
   if (!keep) lvl = 0;
   mini = null;
@@ -501,7 +550,7 @@ function reset(keep) {
 function chooseEnd(k) {
   $("ch").hidden = true;
   $("st").hidden = false;
-  localStorage.setItem("anarco_final", k);
+  guardar("anarco_final", k);
   sfx(k === "caos" ? "win" : "pulse");
   if (k === "caos") {
     $("ot").innerHTML = "FINAL <span>CAOS</span>";
@@ -580,7 +629,7 @@ function introTerm(done) {
   addEventListener("keydown", function k() { if (i >= L.length || fin) { removeEventListener("keydown", k); end(); } });
 }
 $("st").onclick = () => {
-  tut = localStorage.getItem("anarco_tut") ? -1 : 0;
+  tut = ler("anarco_tut") ? -1 : 0;
   introTerm(startGame);
 };
 $("tb").onclick = () => {
@@ -992,6 +1041,13 @@ function applyLevel() {
   drones.forEach((d, i) => {
     d.path = r ? ROOMP[i] : CITYP[i];
   });
+  crates.forEach((c, i) => {
+    c.x = r ? 999 : c.bx; // fora da sala = sem colisão
+    c.z = r ? 999 : c.bz;
+    c.m.visible = !r;
+    solids[towers.length + i].x = c.x;
+    solids[towers.length + i].z = c.z;
+  });
   HIDE.forEach((o) => { o.x = r ? o.hx : 999; o.z = r ? o.hz : 999; });
   sky.forEach((m) => (m.visible = !r));
   sign.visible = !r;
@@ -1105,7 +1161,7 @@ function hitBoss(d) {
 function breach() {
   if (state !== "play" || bz > 0 || mini) return;
   bz = LV[lvl].boss ? 6 : 10;
-  rainT = 2.2;
+  rainT = calm ? 0 : 2.2; // sem chuva de código se o sistema pede menos movimento
   ringT = 0;
   castT = 0.6;
   ringM.position.x = P.position.x;
@@ -1201,7 +1257,7 @@ function loop() {
     }
     if (t.glitch > 0) {
       t.glitch -= dt;
-      t.mesh.position.x = t.x + (Math.random() - 0.5) * 0.5 * Math.min(1, t.glitch);
+      t.mesh.position.x = calm ? t.x : t.x + (Math.random() - 0.5) * 0.5 * Math.min(1, t.glitch);
     } else t.mesh.position.x = t.x;
     t.spr.position.y = t.h + 5 + Math.sin(time * 2) * 0.5;
     // anel por estado: concluída (verde), hackeando (pulso rápido),
@@ -1213,8 +1269,8 @@ function loop() {
       t.ring.scale.setScalar(1);
     } else if (dP < 5.1) {
       t.ring.material.color.set(0xe0261c);
-      t.ring.material.opacity = 0.6 + Math.abs(Math.sin(time * 10)) * 0.4;
-      t.ring.scale.setScalar(1 + Math.sin(time * 10) * 0.06);
+      t.ring.material.opacity = calm ? 0.85 : 0.6 + Math.abs(Math.sin(time * 10)) * 0.4;
+      t.ring.scale.setScalar(calm ? 1 : 1 + Math.sin(time * 10) * 0.06);
     } else if (t === nextT) {
       t.ring.material.color.set(0xffe14a);
       t.ring.material.opacity = 0.75 + Math.sin(time * 4) * 0.25;
@@ -1227,7 +1283,7 @@ function loop() {
     if (t.pulse > 0) {
       t.pulse = Math.max(0, t.pulse - dt * 2.5);
       const k = 1 + Math.sin(t.pulse * Math.PI) * 0.25;
-      t.mesh.scale.x = t.mesh.scale.z = k;
+      t.mesh.scale.x = t.mesh.scale.z = calm ? 1 : k; // em modo reduzido fica só o brilho, sem crescer
       t.mesh.material.emissiveIntensity = 0.9 + t.pulse * 2;
     }
   });
@@ -1266,17 +1322,19 @@ function loop() {
     vel.z += (iz * SP - vel.z) * Math.min(1, dt * 10);
     P.position.x = Math.max(-34, Math.min(34, P.position.x + vel.x * dt));
     P.position.z = Math.max(-34, Math.min(34, P.position.z + vel.z * dt));
-    solids.forEach((s) => {
-      if (s.w) return collideBox(s);
-      const dx = P.position.x - s.x,
-        dz = P.position.z - s.z,
-        d = Math.hypot(dx, dz),
-        m = s.r + 0.5;
-      if (d < m && d > 0) {
-        P.position.x = s.x + (dx / d) * m;
-        P.position.z = s.z + (dz / d) * m;
-      }
-    });
+    for (let passada = 0; passada < 2; passada++) {
+      solids.forEach((s) => {
+        if (s.w) return collideBox(s);
+        const dx = P.position.x - s.x,
+          dz = P.position.z - s.z,
+          d = Math.hypot(dx, dz),
+          m = s.r + 0.5;
+        if (d < m && d > 0) {
+          P.position.x = s.x + (dx / d) * m;
+          P.position.z = s.z + (dz / d) * m;
+        }
+      });
+    }
     const sp = Math.hypot(vel.x, vel.z);
     // rotação suave: o personagem só vira quando está em movimento
     if (sp > 0.5) {
@@ -1336,7 +1394,7 @@ function loop() {
       d.disc.material.color.set(col);
       d.edge.material.color.set(col);
       d.beam.material.color.set(col);
-      d.beam.material.opacity = sees ? 0.22 + Math.sin(time * 20) * 0.06 : 0.1;
+      d.beam.material.opacity = sees ? 0.22 + (calm ? 0 : Math.sin(time * 20) * 0.06) : 0.1; // piscar do feixe: fixo em modo reduzido
       d.children[0].material.emissive.set(col);
     });
     bossIn = false;
@@ -1405,9 +1463,9 @@ function loop() {
         getPick(p.t);
       }
     }
-    glow.intensity = near ? 1.4 + Math.sin(time * 30) * 0.4 : 0;
+    glow.intensity = near ? 1.4 + (calm ? 0 : Math.sin(time * 30) * 0.4) : 0;
     lapG.visible = hacking;
-    lapLight.intensity = hacking ? 1.2 + Math.sin(time * 24) * 0.35 : 0;
+    lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
       $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
       if (near.p >= 1 && !mini) startMini(near);
@@ -1458,14 +1516,14 @@ loop();
 const DOCS = ["Planilha de propinas", "E-mails do conselho", "Contratos secretos", "Lista de espionados",
   "Relatório de evasão fiscal", "Memorando de demissões", "Log de câmeras", "Acordo com o governo"];
 function leaks() {
-  try { return JSON.parse(localStorage.getItem("anarco_leaks") || "[]"); } catch (e) { return []; }
+  try { return JSON.parse(ler("anarco_leaks") || "[]"); } catch (e) { return []; }
 }
 function addLeak(corp) {
   const doc = DOCS[Math.floor(Math.random() * DOCS.length)];
   const L = leaks();
   L.unshift({ c: corp, d: doc, n: lvl + 1,
     id: Math.random().toString(16).slice(2, 8).toUpperCase(), t: new Date().toLocaleString("pt-BR") });
-  localStorage.setItem("anarco_leaks", JSON.stringify(L.slice(0, 60)));
+  guardar("anarco_leaks", JSON.stringify(L.slice(0, 60)));
   return doc;
 }
 // cartão "VAZAMENTO CAPTURADO" com a corporação e o documento
@@ -1486,7 +1544,7 @@ function showLeaks() {
 }
 $("lb").onclick = showLeaks;
 $("lkx").onclick = () => ($("lk").hidden = true);
-$("lkz").onclick = () => { localStorage.removeItem("anarco_leaks"); showLeaks(); };
+$("lkz").onclick = () => { apagar("anarco_leaks"); showLeaks(); };
 
 // ===== TUTORIAL INTERATIVO =====
 let tut = -1, tutT = 0, tutP0 = null, tutPk = 0;
@@ -1516,11 +1574,11 @@ function tutTick(dt) {
   else if (tut === 4 && bz > 0) tutNext();
   else if (tut === 5 && tutT > 4) {
     tut = -1;
-    localStorage.setItem("anarco_tut", "1");
+    guardar("anarco_tut", "1");
     tutShow();
   }
 }
-$("tuts").onclick = () => { tut = -1; localStorage.setItem("anarco_tut", "1"); tutShow(); };
+$("tuts").onclick = () => { tut = -1; guardar("anarco_tut", "1"); tutShow(); };
 
 // ===== PRÓXIMO OBJETIVO =====
 const arrow = new T.Mesh(

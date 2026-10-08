@@ -3,7 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ANARCO.EXE 3D</title>
+<title>ANARCO.EXE 3D — hackeie, vaze, resista</title>
+<meta name="description" content="Jogo 3D no navegador: invada torres corporativas, fuja dos drones e vaze os segredos que elas escondem. Tudo é ficção.">
+<meta name="theme-color" content="#09090b">
+<meta name="color-scheme" content="dark">
+
+<!-- ÂNCORA: ícones (favicon.ico = navegadores antigos, svg = modernos, png = iPhone/Android) -->
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+<link rel="apple-touch-icon" href="assets/img/icone-180.png">
+
+<!-- ÂNCORA: preview ao compartilhar o link (WhatsApp, Telegram, Discord, redes sociais).
+     IMPORTANTE: depois de publicar, troque og:image e og:url pelo endereço completo do site
+     (ex.: https://seu-jogo.vercel.app/assets/img/og-preview.jpg). Muitos apps exigem URL completa. -->
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="ANARCO.EXE 3D">
+<meta property="og:title" content="ANARCO.EXE 3D — hackeie, vaze, resista">
+<meta property="og:description" content="Invada torres corporativas, fuja dos drones e vaze os segredos que elas escondem. Jogue no navegador.">
+<meta property="og:image" content="assets/img/og-preview.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Arte do jogo ANARCO.EXE 3D: cidade neon com o título do jogo">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="assets/fonts/fonts.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -30,11 +52,12 @@
 <canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas>
 <button id="snd" aria-label="Som">🔊</button>
 <button id="bz">BREACH · Espaço</button>
+<button id="rn" type="button" aria-label="Segurar para correr">CORRER</button>
 <div id="joy"><b id="nub"></b></div>
 <div id="ov"><div>
   <h2 id="ot">ANARCO<span>.EXE</span></h2>
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
-  <p>Mova com WASD ou setas, segure Shift para correr (faz barulho!) (joystick no celular). Ao completar o hack, digite a sequência de setas. Pegue energia, keycard e USB. Tudo é ficção.</p>
+  <p>Mova com WASD ou setas, segure Shift para correr (faz barulho!). No celular, use o joystick e segure o botão CORRER. Ao completar o hack, digite a sequência de setas. Pegue energia, keycard e USB. Tudo é ficção.</p>
   <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
   <button id="st">Invadir</button>
   <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button></div>
@@ -43,11 +66,9 @@
 
 <!-- Three.js local: o jogo roda 100% offline -->
 <script src="assets/lib/three.min.js"></script>
-<!-- ÂNCORA: dados pesados (modelo, ícones, props, mural) -->
+<!-- ÂNCORA: caminhos das imagens (manifesto) e modelo 3D (ainda em Base64, etapa B) -->
+<script src="assets/dados/manifesto.js"></script>
 <script src="assets/dados/modelo.js"></script>
-<script src="assets/dados/icones.js"></script>
-<script src="assets/dados/props.js"></script>
-<script src="assets/dados/cena.js"></script>
 <!-- ÂNCORA: lógica do jogo -->
 <script src="script.js"></script>
 </body>
