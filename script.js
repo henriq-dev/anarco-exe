@@ -32,7 +32,7 @@ if (location.protocol === "file:") {
   av.id = "aviso-local";
   av.setAttribute("role", "alert");
   av.innerHTML =
-    'Abra o jogo por um servidor para ver tudo (Live Server do VS Code ou <code>python -m http.server</code>). ' +
+    "Abra o jogo por um servidor para ver tudo (Live Server do VS Code ou <code>python -m http.server</code>). " +
     'Na Vercel e na Netlify funciona normal. <button type="button">Entendi</button>';
   av.querySelector("button").onclick = () => av.remove();
   document.body.append(av);
@@ -50,8 +50,11 @@ const rnd = () => {
 $("ic_d").src = ICON.data;
 $("ic_h").src = ICON.hack;
 $("ic_a").src = ICON.drone;
-const R = new T.WebGLRenderer({ antialias: true });
-R.setPixelRatio(Math.min(devicePixelRatio, 2));
+// ÂNCORA: celular (toque) com tela densa gasta muita GPU: limita os pixels e dispensa o antialias (MSAA)
+const toque = matchMedia("(pointer: coarse)").matches;
+const R = new T.WebGLRenderer({ antialias: !(toque && devicePixelRatio >= 2) });
+let pixelRatio = Math.min(devicePixelRatio, toque ? 1.5 : 2);
+R.setPixelRatio(pixelRatio);
 document.body.prepend(R.domElement);
 const S = new T.Scene();
 S.background = new T.Color(0x0a0818);
@@ -227,100 +230,122 @@ let model = null,
   won = false,
   hacking = false,
   wob = 0;
-try {
-  const N = MODELO_INFO.n,
-    F = MODELO_INFO.f;
-  const bin = Uint8Array.from(atob(MODELO_B64), (c) => c.charCodeAt(0)).buffer;
-  const pos = new Int16Array(bin, 0, N * 3),
-    idx = new Uint16Array(bin, N * 6, F * 3),
-    col = new Uint8Array(bin, N * 6 + F * 6, N * 3);
-  const pf = new Float32Array(N * 3);
-  for (let i = 0; i < N * 3; i++) pf[i] = pos[i] / 10000;
-  const g = new T.BufferGeometry();
-  g.setAttribute("position", new T.BufferAttribute(pf, 3));
-  g.setAttribute("color", new T.BufferAttribute(col, 3, true));
-  g.setIndex(new T.BufferAttribute(idx, 1));
-  g.computeVertexNormals();
-  model = new T.Group();
-  const B = {},
-    mkb = (n, x, y, z, par) => {
-      const b = new T.Bone();
-      b.position.set(x - (par ? par.px : 0), y - (par ? par.py : 0), z - (par ? par.pz : 0));
-      b.px = x;
-      b.py = y;
-      b.pz = z;
-      if (par) par.add(b);
-      B[n] = b;
-      return b;
-    };
-  const hips = mkb("hips", 0, 0.9, 0),
-    spine = mkb("spine", 0, 1.3, 0, hips);
-  mkb("head", 0, 2.25, 0, spine);
-  const aP = mkb("armP", 0.36, 2.05, 0, spine),
-    aN = mkb("armN", -0.36, 2.05, 0, spine),
-    lP = mkb("legP", 0.17, 0.9, 0, hips),
-    lN = mkb("legN", -0.17, 0.9, 0, hips);
-  mkb("foreP", 0.43, 1.55, 0, aP);
-  mkb("foreN", -0.43, 1.55, 0, aN);
-  mkb("shinP", 0.17, 0.48, 0, lP);
-  mkb("shinN", -0.17, 0.48, 0, lN);
-  const names = ["hips", "spine", "head", "armP", "armN", "legP", "legN", "foreP", "foreN", "shinP", "shinN"];
-  const SG = [
-    [0, 0, 0.75, 0, 0, 1.25, 0, 0.25],
-    [1, 0, 1.3, 0, 0, 2.1, 0, 0.3],
-    [2, 0, 2.3, 0, 0, 2.7, 0, 0.2],
-    [3, 0.36, 2.05, 0, 0.43, 1.55, 0.02, 0.07],
-    [7, 0.43, 1.55, 0.02, 0.5, 1.05, 0.05, 0.07],
-    [4, -0.36, 2.05, 0, -0.43, 1.55, 0, 0.07],
-    [8, -0.43, 1.55, 0, -0.5, 1.05, 0, 0.07],
-    [5, 0.17, 0.88, 0, 0.17, 0.48, 0, 0.13],
-    [9, 0.17, 0.48, 0, 0.17, 0.05, 0, 0.13],
-    [6, -0.17, 0.88, 0, -0.17, 0.48, 0, 0.13],
-    [10, -0.17, 0.48, 0, -0.17, 0.05, 0, 0.13],
-  ];
-  const si = new Uint16Array(N * 4),
-    sw = new Float32Array(N * 4);
-  for (let i = 0; i < N; i++) {
-    const x = pf[i * 3],
-      y = pf[i * 3 + 1],
-      z = pf[i * 3 + 2];
-    const ws = SG.map((s) => {
-      const vx = s[4] - s[1],
-        vy = s[5] - s[2],
-        vz = s[6] - s[3];
-      let t = ((x - s[1]) * vx + (y - s[2]) * vy + (z - s[3]) * vz) / (vx * vx + vy * vy + vz * vz);
-      t = Math.max(0, Math.min(1, t));
-      const dx = x - s[1] - vx * t,
-        dy = y - s[2] - vy * t,
-        dz = z - s[3] - vz * t;
-      return [s[0], Math.exp(-(dx * dx + dy * dy + dz * dz) / (s[7] * s[7]))];
-    })
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4);
-    const sum = ws.reduce((a, w) => a + w[1], 0) + 1e-9;
-    ws.forEach((w, k) => {
-      si[i * 4 + k] = w[0];
-      sw[i * 4 + k] = w[1] / sum;
-    });
+// ÂNCORA: formato do arquivo assets/models/anarco.bin (tudo em sequência, sem separadores):
+//   [posições Int16 x3 por vértice] [índices Uint16 x3 por triângulo] [cores Uint8 x3 por vértice]
+const MODELO_INFO = { n: 24953, f: 50000 }; // n = vértices, f = triângulos
+async function carregarModelo() {
+  try {
+    const N = MODELO_INFO.n,
+      F = MODELO_INFO.f;
+    const resp = await fetch("assets/models/anarco.bin"); // precisa de servidor (Vercel, Netlify, Live Server)
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const bin = await resp.arrayBuffer();
+    if (bin.byteLength !== N * 6 + F * 6 + N * 3)
+      throw new Error("tamanho inesperado do modelo: " + bin.byteLength);
+    const pos = new Int16Array(bin, 0, N * 3),
+      idx = new Uint16Array(bin, N * 6, F * 3),
+      col = new Uint8Array(bin, N * 6 + F * 6, N * 3);
+    const pf = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i++) pf[i] = pos[i] / 10000;
+    const g = new T.BufferGeometry();
+    g.setAttribute("position", new T.BufferAttribute(pf, 3));
+    g.setAttribute("color", new T.BufferAttribute(col, 3, true));
+    g.setIndex(new T.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    model = new T.Group();
+    const B = {},
+      mkb = (n, x, y, z, par) => {
+        const b = new T.Bone();
+        b.position.set(x - (par ? par.px : 0), y - (par ? par.py : 0), z - (par ? par.pz : 0));
+        b.px = x;
+        b.py = y;
+        b.pz = z;
+        if (par) par.add(b);
+        B[n] = b;
+        return b;
+      };
+    const hips = mkb("hips", 0, 0.9, 0),
+      spine = mkb("spine", 0, 1.3, 0, hips);
+    mkb("head", 0, 2.25, 0, spine);
+    const aP = mkb("armP", 0.36, 2.05, 0, spine),
+      aN = mkb("armN", -0.36, 2.05, 0, spine),
+      lP = mkb("legP", 0.17, 0.9, 0, hips),
+      lN = mkb("legN", -0.17, 0.9, 0, hips);
+    mkb("foreP", 0.43, 1.55, 0, aP);
+    mkb("foreN", -0.43, 1.55, 0, aN);
+    mkb("shinP", 0.17, 0.48, 0, lP);
+    mkb("shinN", -0.17, 0.48, 0, lN);
+    const names = [
+      "hips",
+      "spine",
+      "head",
+      "armP",
+      "armN",
+      "legP",
+      "legN",
+      "foreP",
+      "foreN",
+      "shinP",
+      "shinN",
+    ];
+    const SG = [
+      [0, 0, 0.75, 0, 0, 1.25, 0, 0.25],
+      [1, 0, 1.3, 0, 0, 2.1, 0, 0.3],
+      [2, 0, 2.3, 0, 0, 2.7, 0, 0.2],
+      [3, 0.36, 2.05, 0, 0.43, 1.55, 0.02, 0.07],
+      [7, 0.43, 1.55, 0.02, 0.5, 1.05, 0.05, 0.07],
+      [4, -0.36, 2.05, 0, -0.43, 1.55, 0, 0.07],
+      [8, -0.43, 1.55, 0, -0.5, 1.05, 0, 0.07],
+      [5, 0.17, 0.88, 0, 0.17, 0.48, 0, 0.13],
+      [9, 0.17, 0.48, 0, 0.17, 0.05, 0, 0.13],
+      [6, -0.17, 0.88, 0, -0.17, 0.48, 0, 0.13],
+      [10, -0.17, 0.48, 0, -0.17, 0.05, 0, 0.13],
+    ];
+    const si = new Uint16Array(N * 4),
+      sw = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) {
+      const x = pf[i * 3],
+        y = pf[i * 3 + 1],
+        z = pf[i * 3 + 2];
+      const ws = SG.map((s) => {
+        const vx = s[4] - s[1],
+          vy = s[5] - s[2],
+          vz = s[6] - s[3];
+        let t = ((x - s[1]) * vx + (y - s[2]) * vy + (z - s[3]) * vz) / (vx * vx + vy * vy + vz * vz);
+        t = Math.max(0, Math.min(1, t));
+        const dx = x - s[1] - vx * t,
+          dy = y - s[2] - vy * t,
+          dz = z - s[3] - vz * t;
+        return [s[0], Math.exp(-(dx * dx + dy * dy + dz * dz) / (s[7] * s[7]))];
+      })
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4);
+      const sum = ws.reduce((a, w) => a + w[1], 0) + 1e-9;
+      ws.forEach((w, k) => {
+        si[i * 4 + k] = w[0];
+        sw[i * 4 + k] = w[1] / sum;
+      });
+    }
+    g.setAttribute("skinIndex", new T.Uint16BufferAttribute(si, 4));
+    g.setAttribute("skinWeight", new T.Float32BufferAttribute(sw, 4));
+    const sm = new T.SkinnedMesh(
+      g,
+      new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, skinning: true }),
+    );
+    sm.add(hips);
+    hips.updateMatrixWorld(true);
+    sm.bind(new T.Skeleton(names.map((n) => B[n])));
+    sm.frustumCulled = false;
+    model.add(sm);
+    bone = B;
+    P.remove(body, head, hood, e1, e2, lap);
+    P.add(model);
+  } catch (err) {
+    console.warn("modelo não carregou", err);
+    model = null;
   }
-  g.setAttribute("skinIndex", new T.Uint16BufferAttribute(si, 4));
-  g.setAttribute("skinWeight", new T.Float32BufferAttribute(sw, 4));
-  const sm = new T.SkinnedMesh(
-    g,
-    new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, skinning: true }),
-  );
-  sm.add(hips);
-  hips.updateMatrixWorld(true);
-  sm.bind(new T.Skeleton(names.map((n) => B[n])));
-  sm.frustumCulled = false;
-  model.add(sm);
-  bone = B;
-  P.remove(body, head, hood, e1, e2, lap);
-  P.add(model);
-} catch (err) {
-  console.warn("modelo não carregou", err);
-  model = null;
 }
+carregarModelo();
 // luzes neon que seguem o jogador
 const rig = new T.Group();
 S.add(rig);
@@ -414,7 +439,13 @@ const drones = [
   disc.add(edgeR);
   const beam = new T.Mesh(
     new T.ConeGeometry(3.4, 5, 24, 1, true),
-    new T.MeshBasicMaterial({ color: 0xe0261c, transparent: true, opacity: 0.1, depthWrite: false, side: T.DoubleSide }),
+    new T.MeshBasicMaterial({
+      color: 0xe0261c,
+      transparent: true,
+      opacity: 0.1,
+      depthWrite: false,
+      side: T.DoubleSide,
+    }),
   );
   beam.position.y = 2.5;
   disc.add(beam);
@@ -497,7 +528,9 @@ btnCorrer.addEventListener("pointerdown", (e) => {
   btnCorrer.setPointerCapture(e.pointerId); // continua valendo se o dedo escorregar
   correr(true);
 });
-["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => btnCorrer.addEventListener(ev, () => correr(false)));
+["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) =>
+  btnCorrer.addEventListener(ev, () => correr(false)),
+);
 
 // state
 let state = "menu",
@@ -554,10 +587,12 @@ function chooseEnd(k) {
   sfx(k === "caos" ? "win" : "pulse");
   if (k === "caos") {
     $("ot").innerHTML = "FINAL <span>CAOS</span>";
-    $("od").textContent = "Você jogou tudo na rede. Bancos travam, a MegaCorp desaba e as ruas acendem. Ninguém manda mais — nem você. A verdade é de todos.";
+    $("od").textContent =
+      "Você jogou tudo na rede. Bancos travam, a MegaCorp desaba e as ruas acendem. Ninguém manda mais — nem você. A verdade é de todos.";
   } else {
     $("ot").innerHTML = "FINAL <span>SOMBRIO</span>";
-    $("od").textContent = "Você guardou os arquivos e mandou um recado ao CEO. Agora as corporações pagam e obedecem... a você. O capuz sem chefe virou o novo chefe.";
+    $("od").textContent =
+      "Você guardou os arquivos e mandou um recado ao CEO. Agora as corporações pagam e obedecem... a você. O capuz sem chefe virou o novo chefe.";
   }
   $("st").textContent = "Jogar de novo";
 }
@@ -577,9 +612,21 @@ function end(win) {
     ? "As três corporações caíram e a verdade está solta. Nenhum chefe, nenhum servidor sagrado."
     : "Os drones te localizaram. Troque de proxy e tente de novo.";
   $("st").textContent = win ? "Jogar de novo" : "Tentar de novo";
+  $("rkres").hidden = true;
   if (win) {
+    const r = registrarTempo(runT);
+    $("rkres").hidden = false;
+    $("rkres").innerHTML =
+      "TEMPO <b>" +
+      fmtTempo(r.t) +
+      "</b> · " +
+      (r.pos === 1 ? "NOVO RECORDE!" : r.pos ? "#" + r.pos + " no ranking" : "fora do top " + RK_MAX) +
+      ' <button id="rkv" type="button">ver ranking</button>';
+    $("rkv").onclick = () => showRank(r.pos);
+    if (r.pos === 1) sfx("record"); // fanfarra um pouco depois do "win"
     $("ot").innerHTML = "A ESCOLHA É <span>SUA</span>";
-    $("od").textContent = "Os arquivos das três corporações estão no seu laptop. Vazar tudo e libertar a rede — ou usar isso para chantagear quem manda?";
+    $("od").textContent =
+      "Os arquivos das três corporações estão no seu laptop. Vazar tudo e libertar a rede — ou usar isso para chantagear quem manda?";
     $("ch").hidden = false;
     $("st").hidden = true;
   }
@@ -614,19 +661,51 @@ function hackDone(t) {
   }
 }
 function introTerm(done) {
-  const L = ["> conectando a rede anonima...", "> identidade: BRECH", "> hacker de periferia, 19 anos.", "> as corporacoes vigiam, lucram e mentem.", "> missao: invadir os servidores e vazar a verdade.", "> cuidado com os drones. correr faz barulho.", "> boa sorte. a escolha final sera sua."];
+  const L = [
+    "> conectando a rede anonima...",
+    "> identidade: BRECH",
+    "> hacker de periferia, 19 anos.",
+    "> as corporacoes vigiam, lucram e mentem.",
+    "> missao: invadir os servidores e vazar a verdade.",
+    "> cuidado com os drones. correr faz barulho.",
+    "> boa sorte. a escolha final sera sua.",
+  ];
   const o = document.createElement("div");
-  o.style.cssText = "position:fixed;inset:0;z-index:9999;background:#000;color:#39ff6a;font:18px 'Special Elite',monospace;padding:8vh 8vw;white-space:pre-wrap;cursor:pointer;line-height:1.6";
+  o.style.cssText =
+    "position:fixed;inset:0;z-index:9999;background:#000;color:#39ff6a;font:18px 'Special Elite',monospace;padding:8vh 8vw;white-space:pre-wrap;cursor:pointer;line-height:1.6";
   document.body.appendChild(o);
-  let i = 0, c = 0, fin = false, txt = "";
-  const end = () => { if (fin) return; fin = true; clearInterval(t); o.remove(); done(); };
+  let i = 0,
+    c = 0,
+    fin = false,
+    txt = "";
+  const end = () => {
+    if (fin) return;
+    fin = true;
+    clearInterval(t);
+    o.remove();
+    done();
+  };
   const t = setInterval(() => {
-    if (i >= L.length) { clearInterval(t); o.innerHTML = txt + "\n\n<b>[ clique ou aperte qualquer tecla ]</b>"; return; }
-    txt += L[i][c++] || ""; if (c > L[i].length) { txt += "\n"; i++; c = 0; }
+    if (i >= L.length) {
+      clearInterval(t);
+      o.innerHTML = txt + "\n\n<b>[ clique ou aperte qualquer tecla ]</b>";
+      return;
+    }
+    txt += L[i][c++] || "";
+    if (c > L[i].length) {
+      txt += "\n";
+      i++;
+      c = 0;
+    }
     o.textContent = txt + "█";
   }, 15);
   o.onclick = end;
-  addEventListener("keydown", function k() { if (i >= L.length || fin) { removeEventListener("keydown", k); end(); } });
+  addEventListener("keydown", function k() {
+    if (i >= L.length || fin) {
+      removeEventListener("keydown", k);
+      end();
+    }
+  });
 }
 $("st").onclick = () => {
   tut = ler("anarco_tut") ? -1 : 0;
@@ -642,17 +721,22 @@ function startGame() {
       actx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {}
   }
+  runT = 0;
+  tmShown = "";
+  $("tmv").textContent = fmtTempo(0);
   reset();
   tutShow();
 }
 // níveis, minigame de sequência e itens
+// ÂNCORA: dr = drones, sp = velocidade, seq/t = sequência do hack e tempo, vis = raio de visão do drone (metros)
 const LV = [
-  { dr: 3, sp: 1, seq: 4, t: 7 },
-  { dr: 4, sp: 1.15, seq: 5, t: 7 },
-  { dr: 5, sp: 1.3, seq: 6, t: 7 },
-  { dr: 5, sp: 1.35, seq: 7, t: 6, room: true },
-  { dr: 2, sp: 1.1, seq: 5, t: 7, boss: true },
+  { dr: 3, sp: 1, seq: 4, t: 7, vis: 3.4 },
+  { dr: 4, sp: 1.15, seq: 5, t: 7, vis: 3.6 },
+  { dr: 5, sp: 1.3, seq: 6, t: 7, vis: 3.8 },
+  { dr: 5, sp: 1.35, seq: 7, t: 6, vis: 4.0, room: true },
+  { dr: 2, sp: 1.1, seq: 5, t: 7, vis: 3.6, boss: true },
 ];
+const VIS_BASE = 3.4; // raio com que o disco e o cone foram modelados
 let lvl = 0,
   emp = 0,
   boost = 0,
@@ -863,7 +947,8 @@ function drawMap() {
 }
 let actx = null,
   mute = false,
-  aLast = 0;
+  aLast = 0,
+  alertAnt = 0;
 $("snd").onclick = () => {
   mute = !mute;
   $("snd").textContent = mute ? "🔇" : "🔊";
@@ -883,7 +968,54 @@ function sfx(n, i) {
     o.start(t + at);
     o.stop(t + at + d);
   };
-  if (n === "ok") tone(440 + i * 90, 0.1);
+  // ÂNCORA: sweep = tom que desliza de f1 até f2 (sirenes, "zaps")
+  const sweep = (f1, f2, d, ty = "sawtooth", v = 0.06, at = 0) => {
+    const o = actx.createOscillator(),
+      g = actx.createGain();
+    o.type = ty;
+    o.frequency.setValueAtTime(f1, t + at);
+    o.frequency.exponentialRampToValueAtTime(f2, t + at + d);
+    g.gain.setValueAtTime(v, t + at);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + at + d);
+    o.connect(g);
+    g.connect(actx.destination);
+    o.start(t + at);
+    o.stop(t + at + d);
+  };
+  // ÂNCORA: ruído = números aleatórios no buffer; o filtro passa-baixa deixa o som "abafado" (impacto)
+  const noise = (d, v = 0.15, corte = 1200, at = 0) => {
+    const len = Math.floor(actx.sampleRate * d),
+      buf = actx.createBuffer(1, len, actx.sampleRate),
+      dado = buf.getChannelData(0);
+    for (let k = 0; k < len; k++) dado[k] = (Math.random() * 2 - 1) * (1 - k / len); // some aos poucos
+    const src = actx.createBufferSource(),
+      f = actx.createBiquadFilter(),
+      g = actx.createGain();
+    src.buffer = buf;
+    f.type = "lowpass";
+    f.frequency.value = corte;
+    g.gain.value = v;
+    src.connect(f);
+    f.connect(g);
+    g.connect(actx.destination);
+    src.start(t + at);
+  };
+  if (n === "tick") tone(1200, 0.04, "square", 0.03);
+  else if (n === "ready") {
+    tone(660, 0.07, "triangle", 0.05);
+    tone(990, 0.1, "triangle", 0.05, 0.06);
+  }
+  else if (n === "spot") {
+    sweep(300, 900, 0.18, "sawtooth", 0.07);
+    sweep(900, 300, 0.18, "sawtooth", 0.07, 0.18);
+  } else if (n === "boss") {
+    noise(0.25, 0.22, 900);
+    sweep(220, 55, 0.3, "square", 0.1);
+  } else if (n === "freeze") {
+    sweep(2400, 400, 0.45, "sine", 0.08);
+    noise(0.35, 0.05, 6000);
+  } else if (n === "record") [784, 988, 1175, 1568].forEach((f, k) => tone(f, 0.22, "triangle", 0.08, 0.7 + k * 0.11));
+  else if (n === "ok") tone(440 + i * 90, 0.1);
   else if (n === "bad") tone(110, 0.25, "sawtooth", 0.08);
   else if (n === "done") [523, 659, 784, 1047].forEach((f, k) => tone(f, 0.18, "square", 0.07, k * 0.09));
   else if (n === "pick") {
@@ -896,6 +1028,17 @@ function sfx(n, i) {
   else if (n === "lose") [400, 300, 200, 120].forEach((f, k) => tone(f, 0.25, "sawtooth", 0.08, k * 0.15));
   else if (n === "win") [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, 0.2, "square", 0.07, k * 0.1));
 }
+// ÂNCORA: todo <button> faz "tick"; o 1º clique também liga o áudio (navegadores exigem gesto do usuário)
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("button")) return;
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (err) {}
+  }
+  if (actx && actx.state === "suspended") actx.resume();
+  sfx("tick");
+});
 function brief() {
   state = "brief";
   sfx("done");
@@ -960,7 +1103,12 @@ const HIDE = [];
       const top = new T.Mesh(new T.BoxGeometry(w, 0.2, d), mTab);
       top.position.y = h;
       g.add(top);
-      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => {
+      [
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ].forEach(([a, b]) => {
         const l = new T.Mesh(new T.BoxGeometry(0.2, h, 0.2), mTab);
         l.position.set(a * (w / 2 - 0.2), h / 2, b * (d / 2 - 0.2));
         g.add(l);
@@ -971,11 +1119,19 @@ const HIDE = [];
     } else {
       const m = new T.Mesh(new T.BoxGeometry(w, h, d), kind === "rack" ? mRack : mBox);
       m.position.y = h / 2;
-      m.add(new T.LineSegments(new T.EdgesGeometry(m.geometry), kind === "rack" ? edge : new T.LineBasicMaterial({ color: 0x2a1f12 })));
+      m.add(
+        new T.LineSegments(
+          new T.EdgesGeometry(m.geometry),
+          kind === "rack" ? edge : new T.LineBasicMaterial({ color: 0x2a1f12 }),
+        ),
+      );
       g.add(m);
       if (kind === "rack")
         for (let k = 0; k < 6; k++) {
-          const led = new T.Mesh(new T.BoxGeometry(w * 0.7, 0.08, 0.05), new T.MeshBasicMaterial({ color: k % 2 ? 0x39ff88 : 0xff3fd0 }));
+          const led = new T.Mesh(
+            new T.BoxGeometry(w * 0.7, 0.08, 0.05),
+            new T.MeshBasicMaterial({ color: k % 2 ? 0x39ff88 : 0xff3fd0 }),
+          );
           led.position.set(0, 0.6 + k * (h / 7), d / 2 + 0.03);
           g.add(led);
         }
@@ -1003,19 +1159,34 @@ const HIDE = [];
 }
 // colisão círculo (jogador) x retângulo girado
 function collideBox(s, pr = 0.5) {
-  const c = Math.cos(s.rot), n = Math.sin(s.rot);
-  const dx = P.position.x - s.x, dz = P.position.z - s.z;
-  const lx = dx * c - dz * n, lz = dx * n + dz * c; // espaço local do retângulo
-  const hw = s.w / 2, hd = s.d / 2;
-  const qx = Math.max(-hw, Math.min(hw, lx)), qz = Math.max(-hd, Math.min(hd, lz));
-  const ox = lx - qx, oz = lz - qz, d = Math.hypot(ox, oz);
+  const c = Math.cos(s.rot),
+    n = Math.sin(s.rot);
+  const dx = P.position.x - s.x,
+    dz = P.position.z - s.z;
+  const lx = dx * c - dz * n,
+    lz = dx * n + dz * c; // espaço local do retângulo
+  const hw = s.w / 2,
+    hd = s.d / 2;
+  const qx = Math.max(-hw, Math.min(hw, lx)),
+    qz = Math.max(-hd, Math.min(hd, lz));
+  const ox = lx - qx,
+    oz = lz - qz,
+    d = Math.hypot(ox, oz);
   let nx, nz;
   if (d >= pr) return;
-  if (d > 1e-4) { nx = (ox / d) * pr + qx; nz = (oz / d) * pr + qz; }
-  else {
-    const px = hw - Math.abs(lx), pz = hd - Math.abs(lz);
-    if (px < pz) { nx = Math.sign(lx || 1) * (hw + pr); nz = lz; }
-    else { nx = lx; nz = Math.sign(lz || 1) * (hd + pr); }
+  if (d > 1e-4) {
+    nx = (ox / d) * pr + qx;
+    nz = (oz / d) * pr + qz;
+  } else {
+    const px = hw - Math.abs(lx),
+      pz = hd - Math.abs(lz);
+    if (px < pz) {
+      nx = Math.sign(lx || 1) * (hw + pr);
+      nz = lz;
+    } else {
+      nx = lx;
+      nz = Math.sign(lz || 1) * (hd + pr);
+    }
   }
   P.position.x = s.x + nx * c + nz * n; // de volta ao mundo
   P.position.z = s.z - nx * n + nz * c;
@@ -1048,7 +1219,10 @@ function applyLevel() {
     solids[towers.length + i].x = c.x;
     solids[towers.length + i].z = c.z;
   });
-  HIDE.forEach((o) => { o.x = r ? o.hx : 999; o.z = r ? o.hz : 999; });
+  HIDE.forEach((o) => {
+    o.x = r ? o.hx : 999;
+    o.z = r ? o.hz : 999;
+  });
   sky.forEach((m) => (m.visible = !r));
   sign.visible = !r;
   roomG.visible = r;
@@ -1139,6 +1313,7 @@ function hitBoss(d) {
   if (!calm) shake = 0.5;
   if (boss.hp > 0) {
     $("bh").style.width = boss.hp + "%";
+    sfx("boss");
     note = "Chefão atingido!";
     noteT = 1.5;
     return;
@@ -1166,17 +1341,31 @@ function breach() {
   castT = 0.6;
   ringM.position.x = P.position.x;
   ringM.position.z = P.position.z;
-  sfx("done");
+  sfx("freeze");
   if (!calm) shake = 0.3;
   const R = 16,
     near = (x, z) => Math.hypot(P.position.x - x, P.position.z - z) < R;
+  // ÂNCORA: conta o que o BREACH atingiu para mostrar ao jogador (antes ele não sabia se valeu a pena)
+  let nDr = 0,
+    nTo = 0;
   drones.forEach((d, n) => {
-    if (n < LV[lvl].dr && near(d.position.x, d.position.z)) d.fz = 4;
+    if (n < LV[lvl].dr && near(d.position.x, d.position.z)) {
+      d.fz = 4;
+      nDr++;
+    }
   });
   towers.forEach((t) => {
-    if (!t.done && near(t.x, t.z)) t.p = Math.min(0.95, t.p + 0.4);
+    if (!t.done && near(t.x, t.z)) {
+      t.p = Math.min(0.95, t.p + 0.4);
+      nTo++;
+    }
   });
   alert_ = Math.max(0, alert_ - 0.3);
+  const partes = [];
+  if (nDr) partes.push(nDr + (nDr === 1 ? " drone congelado" : " drones congelados"));
+  if (nTo) partes.push(nTo + (nTo === 1 ? " torre +40%" : " torres +40%"));
+  note = "BREACH: " + (partes.length ? partes.join(" · ") : "nada ao alcance (raio 16)");
+  noteT = 2;
   if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(34);
   else if (boss) {
     note = "BREACH longe demais! Chegue a menos de 16.";
@@ -1193,25 +1382,49 @@ $("bz").onpointerdown = (e) => {
   e.preventDefault();
   breach();
 };
+let bzShown = "",
+  bzAntes = 0,
+  chuvaFade = 0; // segundos de rastro restantes; 0 = canvas limpo e parado
 function fxTick(dt) {
   if (state === "play" || state === "menu") bz = Math.max(0, bz - dt);
+  // ÂNCORA: botão mostra os segundos restantes; ao zerar, avisa que está pronto (som + brilho)
+  const txt = bz > 0 ? "BREACH · " + Math.ceil(bz) + "s" : "BREACH · Espaço";
+  if (txt !== bzShown) {
+    bzShown = txt;
+    $("bz").textContent = txt;
+  }
+  if (bzAntes > 0 && bz <= 0 && state === "play") {
+    sfx("ready");
+    $("bz").classList.remove("pronto");
+    void $("bz").offsetWidth; // reinicia a animação CSS se ela já estiver tocando
+    $("bz").classList.add("pronto");
+  }
+  bzAntes = bz;
   if (castT > 0) castT -= dt;
   const cd = LV[lvl].boss ? 6 : 10;
   $("bz").style.background =
     bz > 0 ? `linear-gradient(90deg,#7a2b8e ${(1 - bz / cd) * 100}%,#141414 0)` : "#ff3fd0";
   $("bz").style.color = bz > 0 ? "#bbb" : "#141414";
-  rx.globalCompositeOperation = "destination-out";
-  rx.fillStyle = "rgba(0,0,0,.18)";
-  rx.fillRect(0, 0, rc.width, rc.height);
-  rx.globalCompositeOperation = "source-over";
-  if (rainT > 0) {
-    rainT -= dt;
-    rx.font = "16px monospace";
-    drops.forEach((y, i) => {
-      rx.fillStyle = Math.random() < 0.2 ? "#ff9be8" : "#39ff88";
-      rx.fillText(Math.random() < 0.5 ? "0" : Math.random() < 0.5 ? "1" : "A", i * 18, y * 18);
-      drops[i] = y * 18 > rc.height && Math.random() > 0.93 ? 0 : y + 1;
-    });
+  // ÂNCORA: o canvas da chuva só trabalha enquanto há chuva ou rastro; depois limpa uma vez e fica parado
+  if (rainT > 0) chuvaFade = 1.5;
+  if (chuvaFade > 0) {
+    chuvaFade -= dt;
+    if (chuvaFade <= 0) rx.clearRect(0, 0, rc.width, rc.height);
+    else {
+      rx.globalCompositeOperation = "destination-out";
+      rx.fillStyle = "rgba(0,0,0,.18)";
+      rx.fillRect(0, 0, rc.width, rc.height);
+      rx.globalCompositeOperation = "source-over";
+      if (rainT > 0) {
+        rainT -= dt;
+        rx.font = "16px monospace";
+        drops.forEach((y, i) => {
+          rx.fillStyle = Math.random() < 0.2 ? "#ff9be8" : "#39ff88";
+          rx.fillText(Math.random() < 0.5 ? "0" : Math.random() < 0.5 ? "1" : "A", i * 18, y * 18);
+          drops[i] = y * 18 > rc.height && Math.random() > 0.93 ? 0 : y + 1;
+        });
+      }
+    }
   }
   if (ringT >= 0) {
     ringT += dt;
@@ -1224,10 +1437,43 @@ function fxTick(dt) {
 let slowT = 0;
 const clock = new T.Clock();
 let time = 0;
+let ultimoQuadro = performance.now();
+// ÂNCORA: resolução dinâmica — se mais da metade dos quadros de uma janela de 90 passa de 25 ms (< 40 FPS),
+// reduz o pixelRatio em 0,25 (mínimo 0,75). Nunca sobe de volta, para não ficar oscilando.
+const PR_MIN = 0.75;
+let janelaQ = 0,
+  lentosQ = 0;
+function ajustarResolucao(dtReal) {
+  if (state !== "play" || dtReal >= 1) return; // pausa, menu e retorno de aba escondida não contam
+  janelaQ++;
+  if (dtReal > 0.025) lentosQ++;
+  if (janelaQ < 90) return;
+  if (lentosQ / janelaQ > 0.5 && pixelRatio > PR_MIN) {
+    pixelRatio = Math.max(PR_MIN, pixelRatio - 0.25);
+    R.setPixelRatio(pixelRatio); // refaz o tamanho do canvas; o CSS continua ocupando a tela toda
+  }
+  janelaQ = lentosQ = 0;
+}
 function loop() {
   requestAnimationFrame(loop);
   const rawDt = Math.min(clock.getDelta(), 0.05);
-  if (state === "pause") { R.render(S, C); return; }
+  // tempo REAL do quadro para o ranking (o jogo limita rawDt a 0,05 s; aqui só ignora travadas > 1 s, ex.: aba escondida)
+  const agora = performance.now(),
+    dtReal = Math.min((agora - ultimoQuadro) / 1000, 1);
+  ultimoQuadro = agora;
+  ajustarResolucao(dtReal);
+  if (state === "pause") {
+    R.render(S, C);
+    return;
+  }
+  if (state === "play" && !(endT > 0)) {
+    runT += dtReal;
+    const txt = fmtTempo(runT);
+    if (txt !== tmShown) {
+      tmShown = txt;
+      $("tmv").textContent = txt;
+    }
+  }
   const dt = slowT > 0 ? rawDt * 0.25 : rawDt; // câmera lenta de 0,2 s após um hack
   slowT = Math.max(0, slowT - rawDt);
   time += dt;
@@ -1317,7 +1563,18 @@ function loop() {
     }
     const running = keys.shift && l > 0.1 && !mini;
     const SP = (boost > 0 ? 13 : 9) * (running ? 1.55 : 1);
-    if (running && grace <= 0) { const near = drones.some((d, n) => n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < 10); if (near) { alert_ = Math.min(1, alert_ + dt * 0.35); if (noteT <= 0) { note = "Correndo faz barulho — drones ouviram!"; noteT = 0.4; } } }
+    if (running && grace <= 0) {
+      const near = drones.some(
+        (d, n) => n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < 10,
+      );
+      if (near) {
+        alert_ = Math.min(1, alert_ + dt * 0.35);
+        if (noteT <= 0) {
+          note = "Correndo faz barulho — drones ouviram!";
+          noteT = 0.4;
+        }
+      }
+    }
     vel.x += (ix * SP - vel.x) * Math.min(1, dt * 10);
     vel.z += (iz * SP - vel.z) * Math.min(1, dt * 10);
     P.position.x = Math.max(-34, Math.min(34, P.position.x + vel.x * dt));
@@ -1349,9 +1606,14 @@ function loop() {
 
     // drones & alert
     let inside = false;
-    const covered = !!LV[lvl].room && Math.hypot(vel.x, vel.z) < 3 &&
+    const covered =
+      !!LV[lvl].room &&
+      Math.hypot(vel.x, vel.z) < 3 &&
       HIDE.some((o) => Math.hypot(P.position.x - o.x, P.position.z - o.z) < o.r + 1.4);
-    if (covered && !mini && noteT <= 0) { note = "Coberto — fique parado atrás do móvel."; noteT = 0.3; }
+    if (covered && !mini && noteT <= 0) {
+      note = "Coberto — fique parado atrás do móvel.";
+      noteT = 0.3;
+    }
     grace = Math.max(0, grace - dt);
     drones.forEach((d, n) => {
       const on = n < LV[lvl].dr;
@@ -1387,7 +1649,9 @@ function loop() {
         }
       }
       d.disc.position.set(d.position.x, 0.08, d.position.z);
-      const sees = !frz && pd < 3.4 && !covered;
+      const k = LV[lvl].vis / VIS_BASE; // o disco (e o cone/anel, filhos dele) cresce com o raio de visão da fase
+      d.disc.scale.set(k, 1, k);
+      const sees = !frz && pd < LV[lvl].vis && !covered;
       if (sees) inside = true;
       // vermelho patrulha · amarelo te viu · laranja perseguindo · ciano congelado
       const col = frz ? 0x2fe6ff : sees ? 0xffe14a : d.chase ? 0xff8a00 : 0xe0261c;
@@ -1419,6 +1683,8 @@ function loop() {
     }
     alert_ = Math.max(0, Math.min(1, alert_ + (inside && !grace ? 1.5 * (bossIn ? 1.5 : 1) : -0.6) * dt));
     $("al").style.width = alert_ * 100 + "%";
+    if (alert_ > 0.5 && alertAnt <= 0.5) sfx("spot"); // cruzou o limite: sirene de aviso
+    alertAnt = alert_;
     if (alert_ > 0.5 && Math.floor(time * 4) !== aLast) {
       aLast = Math.floor(time * 4);
       sfx("alarm");
@@ -1513,16 +1779,33 @@ C.position.set(0, 14, 36);
 loop();
 
 // ===== VAZAMENTOS COLETADOS =====
-const DOCS = ["Planilha de propinas", "E-mails do conselho", "Contratos secretos", "Lista de espionados",
-  "Relatório de evasão fiscal", "Memorando de demissões", "Log de câmeras", "Acordo com o governo"];
+const DOCS = [
+  "Planilha de propinas",
+  "E-mails do conselho",
+  "Contratos secretos",
+  "Lista de espionados",
+  "Relatório de evasão fiscal",
+  "Memorando de demissões",
+  "Log de câmeras",
+  "Acordo com o governo",
+];
 function leaks() {
-  try { return JSON.parse(ler("anarco_leaks") || "[]"); } catch (e) { return []; }
+  try {
+    return JSON.parse(ler("anarco_leaks") || "[]");
+  } catch (e) {
+    return [];
+  }
 }
 function addLeak(corp) {
   const doc = DOCS[Math.floor(Math.random() * DOCS.length)];
   const L = leaks();
-  L.unshift({ c: corp, d: doc, n: lvl + 1,
-    id: Math.random().toString(16).slice(2, 8).toUpperCase(), t: new Date().toLocaleString("pt-BR") });
+  L.unshift({
+    c: corp,
+    d: doc,
+    n: lvl + 1,
+    id: Math.random().toString(16).slice(2, 8).toUpperCase(),
+    t: new Date().toLocaleString("pt-BR"),
+  });
   guardar("anarco_leaks", JSON.stringify(L.slice(0, 60)));
   return doc;
 }
@@ -1537,17 +1820,72 @@ function leakCard(corp, doc) {
 function showLeaks() {
   const L = leaks();
   $("lkl").innerHTML = L.length
-    ? L.map((l) => `<li><b>#${l.id}</b> ${l.d}<br><small>${l.c} · nível ${l.n} · ${l.t}</small></li>`).join("")
+    ? L.map((l) => `<li><b>#${l.id}</b> ${l.d}<br><small>${l.c} · nível ${l.n} · ${l.t}</small></li>`).join(
+        "",
+      )
     : "<li>Nenhum vazamento ainda. Hackeie uma torre!</li>";
   $("lkc").textContent = L.length + " arquivo(s)";
   $("lk").hidden = false;
 }
 $("lb").onclick = showLeaks;
+
+// ===== RANKING POR TEMPO =====
+// ÂNCORA: tempo da corrida inteira (nível 1 até o chefão cair). Só conta com o jogo rodando:
+// pausa e menu não contam. Derrota encerra a corrida; só vitórias entram no ranking (top 5).
+const RK_MAX = 5;
+let runT = 0,
+  tmShown = "";
+const fmtTempo = (seg) => {
+  const total = Math.round(seg * 10) / 10; // arredonda ANTES de dividir (59,95 vira 01:00.0, não 00:60.0)
+  const m = Math.floor(total / 60);
+  return String(m).padStart(2, "0") + ":" + (total - m * 60).toFixed(1).padStart(4, "0");
+};
+function ranking() {
+  try {
+    const a = JSON.parse(ler("anarco_rank") || "[]");
+    return Array.isArray(a) ? a.filter((x) => x && Number.isFinite(x.s)).sort((p, q) => p.s - q.s) : [];
+  } catch (e) {
+    return [];
+  }
+}
+// guarda o tempo e devolve a posição (1 = recorde) ou 0 se ficou fora do top 5
+function registrarTempo(seg) {
+  const t = Math.round(seg * 10) / 10;
+  const L = ranking();
+  const pos = L.filter((x) => x.s <= t).length + 1; // empate fica atrás de quem fez primeiro
+  if (pos > RK_MAX) return { pos: 0, t, L };
+  L.splice(pos - 1, 0, { s: t, d: new Date().toLocaleDateString("pt-BR") });
+  guardar("anarco_rank", JSON.stringify(L.slice(0, RK_MAX)));
+  return { pos, t, L };
+}
+function showRank(destaque) {
+  const L = ranking();
+  $("rkl").innerHTML = L.length
+    ? L.map(
+        (r, i) =>
+          `<li${i + 1 === destaque ? ' class="novo"' : ""}><b>#${i + 1}</b> ${fmtTempo(r.s)}<br><small>${r.d}</small></li>`,
+      ).join("")
+    : "<li>Nenhuma corrida completa ainda. Derrube as 3 corporações!</li>";
+  $("rkc").textContent = L.length ? "Recorde: " + fmtTempo(L[0].s) : "";
+  $("rk").hidden = false;
+}
+$("rb").onclick = () => showRank(0);
+$("rkx").onclick = () => ($("rk").hidden = true);
+$("rkz").onclick = () => {
+  apagar("anarco_rank");
+  showRank(0);
+};
 $("lkx").onclick = () => ($("lk").hidden = true);
-$("lkz").onclick = () => { apagar("anarco_leaks"); showLeaks(); };
+$("lkz").onclick = () => {
+  apagar("anarco_leaks");
+  showLeaks();
+};
 
 // ===== TUTORIAL INTERATIVO =====
-let tut = -1, tutT = 0, tutP0 = null, tutPk = 0;
+let tut = -1,
+  tutT = 0,
+  tutP0 = null,
+  tutPk = 0;
 const TUT = [
   "1/5 · Ande com WASD ou setas (joystick no celular).",
   "2/5 · Pegue um item brilhante — veja os pontos coloridos no minimapa.",
@@ -1559,12 +1897,24 @@ const TUT = [
 function tutShow() {
   $("tut").hidden = tut < 0;
   if (tut >= 0) $("tutx").textContent = TUT[tut];
-  if (tut === 0) { tutP0 = P.position.clone(); tutPk = pick.length; }
+  if (tut === 0) {
+    tutP0 = P.position.clone();
+    tutPk = pick.length;
+  }
 }
-function tutNext() { tut++; tutT = 0; sfx("pick"); tutShow(); }
+function tutNext() {
+  tut++;
+  tutT = 0;
+  sfx("pick");
+  tutShow();
+}
 function tutTick(dt) {
   if (tut < 0) return;
-  if (lvl !== 0) { tut = -1; tutShow(); return; }
+  if (lvl !== 0) {
+    tut = -1;
+    tutShow();
+    return;
+  }
   if (tut < 5) grace = 1; // sem alerta durante o tutorial
   tutT += dt;
   if (tut === 0 && P.position.distanceTo(tutP0) > 4) tutNext();
@@ -1578,7 +1928,11 @@ function tutTick(dt) {
     tutShow();
   }
 }
-$("tuts").onclick = () => { tut = -1; guardar("anarco_tut", "1"); tutShow(); };
+$("tuts").onclick = () => {
+  tut = -1;
+  guardar("anarco_tut", "1");
+  tutShow();
+};
 
 // ===== PRÓXIMO OBJETIVO =====
 const arrow = new T.Mesh(
@@ -1588,17 +1942,30 @@ const arrow = new T.Mesh(
 arrow.renderOrder = 9;
 S.add(arrow);
 function updObjective() {
-  let tg = null, label = "";
-  if (boss) { tg = boss.g.position; label = "Derrube " + boss.cfg.n + " com BREACH"; }
-  else {
+  let tg = null,
+    label = "";
+  if (boss) {
+    tg = boss.g.position;
+    label = "Derrube " + boss.cfg.n + " com BREACH";
+  } else {
     let best = 1e9;
     towers.forEach((t) => {
       const d = Math.hypot(P.position.x - t.x, P.position.z - t.z);
-      if (!t.done && d < best) { best = d; tg = { x: t.x, z: t.z }; label = "Hackear " + t.n; }
+      if (!t.done && d < best) {
+        best = d;
+        tg = { x: t.x, z: t.z };
+        label = "Hackear " + t.n;
+      }
     });
   }
-  if (!tg) { arrow.visible = false; $("obj").textContent = cnt >= 3 ? "OBJETIVO ▸ fuga em andamento…" : ""; return; }
-  const dx = tg.x - P.position.x, dz = tg.z - P.position.z, d = Math.hypot(dx, dz);
+  if (!tg) {
+    arrow.visible = false;
+    $("obj").textContent = cnt >= 3 ? "OBJETIVO ▸ fuga em andamento…" : "";
+    return;
+  }
+  const dx = tg.x - P.position.x,
+    dz = tg.z - P.position.z,
+    d = Math.hypot(dx, dz);
   $("obj").textContent = "OBJETIVO ▸ " + label + " · " + Math.round(d) + " m";
   const a = Math.atan2(dx, dz);
   arrow.position.set(P.position.x + Math.sin(a) * 2.2, 0.4, P.position.z + Math.cos(a) * 2.2);
@@ -1608,14 +1975,27 @@ function updObjective() {
 
 // ===== PAUSA =====
 function togglePause() {
-  if (state === "play") { state = "pause"; $("pz").hidden = false; $("pb").textContent = "▶"; }
-  else if (state === "pause") { state = "play"; $("pz").hidden = true; $("pb").textContent = "⏸"; clock.getDelta(); }
+  if (state === "play") {
+    state = "pause";
+    $("pz").hidden = false;
+    $("pb").textContent = "▶";
+  } else if (state === "pause") {
+    state = "play";
+    $("pz").hidden = true;
+    $("pb").textContent = "⏸";
+    clock.getDelta();
+  }
 }
 addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
-  if (k === "p" || k === "escape") { e.preventDefault(); togglePause(); }
+  if (k === "p" || k === "escape") {
+    e.preventDefault();
+    togglePause();
+  }
 });
-addEventListener("blur", () => { if (state === "play") togglePause(); });
+addEventListener("blur", () => {
+  if (state === "play") togglePause();
+});
 $("pb").onclick = togglePause;
 $("pzc").onclick = togglePause;
 $("pzm").onclick = () => {

@@ -13,19 +13,20 @@
 <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
 <link rel="apple-touch-icon" href="assets/img/icone-180.png">
 
-<!-- ÂNCORA: preview ao compartilhar o link (WhatsApp, Telegram, Discord, redes sociais).
-     IMPORTANTE: depois de publicar, troque og:image e og:url pelo endereço completo do site
-     (ex.: https://seu-jogo.vercel.app/assets/img/og-preview.jpg). Muitos apps exigem URL completa. -->
+<!-- ÂNCORA: preview ao compartilhar o link (WhatsApp, Telegram, Discord). Os apps exigem URL completa;
+     se o domínio mudar, troque og:url, og:image e twitter:image. -->
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="ANARCO.EXE 3D">
 <meta property="og:title" content="ANARCO.EXE 3D — hackeie, vaze, resista">
 <meta property="og:description" content="Invada torres corporativas, fuja dos drones e vaze os segredos que elas escondem. Jogue no navegador.">
-<meta property="og:image" content="assets/img/og-preview.jpg">
+<meta property="og:url" content="https://anarcoexe.vercel.app/">
+<meta property="og:image" content="https://anarcoexe.vercel.app/assets/img/og-preview.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Arte do jogo ANARCO.EXE 3D: cidade neon com o título do jogo">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://anarcoexe.vercel.app/assets/img/og-preview.jpg">
 <link rel="stylesheet" href="assets/fonts/fonts.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -34,6 +35,7 @@
 <div id="hud">
   <h1>ANARCO<span>.EXE</span> 3D</h1>
   <div class="b" id="lv">NÍVEL 1/5</div>
+  <div class="b" id="tm" aria-label="Tempo da corrida">TEMPO <span id="tmv">00:00.0</span></div>
   <div class="b"><img id="ic_d" alt="">TORRES <span id="cnt">0/3</span></div>
   <div class="b"><img id="ic_h" alt="">HACK<i><u id="hk"></u></i></div>
   <div class="b r"><img id="ic_a" alt="">ALERTA<i><u id="al"></u></i></div>
@@ -49,6 +51,8 @@
 <div id="tut" hidden><span id="tutx"></span><button id="tuts">pular</button></div>
 <div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul>
   <button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
+<div id="rk" hidden><div><h2>MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul>
+  <button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
 <canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas>
 <button id="snd" aria-label="Som">🔊</button>
 <button id="bz">BREACH · Espaço</button>
@@ -58,17 +62,17 @@
   <h2 id="ot">ANARCO<span>.EXE</span></h2>
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
   <p>Mova com WASD ou setas, segure Shift para correr (faz barulho!). No celular, use o joystick e segure o botão CORRER. Ao completar o hack, digite a sequência de setas. Pegue energia, keycard e USB. Tudo é ficção.</p>
+  <p id="rkres" hidden></p>
   <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
   <button id="st">Invadir</button>
-  <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button></div>
+  <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button><button id="rb">Ranking</button></div>
 </div></div>
 
 
 <!-- Three.js local: o jogo roda 100% offline -->
 <script src="assets/lib/three.min.js"></script>
-<!-- ÂNCORA: caminhos das imagens (manifesto) e modelo 3D (ainda em Base64, etapa B) -->
+<!-- ÂNCORA: caminhos das imagens (manifesto). O modelo 3D vem de assets/models/anarco.bin -->
 <script src="assets/dados/manifesto.js"></script>
-<script src="assets/dados/modelo.js"></script>
 <!-- ÂNCORA: lógica do jogo -->
 <script src="script.js"></script>
 </body>

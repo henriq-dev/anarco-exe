@@ -321,18 +321,18 @@ canvas {
   padding: 10px 14px; max-width: 90vw; display: flex; gap: 12px; align-items: center;
   box-shadow: 6px 6px 0 var(--red); z-index: 5;
 }
-#tut[hidden], #lk[hidden] { display: none; }
+#tut[hidden], #lk[hidden], #rk[hidden] { display: none; }
 #tut button { font: inherit; background: none; border: 2px solid var(--ink); cursor: pointer; }
-#lk { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+#lk, #rk { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(5, 5, 6, 0.85); padding: 20px; z-index: 10; }
-#lk > div { background: var(--paper); color: var(--ink); border: 4px solid var(--ink);
+#lk > div, #rk > div { background: var(--paper); color: var(--ink); border: 4px solid var(--ink);
   padding: 20px; width: min(520px, 100%); max-height: 85vh; overflow: auto; }
-#lk h2 { font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 2rem; margin: 0; }
-#lk h2 span { background: var(--red); color: #fff; padding: 0 0.12em; }
-#lk ul { list-style: none; padding: 0; margin: 10px 0; }
-#lk li { border-bottom: 2px dashed var(--ink); padding: 8px 0; }
-#lk li b { color: var(--red); }
-#lk button { font: inherit; background: var(--red); color: #fff; border: 3px solid var(--ink); padding: 8px 14px; cursor: pointer; }
+#lk h2, #rk h2 { font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 2rem; margin: 0; }
+#lk h2 span, #rk h2 span { background: var(--red); color: #fff; padding: 0 0.12em; }
+#lk ul, #rk ul { list-style: none; padding: 0; margin: 10px 0; }
+#lk li, #rk li { border-bottom: 2px dashed var(--ink); padding: 8px 0; }
+#lk li b, #rk li b { color: var(--red); }
+#lk button, #rk button { font: inherit; background: var(--red); color: #fff; border: 3px solid var(--ink); padding: 8px 14px; cursor: pointer; }
 
 #obj { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); pointer-events: none;
   background: rgba(8, 6, 16, 0.75); border: 2px solid #ffe14a; color: #ffe14a; padding: 4px 10px; font-size: 0.85rem; white-space: nowrap; }
@@ -399,4 +399,27 @@ canvas {
   background: var(--red);
   border: 0;
   cursor: pointer;
+}
+
+/* ÂNCORA: tempo da corrida (HUD) e resultado na tela final */
+#tm span { font-variant-numeric: tabular-nums; }
+#rkres { margin: 10px 0; padding: 8px 10px; border: 3px dashed var(--ink); font-weight: bold; }
+#rkres b { color: var(--red); }
+#rkl li.novo { background: #ffe9a8; }
+
+/* ÂNCORA: telas estreitas — o HUD quebra em linhas, então o objetivo desce para não cobrir TEMPO/TORRES */
+@media (max-width: 600px) {
+  #obj { top: calc(150px + env(safe-area-inset-top, 0px)); white-space: normal; max-width: 92vw; text-align: center; }
+}
+
+/* ÂNCORA: brilho curto no BREACH quando a recarga termina (reduced-motion já encurta animações) */
+#bz.pronto { animation: bzPronto 0.7s ease-out; }
+@keyframes bzPronto {
+  0% { box-shadow: 0 0 0 0 rgba(255, 63, 208, 0.9); transform: scale(1.08); }
+  100% { box-shadow: 0 0 0 18px rgba(255, 63, 208, 0); transform: scale(1); }
+}
+
+/* ÂNCORA: no toque os botões CORRER/BREACH e o minimapa ocupam o rodapé; o aviso sobe para ficar legível */
+@media (pointer: coarse) {
+  #msg { bottom: calc(262px + env(safe-area-inset-bottom, 0px)); padding: 0 12px; }
 }
