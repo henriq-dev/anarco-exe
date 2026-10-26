@@ -469,9 +469,18 @@ fetch("assets/models/laptop.bin")
     g.setIndex(new T.BufferAttribute(new Uint16Array(buf, LAP_N * 10, LAP_F * 3), 1));
     g.computeVertexNormals();
     new T.TextureLoader().load("assets/img/props/laptop.webp", (tex) => {
-      tex.anisotropy = 4;
-      // ÂNCORA: a própria textura brilha (emissiveMap) para a tela verde parecer ligada
-      const m = new T.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.4, roughness: 0.6, metalness: 0.1 });
+      // ÂNCORA: tela "digitando" — a textura vira um canvas; a área da tela (topo do atlas) recebe um terminal
+      // que escreve letra por letra durante o hack, e teclas do teclado (base do atlas) acendem como se fossem apertadas.
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 1024;
+      const cx = cv.getContext("2d");
+      const ctex = new T.CanvasTexture(cv);
+      ctex.anisotropy = 4;
+      ctex.colorSpace = tex.colorSpace;
+      ctex.flipY = tex.flipY;
+      lapTela = { cv, cx, ctex, img: tex.image, txt: "", li: 0, ci: 0, t: 0, keys: [] };
+      desenharTela(0);
+      const m = new T.MeshStandardMaterial({ map: ctex, emissiveMap: ctex, emissive: 0xffffff, emissiveIntensity: 0.4, roughness: 0.6, metalness: 0.1 });
       const mesh = new T.Mesh(g, m);
       mesh.scale.setScalar(LAP_ESCALA);
       lapG.children.slice().forEach((c) => { lapG.remove(c); c.geometry.dispose(); c.material.dispose(); });
@@ -479,6 +488,67 @@ fetch("assets/models/laptop.bin")
     });
   })
   .catch((e) => console.warn("notebook 3D indisponível, usando o de caixas:", e));
+// ÂNCORA: terminal que aparece digitando na tela do notebook
+let lapTela = null;
+const TERM = [
+  "root@kali-anarc:~# nmap -sS 10.0.0.0/24",
+  "Host up: 10.0.0.13  (torre-corp)",
+  "root@kali-anarc:~# hydra -l root -P rockyou.txt ssh://10.0.0.13",
+  "[attempt] 438/1000 checking 'root' 'pass123'...",
+  "[SUCCESS] login: 'root'",
+  "root@kali-anarc:~# ./anarco.exe --breach --silent",
+  ">> injetando payload..........OK",
+  ">> desligando firewall........OK",
+  ">> copiando /corp/dados.......OK",
+  "root@kali-anarc:~# rm -rf /logs/*",
+  "A REDE E LIVRE. NO CTRL.",
+];
+const TELA = { x: 104, y: 80, w: 920, h: 535 };
+function desenharTela(dt) {
+  const L = lapTela;
+  if (!L) return;
+  if (dt > 0) {
+    L.t += dt;
+    // digita ~45 caracteres por segundo
+    while (L.t > 0.022) {
+      L.t -= 0.022;
+      const linha = TERM[L.li % TERM.length];
+      if (L.ci < linha.length) L.ci++;
+      else { L.li++; L.ci = 0; }
+      if (Math.random() < 0.5) L.keys.push({ i: (Math.random() * 52) | 0, v: 1 });
+    }
+    L.keys.forEach((k) => (k.v -= dt * 9));
+    L.keys = L.keys.filter((k) => k.v > 0);
+  }
+  const c = L.cx;
+  c.drawImage(L.img, 0, 0, 1024, 1024);
+  c.fillStyle = "#04080a";
+  c.fillRect(TELA.x, TELA.y, TELA.w, TELA.h);
+  c.font = "bold 30px monospace";
+  c.textBaseline = "top";
+  const linhas = [];
+  for (let i = Math.max(0, L.li - 13); i <= L.li; i++) {
+    const t = TERM[i % TERM.length];
+    linhas.push(i === L.li ? t.slice(0, L.ci) : t);
+  }
+  linhas.forEach((t, i) => {
+    c.fillStyle = t.startsWith("[SUCCESS]") || t.startsWith("A REDE") ? "#39ff88" : t.startsWith("root@") ? "#ff5a5a" : "#b8ffd2";
+    c.fillText(t, TELA.x + 18, TELA.y + 16 + i * 37);
+  });
+  // cursor piscando
+  if (Math.floor(time * 3) % 2 === 0) {
+    const w = c.measureText(linhas[linhas.length - 1]).width;
+    c.fillStyle = "#39ff88";
+    c.fillRect(TELA.x + 20 + w, TELA.y + 16 + (linhas.length - 1) * 37, 16, 30);
+  }
+  // teclas acesas (4 fileiras do teclado)
+  L.keys.forEach((k) => {
+    const row = (k.i / 13) | 0, col = k.i % 13;
+    c.fillStyle = "rgba(57,255,136," + (0.55 * k.v).toFixed(2) + ")";
+    c.fillRect(145 + col * 67, 880 + row * 31, 52, 24);
+  });
+  L.ctex.needsUpdate = true;
+}
 const lapLight = new T.PointLight(0x39ff88, 0, 7);
 lapLight.position.set(0, 0.3, 1.5);
 P.add(lapLight);
@@ -1846,6 +1916,7 @@ function loop() {
     // ÂNCORA: "pop" do notebook — a escala sobe rápido até 1 ao hackear e some ao parar
     lapEsc += ((hacking ? 1 : 0) - lapEsc) * Math.min(1, dt * 14);
     lapG.visible = hacking || lapEsc > 0.02;
+    if (hacking && lapTela) desenharTela(dt);
     lapG.scale.setScalar(calm ? (hacking ? 1 : 0.001) : Math.max(0.001, lapEsc));
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
