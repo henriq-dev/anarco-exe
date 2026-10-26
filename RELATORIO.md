@@ -20,6 +20,8 @@ Base: pasta `anarco/` enviada por você (já separada em index.html, style.css e
 | F | Médio | Feedback do BREACH: aviso do que foi atingido, contagem regressiva no botão, som e brilho quando fica pronto, aviso mais alto no toque | `script.js` (`breach`, `fxTick`, `sfx`), `style.css` |
 | G | Médio | Dificuldade dos drones: raio de visão cresce por fase (3,4 / 3,6 / 3,8 / 4,0 m; chefão 3,6 m), definido em `LV`; disco e cone acompanham | `script.js` (`LV`, laço dos drones) |
 | H | Difícil | Otimização para celular: menos pixels e sem antialias no toque, resolução dinâmica, chuva de código que só desenha quando há chuva | `script.js` (`R`, `pixelRatio`, `ajustarResolucao`, `fxTick`) |
+| I | Fácil/Médio/Difícil | Ajuste do personagem 3D: 15% maior (Fácil), contorno neon + realce (Médio), animação de corrida diferente da de andar (Difícil) | `script.js` (`CHAR_ESCALA`, `RIM_FORCA`, `carregarModelo`, `animChar`) |
+| J | Fácil/Médio/Difícil | Nova skin "Cachos" a partir do seu .glb do Meshy: redução de 1,67 milhão para 45 mil triângulos (Fácil), pintura por regiões (Médio), esqueleto de 11 ossos, carregador com várias skins e botão no menu com escolha guardada (Difícil) | `assets/models/cachos.bin`, `assets/img/skins/`, `script.js` (`SKINS`, `carregarModelo`, `rotuloSkin`), `index.html`, `style.css` |
 
 ## Conceitos praticados
 - Colisão iterativa (várias passadas resolvem obstáculos encostados) e estado por nível.
@@ -35,6 +37,8 @@ Base: pasta `anarco/` enviada por você (já separada em index.html, style.css e
 - Contadores dentro de `forEach`, detecção de transição (valor anterior x atual, `bzAntes`), reinício de animação CSS (`classList.remove` + `offsetWidth` + `add`) e `@keyframes`.
 - Simulação por computador: trajetórias dos drones em passo fixo, busca no espaço e no tempo (BFS com dilatação binária de um disco) e bisseção para achar a maior margem de segurança.
 - `matchMedia("(pointer: coarse)")` para detectar toque, `devicePixelRatio`, `setPixelRatio`, MSAA (antialias), resolução dinâmica por janela de quadros, `clearRect` x `destination-out` e `renderer.info` para medir chamadas de desenho e triângulos.
+- Escala de malha (`scale` no `SkinnedMesh`), shader customizado com `onBeforeCompile` (efeito Fresnel/rim light, produto escalar entre normal e direção da câmera), material emissivo e interpolação por fator (`r`) para misturar animações.
+- Simplificação de malha (colapso de arestas por erro quadrático), normalização de modelo (escala, origem, orientação), cor por vértice por regiões (elipsoide da cabeça, faixas de altura, máscaras), carregador orientado a dados (objeto `SKINS`), `async` com "pedido mais recente vence" (evita corrida entre cliques) e liberação de memória (`dispose`) ao trocar de modelo.
 
 ## Justificativa da lógica
 - **Caixas:** as da cidade usavam as mesmas posições na fase 4 e invadiam as mesas. Movê-las para x/z = 999 reaproveita o padrão que o projeto já usava (`HIDE`).
@@ -54,6 +58,19 @@ Base: pasta `anarco/` enviada por você (já separada em index.html, style.css e
 - **Limites do que medi:** a simulação ignora prédios e caixas (otimista para o jogador) e a perseguição; o tempo por tecla do hack é uma estimativa (0,45 s/tecla + 0,5 s). A sequência da fase 4 deixa só 0,86 s por tecla (7 teclas em 6 s), o ponto mais apertado do jogo; não mexi, mas é o primeiro candidato se a fase 4 parecer injusta.
 - **Otimização para celular:** medi antes (celular simulado, densidade 3): o canvas 3D tinha 780x1560 px (1,2 milhão de pixels) com antialias; a cena faz só 9 chamadas de desenho, e dos 50.046 triângulos quase tudo é o personagem; o canvas 2D da chuva fazia um preenchimento de tela cheia em TODO quadro, mesmo sem chuva. Mudanças: (1) no toque o `pixelRatio` passa de 2 para 1,5 (43% menos pixels) e o antialias é desligado quando a tela já é densa (DPR >= 2), onde as bordas serrilhadas quase não aparecem; no PC nada muda; (2) resolução dinâmica: se mais da metade de 90 quadros passa de 25 ms (abaixo de 40 FPS), o `pixelRatio` cai 0,25 (mínimo 0,75) e nunca sobe de volta, para não oscilar; pausa, menu e retorno de aba escondida não contam; (3) a chuva só desenha enquanto há chuva ou rastro (1,5 s), depois limpa o canvas uma vez e para. O HUD é HTML, então continua nítido em qualquer resolução.
 - **O que não fiz:** reduzir o modelo de 50 mil triângulos (um LOD) exigiria regerar o `anarco.bin` e mexer na animação; é o próximo passo se o seu celular ainda engasgar. Desligar o antialias só vale para telas densas; um celular DPR 1,5 mantém o antialias.
+- **Personagem maior:** a escala vai no `SkinnedMesh` (`CHAR_ESCALA = 1.15`), não no grupo, porque `animChar` mexe na escala do grupo todo quadro. A colisão usa um raio fixo, então só o visual cresce. Como a escala é em torno da origem, os pés ficam no chão (altura 2,81 -> 3,23 m, pés em -0,01).
+- **Contorno neon:** o personagem é quase todo preto sobre chão escuro. `mat.emissive` (0x0a0614) levanta de leve as sombras; `onBeforeCompile` troca a linha final do fragment shader do Three.js r128 para somar uma cor nas bordas (pouca luz onde a superfície está de frente para a câmera, muita onde está de lado), rosa de um lado e ciano do outro. O primeiro teste com emissivo forte lavou as cores; baixei e o contorno faz o trabalho. `RIM_FORCA = 0` desliga o contorno.
+- **Corrida:** `k = min(1, sp/9)` parava em 1, então correr (14) animava igual a andar (9). Criei `r = clamp((sp-9)/5, 0, 1)`: andando r = 0 (nada muda); correndo r = 1: passos 37% mais rápidos, pernas e braços 30-40% mais amplos, cotovelos dobrados, quique maior e inclinação de 0,16 para 0,30 rad. O boost de energia (13) já mostra r = 0,8.
+- **Skin Cachos:** o .glb tinha 836 mil vértices e 1,67 milhão de triângulos, sem cor, textura, esqueleto nem animação. Reduzi para 45 mil triângulos e 22.351 vértices (mesmo peso do personagem atual, 471 KB), escalei para 2,81 de altura com os pés em y=0 e de frente para +z, como o boneco original. A pintura é por regiões, medidas no próprio modelo: pele (rosto, pescoço, braços abaixo da manga), cabelo marrom-escuro com sombreamento por profundidade (por dentro mais escuro) e poucos cachos com reflexo roxo, olhos, sobrancelhas, lábios e bochechas, camiseta escura com barra ciano nas mangas, calça cargo, cinto, botas com sola rosa. Descartei um emblema rosa no peito: a malha da camiseta é pouco detalhada, então o desenho virava um borrão.
+- **Esqueleto:** o corpo é "chibi" (cabeça e cabelo ~45% da altura, braços curtos), então medi os pontos do próprio modelo (quadril em 0,95, ombros em 1,52, cotovelos em 1,06, joelhos em 0,48, pescoço em 1,75) e montei os mesmos 11 ossos e cápsulas de peso do boneco atual. Assim `animChar` (andar, correr, hackear, BREACH) funciona sem mudança. A cápsula da cabeça é larga (raio 0,5) para o cabelo inteiro virar junto.
+- **Várias skins:** `carregarModelo(id)` lê tudo de `SKINS[id]` (arquivo, vértices, triângulos, escala, ossos e pesos). O corpo novo é montado inteiro antes de trocar o antigo, e o antigo é descartado da memória. Um contador de pedidos (`pedidoSkin`) garante que cliques rápidos não deixem dois corpos na cena. Se o arquivo falhar, o botão volta sozinho à skin que está de fato na tela.
+- **Escala por skin:** Capuz 1,15 (como já aprovado) e Cachos 1,05, porque a cabeça grande já ocupa muito espaço na câmera de cima.
+
+## Como criar mais uma skin (passo a passo)
+1. Reduza o .glb para ~45 mil triângulos (limite do formato: 65.535 vértices) e normalize: altura 2,81, pés em y=0, de frente para +z, centro em x=0.
+2. Pinte por regiões com `pintar-cachos.py` (use como modelo: ajuste as medidas e as cores) e grave o `.bin` (Int16 posições/10000, Uint16 índices, Uint8 cores).
+3. Em `SKINS`, copie uma entrada e troque `nome`, `arq`, `n`, `f`, `escala`, `ossos` e `SG` com as medidas do corpo novo.
+4. Gere a miniatura em `assets/img/skins/<id>.png`. O botão do menu já percorre todas as skins da lista.
 
 ## Testes (navegador de teste, renderização por software)
 - Fase 4: 0 falhas em 20 mil pontos sorteados (antes: 65, penetração de até 0,4). Fases 1, 2, 3 e 5: 0 falhas. Sala 100% alcançável e 3 torres acessíveis.
@@ -70,16 +87,40 @@ Base: pasta `anarco/` enviada por você (já separada em index.html, style.css e
 - Etapa F (modo normal e reduzido, `fxTick` chamado à mão para ser determinístico): 2 drones + 1 torre -> "2 drones congelados · 1 torre +40%" (drones congelados, torre 0,4, alerta -0,3); 1 drone -> "1 drone congelado"; sem alvo -> "nada ao alcance"; contagem 10s/3s/2s/1s -> "BREACH · Espaço"; som de pronto 1 vez (não repete); pausa e menu não avisam nem contam; animação 0,7 s normal e ~0 em modo reduzido; 0 erros. No celular (390x780) o botão cabe (129x38 px) e o aviso ficou acima de CORRER.
 - Etapa G (jogo real, 1 drone parado): jogador 0,3 m fora do raio -> alerta 0; 0,3 m dentro -> alerta sobe, nas 5 fases; escala do disco = raio/3,4 em cada fase (1,000 / 1,059 / 1,118 / 1,176 / 1,059); 0 erros. Captura da fase 4 conferida.
 - Etapa H: configuração (celular DPR 3: pixelRatio 1,5, antialias off, canvas 585x1170; celular DPR 1,5: antialias on; PC DPR 1 e DPR 2: igual a antes); chuva: 0 preenchimentos em 2,5 s parado, desenha durante o BREACH, depois 0 chamadas e 0 pixels visíveis; resolução dinâmica (determinística): 100 FPS não cai, aba escondida e pausa ignoradas, 33% de quadros lentos não cai, lento sustentado 1,5 -> 1,25 -> 1 -> 0,75 e para no piso; canvas 292x585 com CSS 390x780; 0 erros. Capturas a 1,5 e a 0,75 conferidas.
+- Etapa I: altura 3,23 e pés em -0,01; escala 1,15 só no SkinnedMesh; shader sem erro (0 console.error); andando igual ao anterior (perna 0,9, braço 0,7, canela 1,1); correndo perna 1,17, braço 0,98, canela 1,43, cotovelos -1,29/-0,64, quique 0,209; energia (13) perna 1,12; inclinação parado 0 / andando 0,16 / correndo 0,299; cadência 16 -> 21,9 rad/s; corrida real com Shift: velocidade 13,9, inclinação 0,29; menu e fim de jogo sem erros. Capturas conferidas (antes/depois e andar x correr).
+- Etapa J: redução 1.672.382 -> 45.000 triângulos; .bin com tamanho exato (22351*6 + 45000*6 + 22351*3 = 471.159 bytes); corpo novo com 11 ossos; animações conferidas por imagem em parado, andar, correr e hackear (malha sem esticar); menu: rótulo e miniatura corretos, troca em ~1,5 s no navegador de teste (software), guarda em `anarco_skin`, persiste ao recarregar, valor inválido cai em Capuz, 5 cliques rápidos terminam com 1 corpo e vértices coerentes, `cachos.bin` com 404 mantém a skin antiga e o botão volta sozinho, armazenamento bloqueado funciona; partida completa no celular simulado (hack, BREACH, fim de jogo, ranking) com 0 erros; botão cabe na tela de 390 px.
 - Movimento reduzido: chuva 2,2 -> 0, tremor da torre 0,247 -> 0, animação do cartão 0,25 s -> ~0, canvas da chuva `block` -> `none`. A preferência muda ao vivo, sem recarregar.
 
 ## Publicação
 `og:url`, `og:image` e `twitter:image` já apontam para `https://anarcoexe.vercel.app/` (endereço completo, como WhatsApp e outros apps exigem). Se o domínio mudar, troque esses três. Depois do deploy, confira o preview colando o link no WhatsApp ou num depurador de compartilhamento; os apps guardam cache, então pode demorar a atualizar.
 
 ## Não testado
-Volume e timbre dos sons (só verifiquei que disparam), **FPS em celular e GPU reais** (o teste usa renderização por software, então só medi configuração e custo relativo, não o FPS final) e a dificuldade dos drones (medida, não jogada) (só renderização por software no teste), e o piscar das luzes em modo reduzido foi verificado só pelo código.
+As cores da skin Cachos no seu celular (a luz neon da cena muda o tom: a pele fica esverdeada perto da luz ciano e durante o hack), o tempo de troca de skin em celular fraco (calcula 22 mil x 11 pesos) e volume e timbre dos sons (só verifiquei que disparam), **FPS em celular e GPU reais** (o teste usa renderização por software, então só medi configuração e custo relativo, não o FPS final) e a dificuldade dos drones (medida, não jogada) (só renderização por software no teste), e o piscar das luzes em modo reduzido foi verificado só pelo código.
 
 ## O que ainda falta
 - Médio: nenhum item pendente.
 - O bloco Difícil (Base64, ranking e sons) está concluído.
 - Tudo o que estava na lista foi feito. Próximo candidato, só se o celular ainda engasgar: LOD do modelo 3D.
 - Dificuldade: só medi, não joguei. Se a fase 2, 3 ou 4 parecer fácil ou injusta, mude `vis` em `LV` (um número por fase).
+
+
+## Item K — Notebook 3D do usuário (Difícil)
+
+**O que mudou:** o notebook de duas caixas que aparece na frente do personagem ao hackear foi trocado pelo modelo 3D do Henriq (`assets/models/laptop.bin` + textura `assets/img/props/laptop.webp`). Funciona nas duas skins. Ao começar o hack ele "salta" (escala 0 → 1 em ~0,2 s) e some ao parar; com "Reduzir movimento" ele só aparece/some. A luz verde (`lapLight`) continua.
+
+**Ordem:** (1) Fácil: ler o OBJ/MTL e a textura 4096²; (2) Médio: separar a malha em *ilhas de textura* (118 pedaços com UV contínuo); (3) Difícil: decimar cada ilha sozinha (50.000 → 12.447 triângulos) e recalcular o UV de cada vértice novo a partir do ponto mais próximo da mesma ilha; (4) Médio: gravar `.bin` (Int16 posição, Uint16 UV, Uint16 índice = 147.612 bytes) e textura 1024² WebP (~60 KB); (5) Fácil: carregar no jogo com `fetch` + `TextureLoader`, com plano B (notebook de caixas se falhar).
+
+**Conceitos:** BufferGeometry manual, UV e `flipY`, `emissiveMap` (a tela brilha), componentes conexos, decimação de malha, interpolação exponencial (`lapEsc += (alvo - lapEsc) * k`), carregamento assíncrono com fallback.
+
+**Justificativa:** decimar a malha inteira misturava as ilhas (teclado aparecia na tela). Decimar por ilha mantém o UV coerente. Peso total ~207 KB contra ~16 MB do original.
+
+
+## Item L — Notebook com a arte do Kali (Difícil)
+
+**O que mudou:** o notebook do item K (textura neon) foi trocado pela malha limpa `white_mesh_1.glb` (20.000 triângulos, com teclado e dobradiças reais) texturizada com as suas artes: corpo verde-oliva, tela com o terminal Kali (`root@kali-anarc`, hydra, `[SUCCESS]`), teclado, adesivos SYS DOWN / NO CTRL e o símbolo da anarquia. `white_mesh_3.glb` não foi usada: ela traz duas cópias do notebook em poses diferentes e uma placa solta, não tampa e base separadas.
+
+**Ordem:** (1) Fácil: ler a malha e descobrir a orientação (tampa em z<0 virada para +z; teclado em y baixo); (2) Médio: separar *tampa* e *teclado* por posição (distância ao plano da tampa), porque as normais da malha são ruidosas e deixavam manchas; (3) Difícil: projeção planar de cada região em um atlas 1024² (tampa em cima, teclado embaixo, faixa de cor oliva para o resto); (4) Médio: gravar `laptop.bin` (10.764 vértices, 20.000 triângulos, 227.640 bytes) e `laptop.webp` (~46 KB); (5) Fácil: ajustar `LAP_N/LAP_F` no `script.js` e testar nas duas skins.
+
+**Conceitos:** projeção planar de UV, atlas de textura, `flipY` do Three.js (o visualizador de teste estava com `flipY` desligado e parecia que a textura estava de cabeça para baixo), classificação de faces por distância a um plano, vértices duplicados por região.
+
+**Limite:** o notebook continua sendo uma peça só (aberto); para a tampa abrir de verdade seria preciso o modelo com tampa e base separadas. As manchas escuras nas dobradiças são pequenas e quase invisíveis no tamanho do jogo.

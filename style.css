@@ -313,7 +313,7 @@ canvas {
   }
 }
 
-.mb2 { display: flex; gap: 8px; }
+.mb2 { display: flex; flex-wrap: wrap; gap: 8px; }
 #ov .mb2 button { background: var(--ink); font-size: 0.95rem; }
 #tut {
   position: fixed; left: 50%; top: 90px; transform: translateX(-50%);
@@ -423,3 +423,7 @@ canvas {
 @media (pointer: coarse) {
   #msg { bottom: calc(262px + env(safe-area-inset-bottom, 0px)); padding: 0 12px; }
 }
+
+/* ÂNCORA: botão de skin com miniatura do personagem escolhido */
+#sk { display: flex; align-items: center; gap: 8px; }
+#sk img { height: 2.2em; width: auto; }

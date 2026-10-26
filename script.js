@@ -232,63 +232,32 @@ let model = null,
   wob = 0;
 // ÂNCORA: formato do arquivo assets/models/anarco.bin (tudo em sequência, sem separadores):
 //   [posições Int16 x3 por vértice] [índices Uint16 x3 por triângulo] [cores Uint8 x3 por vértice]
-const MODELO_INFO = { n: 24953, f: 50000 }; // n = vértices, f = triângulos
-async function carregarModelo() {
-  try {
-    const N = MODELO_INFO.n,
-      F = MODELO_INFO.f;
-    const resp = await fetch("assets/models/anarco.bin"); // precisa de servidor (Vercel, Netlify, Live Server)
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const bin = await resp.arrayBuffer();
-    if (bin.byteLength !== N * 6 + F * 6 + N * 3)
-      throw new Error("tamanho inesperado do modelo: " + bin.byteLength);
-    const pos = new Int16Array(bin, 0, N * 3),
-      idx = new Uint16Array(bin, N * 6, F * 3),
-      col = new Uint8Array(bin, N * 6 + F * 6, N * 3);
-    const pf = new Float32Array(N * 3);
-    for (let i = 0; i < N * 3; i++) pf[i] = pos[i] / 10000;
-    const g = new T.BufferGeometry();
-    g.setAttribute("position", new T.BufferAttribute(pf, 3));
-    g.setAttribute("color", new T.BufferAttribute(col, 3, true));
-    g.setIndex(new T.BufferAttribute(idx, 1));
-    g.computeVertexNormals();
-    model = new T.Group();
-    const B = {},
-      mkb = (n, x, y, z, par) => {
-        const b = new T.Bone();
-        b.position.set(x - (par ? par.px : 0), y - (par ? par.py : 0), z - (par ? par.pz : 0));
-        b.px = x;
-        b.py = y;
-        b.pz = z;
-        if (par) par.add(b);
-        B[n] = b;
-        return b;
-      };
-    const hips = mkb("hips", 0, 0.9, 0),
-      spine = mkb("spine", 0, 1.3, 0, hips);
-    mkb("head", 0, 2.25, 0, spine);
-    const aP = mkb("armP", 0.36, 2.05, 0, spine),
-      aN = mkb("armN", -0.36, 2.05, 0, spine),
-      lP = mkb("legP", 0.17, 0.9, 0, hips),
-      lN = mkb("legN", -0.17, 0.9, 0, hips);
-    mkb("foreP", 0.43, 1.55, 0, aP);
-    mkb("foreN", -0.43, 1.55, 0, aN);
-    mkb("shinP", 0.17, 0.48, 0, lP);
-    mkb("shinN", -0.17, 0.48, 0, lN);
-    const names = [
-      "hips",
-      "spine",
-      "head",
-      "armP",
-      "armN",
-      "legP",
-      "legN",
-      "foreP",
-      "foreN",
-      "shinP",
-      "shinN",
-    ];
-    const SG = [
+const RIM_FORCA = 0.75; // intensidade do contorno neon (0 desliga)
+// ===== SKINS DO PERSONAGEM =====
+// ÂNCORA: cada skin tem seu .bin (n vértices, f triângulos) e seu esqueleto.
+// ossos: [nome, x, y, z, pai]  ·  SG: [índice do osso, x1,y1,z1, x2,y2,z2, raio] = cápsula que "puxa" os vértices próximos
+const NOMES_OSSOS = ["hips", "spine", "head", "armP", "armN", "legP", "legN", "foreP", "foreN", "shinP", "shinN"];
+const SKINS = {
+  capuz: {
+    nome: "Capuz",
+    escala: 1.15, // tamanho (1 = original)
+    arq: "assets/models/anarco.bin",
+    n: 24953,
+    f: 50000,
+    ossos: [
+      ["hips", 0, 0.9, 0, null],
+      ["spine", 0, 1.3, 0, "hips"],
+      ["head", 0, 2.25, 0, "spine"],
+      ["armP", 0.36, 2.05, 0, "spine"],
+      ["armN", -0.36, 2.05, 0, "spine"],
+      ["legP", 0.17, 0.9, 0, "hips"],
+      ["legN", -0.17, 0.9, 0, "hips"],
+      ["foreP", 0.43, 1.55, 0, "armP"],
+      ["foreN", -0.43, 1.55, 0, "armN"],
+      ["shinP", 0.17, 0.48, 0, "legP"],
+      ["shinN", -0.17, 0.48, 0, "legN"],
+    ],
+    SG: [
       [0, 0, 0.75, 0, 0, 1.25, 0, 0.25],
       [1, 0, 1.3, 0, 0, 2.1, 0, 0.3],
       [2, 0, 2.3, 0, 0, 2.7, 0, 0.2],
@@ -300,14 +269,90 @@ async function carregarModelo() {
       [9, 0.17, 0.48, 0, 0.17, 0.05, 0, 0.13],
       [6, -0.17, 0.88, 0, -0.17, 0.48, 0, 0.13],
       [10, -0.17, 0.48, 0, -0.17, 0.05, 0, 0.13],
-    ];
+    ],
+  },
+  // corpo "chibi": cabeça e cabelo enormes, braços curtos; medidas tiradas do próprio modelo
+  cachos: {
+    nome: "Cachos",
+    escala: 1.05, // a cabeça grande já ocupa muito espaço na tela
+    arq: "assets/models/cachos.bin",
+    n: 22351,
+    f: 45000,
+    ossos: [
+      ["hips", 0, 0.95, 0, null],
+      ["spine", 0, 1.2, 0, "hips"],
+      ["head", 0, 1.75, 0, "spine"],
+      ["armP", 0.4, 1.52, 0, "spine"],
+      ["armN", -0.4, 1.52, 0, "spine"],
+      ["legP", 0.22, 0.88, 0, "hips"],
+      ["legN", -0.22, 0.88, 0, "hips"],
+      ["foreP", 0.5, 1.06, 0, "armP"],
+      ["foreN", -0.5, 1.06, 0, "armN"],
+      ["shinP", 0.22, 0.48, 0, "legP"],
+      ["shinN", -0.22, 0.48, 0, "legN"],
+    ],
+    SG: [
+      [0, 0, 0.62, 0, 0, 1.05, 0, 0.28],
+      [1, 0, 1.15, 0, 0, 1.6, 0, 0.3],
+      [2, 0, 1.9, 0, 0, 2.55, 0, 0.5],
+      [3, 0.4, 1.52, 0, 0.5, 1.06, 0, 0.09],
+      [7, 0.5, 1.06, 0, 0.58, 0.62, 0, 0.09],
+      [4, -0.4, 1.52, 0, -0.5, 1.06, 0, 0.09],
+      [8, -0.5, 1.06, 0, -0.58, 0.62, 0, 0.09],
+      [5, 0.22, 0.88, 0, 0.22, 0.48, 0, 0.17],
+      [9, 0.22, 0.48, 0, 0.22, 0.05, 0, 0.17],
+      [6, -0.22, 0.88, 0, -0.22, 0.48, 0, 0.17],
+      [10, -0.22, 0.48, 0, -0.22, 0.05, 0, 0.17],
+    ],
+  },
+};
+let skinAtual = ler("anarco_skin");
+if (!SKINS[skinAtual]) skinAtual = "capuz";
+let pedidoSkin = 0, // só o pedido mais recente vale (cliques rápidos não embaralham)
+  skinCarregada = null; // skin que está de fato na tela
+async function carregarModelo(id = skinAtual) {
+  const cfg = SKINS[id],
+    pedido = ++pedidoSkin;
+  try {
+    const N = cfg.n,
+      F = cfg.f;
+    const resp = await fetch(cfg.arq); // precisa de servidor (Vercel, Netlify, Live Server)
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const bin = await resp.arrayBuffer();
+    if (bin.byteLength !== N * 6 + F * 6 + N * 3)
+      throw new Error("tamanho inesperado do modelo: " + bin.byteLength);
+    if (pedido !== pedidoSkin) return; // chegou outro pedido depois deste: descarta
+    const pos = new Int16Array(bin, 0, N * 3),
+      idx = new Uint16Array(bin, N * 6, F * 3),
+      col = new Uint8Array(bin, N * 6 + F * 6, N * 3);
+    const pf = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i++) pf[i] = pos[i] / 10000;
+    const g = new T.BufferGeometry();
+    g.setAttribute("position", new T.BufferAttribute(pf, 3));
+    g.setAttribute("color", new T.BufferAttribute(col, 3, true));
+    g.setIndex(new T.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    const novo = new T.Group();
+    const B = {};
+    cfg.ossos.forEach(([n, x, y, z, pai]) => {
+      const par = pai ? B[pai] : null,
+        b = new T.Bone();
+      b.position.set(x - (par ? par.px : 0), y - (par ? par.py : 0), z - (par ? par.pz : 0));
+      b.px = x;
+      b.py = y;
+      b.pz = z;
+      if (par) par.add(b);
+      B[n] = b;
+    });
+    const hips = B.hips;
+    // ÂNCORA: peso de cada vértice = quão perto ele está de cada cápsula (gaussiana); guarda os 4 maiores
     const si = new Uint16Array(N * 4),
       sw = new Float32Array(N * 4);
     for (let i = 0; i < N; i++) {
       const x = pf[i * 3],
         y = pf[i * 3 + 1],
         z = pf[i * 3 + 2];
-      const ws = SG.map((s) => {
+      const ws = cfg.SG.map((s) => {
         const vx = s[4] - s[1],
           vy = s[5] - s[2],
           vz = s[6] - s[3];
@@ -328,24 +373,62 @@ async function carregarModelo() {
     }
     g.setAttribute("skinIndex", new T.Uint16BufferAttribute(si, 4));
     g.setAttribute("skinWeight", new T.Float32BufferAttribute(sw, 4));
-    const sm = new T.SkinnedMesh(
-      g,
-      new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, skinning: true }),
-    );
+    const mat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, skinning: true });
+    // ÂNCORA: o personagem é quase todo preto sobre chão escuro. Um toque de emissivo levanta as sombras e o
+    // "rim light" (Fresnel) pinta as bordas de rosa/ciano, como os neons da cidade, destacando a silhueta.
+    mat.emissive.set(0x0a0614);
+    mat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "gl_FragColor = vec4( outgoingLight, diffuseColor.a );",
+        `float rimF = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0), 2.2);
+        vec3 rimCor = mix(vec3(1.0, 0.25, 0.8), vec3(0.18, 0.9, 1.0), clamp(vNormal.x * 0.5 + 0.5, 0.0, 1.0));
+        outgoingLight += rimCor * rimF * ${RIM_FORCA.toFixed(2)};
+        gl_FragColor = vec4( outgoingLight, diffuseColor.a );`,
+      );
+    };
+    const sm = new T.SkinnedMesh(g, mat);
+    sm.scale.setScalar(cfg.escala); // só o visual cresce; o raio de colisão continua o mesmo
     sm.add(hips);
     hips.updateMatrixWorld(true);
-    sm.bind(new T.Skeleton(names.map((n) => B[n])));
+    sm.bind(new T.Skeleton(NOMES_OSSOS.map((n) => B[n])));
     sm.frustumCulled = false;
-    model.add(sm);
+    novo.add(sm);
+    // troca de uma vez só: o personagem nunca fica sem corpo no meio da troca
+    if (model) {
+      P.remove(model);
+      model.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+    } else P.remove(body, head, hood, e1, e2, lap);
+    model = novo;
     bone = B;
-    P.remove(body, head, hood, e1, e2, lap);
     P.add(model);
+    skinCarregada = id;
   } catch (err) {
-    console.warn("modelo não carregou", err);
-    model = null;
+    console.warn("modelo não carregou", err); // mantém o que já estava na tela (ou o boneco simples)
+    if (pedido === pedidoSkin && skinCarregada && skinCarregada !== id) {
+      skinAtual = skinCarregada; // o botão volta a mostrar a skin que está realmente na tela
+      guardar("anarco_skin", skinAtual);
+      rotuloSkin();
+    }
   }
 }
 carregarModelo();
+// ===== ESCOLHA DE SKIN =====
+// ÂNCORA: o botão do menu passa para a próxima skin da lista, lembra a escolha e recarrega o corpo
+const ordemSkins = Object.keys(SKINS);
+function rotuloSkin() {
+  $("skn").textContent = "Skin: " + SKINS[skinAtual].nome;
+  $("sk").querySelector("img").src = "assets/img/skins/" + skinAtual + ".png";
+}
+$("sk").onclick = () => {
+  skinAtual = ordemSkins[(ordemSkins.indexOf(skinAtual) + 1) % ordemSkins.length];
+  guardar("anarco_skin", skinAtual);
+  rotuloSkin();
+  carregarModelo(skinAtual);
+};
+rotuloSkin();
 // luzes neon que seguem o jogador
 const rig = new T.Group();
 S.add(rig);
@@ -369,15 +452,45 @@ lapG.add(lapBase, lapScr);
 lapG.position.set(0, 1.15, 0.62);
 lapG.visible = false;
 P.add(lapG);
+// ÂNCORA: notebook 3D do usuário (laptop.bin = Int16 pos/10000 + Uint16 uv/65535 + Uint16 índices). Se falhar, fica o notebook de caixas.
+const LAP_N = 10764, LAP_F = 20000, LAP_ESCALA = 1.0;
+let lapEsc = 0; // escala atual do "pop" ao abrir (0 -> 1)
+fetch("assets/models/laptop.bin")
+  .then((r) => r.arrayBuffer())
+  .then((buf) => {
+    if (buf.byteLength !== LAP_N * 10 + LAP_F * 6) throw new Error("laptop.bin com tamanho inesperado");
+    const pos = new Float32Array(LAP_N * 3), uv = new Float32Array(LAP_N * 2);
+    const i16 = new Int16Array(buf, 0, LAP_N * 3), u16 = new Uint16Array(buf, LAP_N * 6, LAP_N * 2);
+    for (let i = 0; i < pos.length; i++) pos[i] = i16[i] / 10000;
+    for (let i = 0; i < uv.length; i++) uv[i] = u16[i] / 65535;
+    const g = new T.BufferGeometry();
+    g.setAttribute("position", new T.BufferAttribute(pos, 3));
+    g.setAttribute("uv", new T.BufferAttribute(uv, 2));
+    g.setIndex(new T.BufferAttribute(new Uint16Array(buf, LAP_N * 10, LAP_F * 3), 1));
+    g.computeVertexNormals();
+    new T.TextureLoader().load("assets/img/props/laptop.webp", (tex) => {
+      tex.anisotropy = 4;
+      // ÂNCORA: a própria textura brilha (emissiveMap) para a tela verde parecer ligada
+      const m = new T.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.4, roughness: 0.6, metalness: 0.1 });
+      const mesh = new T.Mesh(g, m);
+      mesh.scale.setScalar(LAP_ESCALA);
+      lapG.children.slice().forEach((c) => { lapG.remove(c); c.geometry.dispose(); c.material.dispose(); });
+      lapG.add(mesh);
+    });
+  })
+  .catch((e) => console.warn("notebook 3D indisponível, usando o de caixas:", e));
 const lapLight = new T.PointLight(0x39ff88, 0, 7);
 lapLight.position.set(0, 0.3, 1.5);
 P.add(lapLight);
 function animChar(dt, sp) {
   if (!model) return;
   const k = Math.min(1, sp / 9);
-  wob += dt * (6 + k * 10);
-  model.position.y = Math.abs(Math.sin(wob)) * 0.14 * k;
-  const tx = 0.16 * k + (hacking ? 0.1 + Math.sin(time * 40) * 0.02 : 0);
+  // ÂNCORA: r = "fator de corrida" (0 andando a 9, 1 correndo a ~14). Antes tudo parava em k = 1, então
+  // correr tinha a mesma animação de andar. Com r: passos mais rápidos e largos, corpo mais inclinado, cotovelos dobrados.
+  const r = Math.max(0, Math.min(1, (sp - 9) / 5));
+  wob += dt * (6 + k * 10 + r * 6);
+  model.position.y = Math.abs(Math.sin(wob)) * 0.14 * k * (1 + 0.5 * r);
+  const tx = 0.16 * k + 0.14 * r + (hacking ? 0.1 + Math.sin(time * 40) * 0.02 : 0);
   model.rotation.x += (tx - model.rotation.x) * Math.min(1, dt * 10);
   model.rotation.z = Math.sin(wob) * 0.07 * k + Math.sin(time * 1.6) * 0.01 * (1 - k);
   model.rotation.y = Math.sin(wob) * 0.12 * k;
@@ -386,16 +499,16 @@ function animChar(dt, sp) {
     const s = Math.sin(wob),
       idle = Math.sin(time * 1.6) * 0.04 * (1 - k),
       hk = hacking;
-    bone.legP.rotation.x = s * 0.9 * k;
-    bone.legN.rotation.x = -s * 0.9 * k;
-    bone.armN.rotation.x = hk ? -0.9 + Math.sin(time * 38) * 0.07 : s * 0.7 * k + idle;
+    bone.legP.rotation.x = s * 0.9 * k * (1 + 0.3 * r);
+    bone.legN.rotation.x = -s * 0.9 * k * (1 + 0.3 * r);
+    bone.armN.rotation.x = hk ? -0.9 + Math.sin(time * 38) * 0.07 : s * 0.7 * k * (1 + 0.4 * r) + idle;
     bone.armP.rotation.x = hk ? -1 : -s * 0.18 * k;
     bone.armP.rotation.z = 0.08;
     bone.armN.rotation.z = -0.08;
-    bone.shinP.rotation.x = Math.max(0, s) * 1.1 * k;
-    bone.shinN.rotation.x = Math.max(0, -s) * 1.1 * k;
-    bone.foreN.rotation.x = hk ? -0.35 + Math.sin(time * 38) * 0.05 : -0.5 * k - 0.3 * Math.max(0, s) * k;
-    bone.foreP.rotation.x = hk ? -0.3 : -0.15 * k;
+    bone.shinP.rotation.x = Math.max(0, s) * 1.1 * k * (1 + 0.3 * r);
+    bone.shinN.rotation.x = Math.max(0, -s) * 1.1 * k * (1 + 0.3 * r);
+    bone.foreN.rotation.x = hk ? -0.35 + Math.sin(time * 38) * 0.05 : -0.5 * k - 0.3 * Math.max(0, s) * k - 0.5 * r;
+    bone.foreP.rotation.x = hk ? -0.3 : -0.15 * k - 0.5 * r;
     bone.spine.rotation.y = -s * 0.18 * k;
     bone.head.rotation.y = s * 0.1 * k;
     bone.head.rotation.x = hk ? 0.12 : 0;
@@ -1730,7 +1843,10 @@ function loop() {
       }
     }
     glow.intensity = near ? 1.4 + (calm ? 0 : Math.sin(time * 30) * 0.4) : 0;
-    lapG.visible = hacking;
+    // ÂNCORA: "pop" do notebook — a escala sobe rápido até 1 ao hackear e some ao parar
+    lapEsc += ((hacking ? 1 : 0) - lapEsc) * Math.min(1, dt * 14);
+    lapG.visible = hacking || lapEsc > 0.02;
+    lapG.scale.setScalar(calm ? (hacking ? 1 : 0.001) : Math.max(0.001, lapEsc));
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
       $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
