@@ -427,3 +427,49 @@ canvas {
 /* ÂNCORA: botão de skin com miniatura do personagem escolhido */
 #sk { display: flex; align-items: center; gap: 8px; }
 #sk img { height: 2.2em; width: auto; }
+
+/* Upgrade 3D combat HUD */
+#hx {
+  position: fixed;
+  left: calc(14px + env(safe-area-inset-left, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  font: 700 .78rem/1 "Special Elite", monospace;
+  letter-spacing: .08em;
+  color: #081014;
+  background: linear-gradient(135deg,#39ff88,#2fe6ff);
+  border: 2px solid #eaffff;
+  box-shadow: 0 0 18px #2fe6ff88;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+#hx.cooldown { filter: grayscale(1); opacity: .6; box-shadow: none; }
+#hx.ready { animation: empReady .8s ease-in-out infinite alternate; }
+@keyframes empReady { to { box-shadow: 0 0 26px #39ff88, 0 0 8px #fff inset; transform: translateY(-2px); } }
+.boss-telegraph { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 6; color: #fff; border: 2px solid currentColor; background: #080610dd; padding: 7px 14px; font: 700 .8rem/1 "Special Elite", monospace; letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 0 22px currentColor; pointer-events: none; }
+.boss-telegraph[data-kind="warning"] { color: #ff9d3b; }
+.boss-telegraph[data-kind="danger"] { color: #ff3fd0; animation: dangerPulse .3s ease-in-out infinite alternate; }
+@keyframes dangerPulse { to { transform: translateX(-50%) scale(1.06); } }
+@media (pointer: coarse) {
+  #hx { bottom: calc(154px + env(safe-area-inset-bottom, 0px)); left: auto; right: calc(160px + env(safe-area-inset-right, 0px)); }
+}
+#vx {
+  position: fixed;
+  left: calc(14px + env(safe-area-inset-left, 0px));
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  font: 700 .78rem/1 "Special Elite", monospace;
+  letter-spacing: .08em;
+  color: #fff;
+  background: linear-gradient(135deg,#ff3fd0,#9c4dff);
+  border: 2px solid #ffe8ff;
+  box-shadow: 0 0 18px #ff3fd088;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+#vx.cooldown { filter: grayscale(1); opacity: .6; box-shadow: none; }
+#vx.ready { animation: virusReady .8s ease-in-out infinite alternate; }
+@keyframes virusReady { to { box-shadow: 0 0 26px #ff3fd0, 0 0 8px #fff inset; transform: translateY(-2px); } }
+@media (pointer: coarse) {
+  #vx { bottom: calc(154px + env(safe-area-inset-bottom, 0px)); right: calc(18px + env(safe-area-inset-right, 0px)); left: auto; }
+}

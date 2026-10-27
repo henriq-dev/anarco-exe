@@ -3,28 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ANARCO.EXE 3D — hackeie, vaze, resista</title>
-<meta name="description" content="Jogo 3D no navegador: invada torres corporativas, fuja dos drones e vaze os segredos que elas escondem. Tudo é ficção.">
+<title>ANARCO.EXE 3D — Breach Protocol</title>
+<meta name="description" content="Jogo 3D cyberpunk: invada torres corporativas, fuja dos drones e enfrente chefões aprimorados.">
 <meta name="theme-color" content="#09090b">
 <meta name="color-scheme" content="dark">
-
-<!-- ÂNCORA: ícones (favicon.ico = navegadores antigos, svg = modernos, png = iPhone/Android) -->
 <link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
 <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
 <link rel="apple-touch-icon" href="assets/img/icone-180.png">
-
-<!-- ÂNCORA: preview ao compartilhar o link (WhatsApp, Telegram, Discord). Os apps exigem URL completa;
-     se o domínio mudar, troque og:url, og:image e twitter:image. -->
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="ANARCO.EXE 3D">
-<meta property="og:title" content="ANARCO.EXE 3D — hackeie, vaze, resista">
-<meta property="og:description" content="Invada torres corporativas, fuja dos drones e vaze os segredos que elas escondem. Jogue no navegador.">
+<meta property="og:title" content="ANARCO.EXE 3D — Breach Protocol">
+<meta property="og:description" content="Invada torres, fuja dos drones e derrube chefões cyberpunk aprimorados.">
 <meta property="og:url" content="https://anarcoexe.vercel.app/">
 <meta property="og:image" content="https://anarcoexe.vercel.app/assets/img/og-preview.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Arte do jogo ANARCO.EXE 3D: cidade neon com o título do jogo">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://anarcoexe.vercel.app/assets/img/og-preview.jpg">
 <link rel="stylesheet" href="assets/fonts/fonts.css">
@@ -49,31 +44,42 @@
 <div id="bf" hidden><div><h2 id="bfh"></h2><p id="bft"></p></div></div>
 <div id="mini" hidden><b>BREACH — digite a sequência</b><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
 <div id="tut" hidden><span id="tutx"></span><button id="tuts">pular</button></div>
-<div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul>
-  <button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
-<div id="rk" hidden><div><h2>MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul>
-  <button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
+<div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul><button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
+<div id="rk" hidden><div><h2>MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul><button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
 <canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas>
 <button id="snd" aria-label="Som">🔊</button>
 <button id="bz">BREACH · Espaço</button>
+<button id="hx" title="Habilidade nova: descarga EMP">EMP · E</button>
+<button id="vx" title="Habilidade nova: vírus de impacto">VÍRUS · Q</button>
 <button id="rn" type="button" aria-label="Segurar para correr">CORRER</button>
 <div id="joy"><b id="nub"></b></div>
 <div id="ov"><div>
   <h2 id="ot">ANARCO<span>.EXE</span></h2>
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
-  <p>Mova com WASD ou setas, segure Shift para correr (faz barulho!). No celular, use o joystick e segure o botão CORRER. Ao completar o hack, digite a sequência de setas. Pegue energia, keycard e USB. Tudo é ficção.</p>
+  <p>Mova com WASD ou setas, segure Shift para correr. Use BREACH, EMP e VÍRUS para controlar a rede e sobreviver aos chefões. Tudo é ficção.</p>
   <p id="rkres" hidden></p>
   <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
   <button id="st">Invadir</button>
   <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button><button id="rb">Ranking</button><button id="sk" type="button" aria-label="Trocar a skin do personagem"><img alt="" src="assets/img/skins/capuz.png"><span id="skn">Skin: Capuz</span></button></div>
 </div></div>
-
-
-<!-- Three.js local: o jogo roda 100% offline -->
 <script src="assets/lib/three.min.js"></script>
-<!-- ÂNCORA: caminhos das imagens (manifesto). O modelo 3D vem de assets/models/anarco.bin -->
 <script src="assets/dados/manifesto.js"></script>
-<!-- ÂNCORA: lógica do jogo -->
-<script src="script.js"></script>
+<script>
+window.THREE = window.THREE || THREE;
+window.BOSS_MODEL_URLS = {
+  banqueiro: 'assets/models/boss-banqueiro-animated.glb',
+  petroleo: 'assets/models/boss-petroleo-rigged.glb',
+  ceo: 'assets/models/boss-ceo-rigged.glb'
+};
+</script>
+<script type="module">
+  import * as ModuleThree from './assets/lib/three.module.js';
+  import { GLTFLoader } from './assets/lib/GLTFLoader.js';
+  window.THREE = ModuleThree;
+  window.GLTFLoader = GLTFLoader;
+  const script = document.createElement('script');
+  script.src = './script.js';
+  document.body.appendChild(script);
+</script>
 </body>
 </html>

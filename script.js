@@ -731,7 +731,7 @@ function reset(keep) {
   if (!keep) lvl = 0;
   mini = null;
   $("mini").hidden = true;
-  emp = boost = 0;
+  emp = boost = empCd = virusCd = 0;
   $("msg").textContent = "";
   applyLevel();
   spawnPickups();
@@ -1427,7 +1427,11 @@ let bz = 0,
   bi = 0,
   boss = null,
   bossIn = false,
-  drops = [];
+  drops = [],
+  empCd = 0,
+  virusCd = 0,
+  bossHazards = [],
+  bossTelegraph = null;
 const rc = $("rain"),
   rx = rc.getContext("2d");
 function rainResize() {
@@ -1450,12 +1454,98 @@ const ringM = new T.Mesh(
 ringM.position.y = 0.15;
 S.add(ringM);
 const BOSS = [
-  { n: "DIRETOR-BANQUEIRO", sp: 2.2, r: 5.5, s: 1, c: 0xe0261c },
-  { n: "BARÃO DO PETRÓLEO", sp: 3.1, r: 6, s: 1.25, c: 0xff8a00 },
-  { n: "CEO MEGACORP", sp: 3.8, r: 7, s: 1.6, c: 0xff3fd0 },
+  { n: "DIRETOR-BANQUEIRO", sp: 2.2, r: 5.5, s: 1, c: 0xe0261c, model: "banqueiro", attacks: ["AUDITORIA DE DÍVIDA", "MURALHA DE CONTRATOS", "EXECUÇÃO FISCAL"] },
+  { n: "BARÃO DO PETRÓLEO", sp: 3.1, r: 6, s: 1.25, c: 0xff8a00, model: "petroleo", attacks: ["VAZAMENTO TÓXICO", "CHAMINÉ DE FOGO", "MARÉ DE PETRÓLEO"] },
+  { n: "CEO MEGACORP", sp: 3.8, r: 7, s: 1.6, c: 0xff3fd0, model: "ceo", attacks: ["PROTOCOLO ZERO", "CAGE DE DADOS", "COLAPSO DE REDE"] },
 ];
+const BOSS_MODEL_URLS = globalThis.BOSS_MODEL_URLS || {};
+const BossGLTFLoader = globalThis.GLTFLoader;
+function clearBossHazards() {
+  bossHazards.forEach((h) => S.remove(h.g));
+  bossHazards = [];
+  if (bossTelegraph) {
+    bossTelegraph.remove();
+    bossTelegraph = null;
+  }
+}
+function createBossTelegraph(label, kind, color) {
+  if (!bossTelegraph) {
+    bossTelegraph = document.createElement("div");
+    bossTelegraph.className = "boss-telegraph";
+    document.body.appendChild(bossTelegraph);
+  }
+  bossTelegraph.textContent = "ALERTA // " + label;
+  bossTelegraph.dataset.kind = kind;
+  bossTelegraph.style.color = "#" + color.toString(16).padStart(6, "0");
+}
+function createBossHazard(x, z, r, color, delay, life, label) {
+  const g = new T.Group();
+  const ring = new T.Mesh(
+    new T.RingGeometry(Math.max(0.5, r * 0.72), r, 64).rotateX(-Math.PI / 2),
+    new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false }),
+  );
+  const core = new T.Mesh(
+    new T.CircleGeometry(Math.max(0.5, r * 0.7), 48).rotateX(-Math.PI / 2),
+    new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.06, depthWrite: false, blending: T.AdditiveBlending }),
+  );
+  const pillar = new T.Mesh(
+    new T.CylinderGeometry(0.12, 0.5, 7, 12, 1, true),
+    new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.06, depthWrite: false, blending: T.AdditiveBlending }),
+  );
+  pillar.position.y = 3.5;
+  g.add(core, ring, pillar);
+  g.position.set(x, 0.09, z);
+  S.add(g);
+  bossHazards.push({ g, ring, core, pillar, x, z, r, delay, life, hit: false, label });
+  createBossTelegraph(label, delay < 0.9 ? "danger" : "warning", color);
+}
+function startBossAttack(b) {
+  const index = (b.attackIndex || 0) % 3;
+  b.attackIndex = index + 1;
+  const targetX = index === 1 ? P.position.x : b.g.position.x;
+  const targetZ = index === 1 ? P.position.z : b.g.position.z;
+  const radius = b.cfg.r * (index === 2 ? 0.9 : 0.62);
+  const delay = index === 0 ? 1.15 : index === 1 ? 0.8 : 0.55;
+  createBossHazard(targetX, targetZ, radius, b.cfg.c, delay, 1.3, b.cfg.attacks[index]);
+}
+function updateBossHazards(dt) {
+  for (let i = bossHazards.length - 1; i >= 0; i--) {
+    const h = bossHazards[i];
+    h.delay -= dt;
+    if (h.delay > 0) {
+      const pulse = 0.8 + Math.sin(time * 15) * 0.16;
+      h.ring.material.opacity = 0.16 + pulse * 0.16;
+      h.core.material.opacity = 0.03 + pulse * 0.03;
+      h.g.scale.setScalar(0.88 + Math.min(0.16, (1 - h.delay) * 0.12));
+    } else {
+      h.life -= dt;
+      h.ring.material.color.set(0xff244d);
+      h.core.material.color.set(0xff244d);
+      h.pillar.material.color.set(0xff244d);
+      h.ring.material.opacity = 0.68 + Math.sin(time * 28) * 0.2;
+      h.core.material.opacity = 0.11;
+      h.pillar.material.opacity = 0.16;
+      if (!h.hit && Math.hypot(P.position.x - h.x, P.position.z - h.z) < h.r) {
+        h.hit = true;
+        alert_ = Math.min(0.96, alert_ + 0.28);
+        note = h.label + " atingiu a área!";
+        noteT = 1.4;
+        if (!calm) shake = 0.8;
+      }
+    }
+    if (h.life <= 0) {
+      S.remove(h.g);
+      bossHazards.splice(i, 1);
+    }
+  }
+  if (!bossHazards.length && bossTelegraph) {
+    bossTelegraph.remove();
+    bossTelegraph = null;
+  }
+}
 function spawnBoss(i) {
   const c = BOSS[i];
+  clearBossHazards();
   if (boss) S.remove(boss.g, boss.disc);
   const g = new T.Group();
   g.add(
@@ -1476,7 +1566,7 @@ function spawnBoss(i) {
     g.add(rg);
   }
   g.scale.setScalar(c.s);
-  g.position.set(0, 4.5, -26);
+  g.position.set(0, 0.22, -26);
   const disc = new T.Mesh(
     new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2),
     new T.MeshBasicMaterial({ color: c.c, transparent: true, opacity: 0.22, depthWrite: false }),
@@ -1484,7 +1574,35 @@ function spawnBoss(i) {
   disc.scale.set(c.r, 1, c.r);
   disc.position.set(0, 0.08, -26);
   S.add(g, disc);
-  boss = { g, disc, hp: 100, fz: 0, cfg: c };
+  boss = { g, disc, hp: 100, fz: 0, cfg: c, atkT: 2.1, attackIndex: 0 };
+  const modelUrl = BOSS_MODEL_URLS[c.model];
+  if (modelUrl && BossGLTFLoader) {
+    const loader = new BossGLTFLoader();
+    loader.load(modelUrl, (res) => {
+      if (!boss || boss.g !== g) return;
+      const art = res.scene;
+      const box = new T.Box3().setFromObject(art);
+      const size = box.getSize(new T.Vector3());
+      const k = 5.2 / Math.max(size.y, 0.1);
+      art.scale.setScalar(k);
+      art.position.set(-(box.min.x + box.max.x) * k * 0.5, -box.min.y * k, -(box.min.z + box.max.z) * k * 0.5);
+      art.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+      g.add(art);
+      if (res.animations && res.animations.length) {
+        const mixer = new T.AnimationMixer(art);
+        const idle = res.animations.find((clip) => clip.name.toLowerCase().includes("idle")) || res.animations[0];
+        mixer.clipAction(idle).play();
+        g.userData.mixer = mixer;
+      }
+      g.children.slice(0, 3).forEach((o) => (o.visible = false));
+      g.userData.art = art;
+    }, undefined, () => undefined);
+  }
   $("bn").textContent = "CHEFÃO " + (i + 1) + "/3 — " + c.n;
   $("bh").style.width = "100%";
 }
@@ -1502,6 +1620,7 @@ function hitBoss(d) {
     return;
   }
   sfx("win");
+  clearBossHazards();
   S.remove(boss.g, boss.disc);
   boss = null;
   bi++;
@@ -1555,21 +1674,100 @@ function breach() {
     noteT = 1.8;
   }
 }
+function empAttack() {
+  if (state !== "play" || empCd > 0 || mini) return;
+  empCd = 7;
+  ringT = 0;
+  ringM.material.color.set(0x39ff88);
+  ringM.position.x = P.position.x;
+  ringM.position.z = P.position.z;
+  const R = 12;
+  let frozen = 0;
+  drones.forEach((d, n) => {
+    if (n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < R) {
+      d.fz = 4.5;
+      frozen++;
+    }
+  });
+  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(18);
+  alert_ = Math.max(0, alert_ - 0.35);
+  note = frozen ? "EMP: " + frozen + " drone(s) travado(s)!" : "EMP: firewall inimigo drenado.";
+  noteT = 1.8;
+  sfx("freeze");
+  if (!calm) shake = 0.45;
+}
+function virusAttack() {
+  if (state !== "play" || virusCd > 0 || mini) return;
+  virusCd = 10;
+  ringT = 0;
+  ringM.material.color.set(0xff3fd0);
+  ringM.position.x = P.position.x;
+  ringM.position.z = P.position.z;
+  let target = null;
+  let distance = Infinity;
+  if (boss) {
+    const d = Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z);
+    if (d < distance) { distance = d; target = boss; }
+  }
+  if (target && distance < 20) {
+    hitBoss(12);
+    note = "VÍRUS: blindagem do chefão corrompida!";
+  } else {
+    let best = null;
+    drones.forEach((d, n) => {
+      if (n >= LV[lvl].dr) return;
+      const d2 = Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z);
+      if (d2 < distance) { distance = d2; best = d; }
+    });
+    if (best && distance < 18) best.fz = 6;
+    note = best && distance < 18 ? "VÍRUS: drone sequestrado por 6s." : "VÍRUS lançado na rede.";
+  }
+  noteT = 1.8;
+  sfx("pulse");
+  if (!calm) shake = 0.3;
+}
 addEventListener("keydown", (e) => {
   if (e.code === "Space" || e.key.toLowerCase() === "b") {
     e.preventDefault();
     breach();
+  }
+  if (e.code === "KeyE") {
+    e.preventDefault();
+    empAttack();
+  }
+  if (e.code === "KeyQ") {
+    e.preventDefault();
+    virusAttack();
   }
 });
 $("bz").onpointerdown = (e) => {
   e.preventDefault();
   breach();
 };
+$("hx").onpointerdown = (e) => {
+  e.preventDefault();
+  empAttack();
+};
+$("vx").onpointerdown = (e) => {
+  e.preventDefault();
+  virusAttack();
+};
 let bzShown = "",
   bzAntes = 0,
   chuvaFade = 0; // segundos de rastro restantes; 0 = canvas limpo e parado
 function fxTick(dt) {
   if (state === "play" || state === "menu") bz = Math.max(0, bz - dt);
+  if (state === "play" || state === "menu") {
+    empCd = Math.max(0, empCd - dt);
+    virusCd = Math.max(0, virusCd - dt);
+  }
+  const hx = $("hx"), vx = $("vx");
+  hx.textContent = empCd > 0 ? "EMP · " + Math.ceil(empCd) + "s" : "EMP · E";
+  vx.textContent = virusCd > 0 ? "VÍRUS · " + Math.ceil(virusCd) + "s" : "VÍRUS · Q";
+  hx.classList.toggle("cooldown", empCd > 0);
+  vx.classList.toggle("cooldown", virusCd > 0);
+  hx.classList.toggle("ready", empCd <= 0 && state === "play");
+  vx.classList.toggle("ready", virusCd <= 0 && state === "play");
   // ÂNCORA: botão mostra os segundos restantes; ao zerar, avisa que está pronto (som + brilho)
   const txt = bz > 0 ? "BREACH · " + Math.ceil(bz) + "s" : "BREACH · Espaço";
   if (txt !== bzShown) {
@@ -1851,12 +2049,18 @@ function loop() {
         dz = P.position.z - b.g.position.z,
         dd = Math.hypot(dx, dz);
       b.fz = Math.max(0, b.fz - dt);
+      b.atkT = Math.max(0, b.atkT - dt);
       if (b.fz <= 0 && dd > 1.5) {
         b.g.position.x += (dx / dd) * b.cfg.sp * dt;
         b.g.position.z += (dz / dd) * b.cfg.sp * dt;
       }
-      b.g.position.y = 4.5 + Math.sin(time * 2) * 0.4;
-      b.g.rotation.y += dt;
+      if (b.fz <= 0 && b.atkT <= 0) {
+        startBossAttack(b);
+        b.atkT = Math.max(2.8, 4.8 - bi * 0.45);
+      }
+      if (b.g.userData.mixer) b.g.userData.mixer.update(dt);
+      b.g.position.y = 0.22 + Math.sin(time * 2.4) * 0.08;
+      b.g.rotation.y += dt * (b.fz > 0 ? 0.15 : 0.35);
       b.disc.position.set(b.g.position.x, 0.08, b.g.position.z);
       b.disc.material.color.set(b.fz > 0 ? 0x2fe6ff : b.cfg.c);
       if (b.fz <= 0 && dd < b.cfg.r) {
@@ -1864,6 +2068,7 @@ function loop() {
         bossIn = true;
       }
     }
+    updateBossHazards(dt);
     alert_ = Math.max(0, Math.min(1, alert_ + (inside && !grace ? 1.5 * (bossIn ? 1.5 : 1) : -0.6) * dt));
     $("al").style.width = alert_ * 100 + "%";
     if (alert_ > 0.5 && alertAnt <= 0.5) sfx("spot"); // cruzou o limite: sirene de aviso
