@@ -473,3 +473,7 @@ canvas {
 @media (pointer: coarse) {
   #vx { bottom: calc(154px + env(safe-area-inset-bottom, 0px)); right: calc(18px + env(safe-area-inset-right, 0px)); left: auto; }
 }
+
+/* Botão de instalar o app (PWA) */
+#inst { border-color: #39ff88; color: #39ff88; }
+#inst[hidden] { display: none; }

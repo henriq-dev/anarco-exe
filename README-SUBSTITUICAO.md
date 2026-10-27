@@ -32,3 +32,10 @@ A versão mantém o jogo offline e não exige Node.js, Vite ou instalação de d
 
 ## v2.2 — chefões animados
 O Barão do Petróleo e o CEO MEGACORP não tinham animação gravada. Agora eles usam o "idle" (respiração) do Diretor-Banqueiro, que tem o mesmo esqueleto. A mudança está em `spawnBoss()` no `script.js` (procure por `bossIdleCache`). Só as rotações dos ossos são copiadas.
+
+## v2.3 — instalar como app (PWA)
+Novos arquivos: `manifest.webmanifest`, `sw.js`, `assets/img/icone-192.png`, `assets/img/icone-512.png`. Alterados: `index.html` (links do manifest e botão "⬇ Instalar" no menu), `script.js` (registro do service worker e lógica do botão, no final do arquivo) e `style.css`.
+- Android/Chrome/Edge (celular e PC): o botão "Instalar" aparece no menu quando o navegador permite, e instala com um toque.
+- iPhone/iPad: o botão mostra a dica "Compartilhar > Adicionar à Tela de Início".
+- Depois da 1ª visita o jogo abre sem internet. Os chefões (GLB) só ficam offline depois de já terem aparecido uma vez.
+- A instalação só funciona em HTTPS (a Vercel já é) ou em localhost.

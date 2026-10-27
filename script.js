@@ -2438,3 +2438,31 @@ $("pzm").onclick = () => {
   mini = null;
   $("ov").style.display = "flex";
 };
+
+
+/* ÂNCORA: instalar como app (PWA) — botão "Instalar" no menu */
+(function () {
+  const btn = document.getElementById("inst");
+  if (!btn) return;
+  let pedido = null; // o navegador entrega o "evento de instalação"; guardamos para usar no clique
+  const instalado = () => matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || navigator.standalone;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !instalado();
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+  addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); // segura o aviso automático para mostrar só quando clicar
+    pedido = e;
+    btn.hidden = false;
+  });
+  addEventListener("appinstalled", () => { pedido = null; btn.hidden = true; });
+  if (ios) btn.hidden = false; // iPhone não tem o evento; mostramos a dica manual
+  btn.onclick = async () => {
+    if (pedido) {
+      pedido.prompt();
+      await pedido.userChoice;
+      pedido = null;
+      btn.hidden = true;
+    } else if (ios) {
+      alert("No iPhone/iPad: toque em Compartilhar (□↑) e depois em \"Adicionar à Tela de Início\".");
+    }
+  };
+})();
