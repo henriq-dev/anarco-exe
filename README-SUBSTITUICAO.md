@@ -29,3 +29,6 @@ Depois acesse `http://localhost:8080`.
 - `assets/img/favicon.png`
 
 A versão mantém o jogo offline e não exige Node.js, Vite ou instalação de dependências no repositório publicado.
+
+## v2.2 — chefões animados
+O Barão do Petróleo e o CEO MEGACORP não tinham animação gravada. Agora eles usam o "idle" (respiração) do Diretor-Banqueiro, que tem o mesmo esqueleto. A mudança está em `spawnBoss()` no `script.js` (procure por `bossIdleCache`). Só as rotações dos ossos são copiadas.

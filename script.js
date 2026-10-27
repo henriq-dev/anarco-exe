@@ -1473,6 +1473,7 @@ const BOSS = [
 ];
 const BOSS_MODEL_URLS = globalThis.BOSS_MODEL_URLS || {};
 const BossGLTFLoader = globalThis.GLTFLoader;
+let bossIdleCache = null; // animação "idle" compartilhada entre chefões
 function clearBossHazards() {
   bossHazards.forEach((h) => S.remove(h.g));
   bossHazards = [];
@@ -1611,6 +1612,23 @@ function spawnBoss(i) {
         const idle = res.animations.find((clip) => clip.name.toLowerCase().includes("idle")) || res.animations[0];
         mixer.clipAction(idle).play();
         g.userData.mixer = mixer;
+        bossIdleCache = bossIdleCache || idle; // ÂNCORA: guarda o "idle" do banqueiro para os outros chefões
+      } else {
+        // ÂNCORA: petróleo e CEO têm o mesmo esqueleto, mas nenhuma animação gravada.
+        // Emprestamos o "idle" do banqueiro: só as tracks de ROTAÇÃO dos ossos (posição/escala deformariam o corpo diferente).
+        const emprestar = (clip) => {
+          if (!boss || boss.g !== g || !clip) return;
+          const rot = new T.AnimationClip("idle-emprestado", clip.duration, clip.tracks.filter((t) => t.name.endsWith(".quaternion")));
+          const mixer = new T.AnimationMixer(art);
+          mixer.clipAction(rot).play();
+          g.userData.mixer = mixer;
+        };
+        if (bossIdleCache) emprestar(bossIdleCache);
+        else
+          new BossGLTFLoader().load(BOSS_MODEL_URLS.banqueiro, (r2) => {
+            bossIdleCache = r2.animations.find((c2) => c2.name.toLowerCase().includes("idle")) || r2.animations[0];
+            emprestar(bossIdleCache);
+          });
       }
       g.children.slice(0, 3).forEach((o) => (o.visible = false));
       g.userData.art = art;
