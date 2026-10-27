@@ -453,6 +453,7 @@ lapG.position.set(0, 1.15, 0.62);
 lapG.visible = false;
 P.add(lapG);
 // ÂNCORA: notebook 3D do usuário (laptop.bin = Int16 pos/10000 + Uint16 uv/65535 + Uint16 índices). Se falhar, fica o notebook de caixas.
+const HACK_ANG = Math.PI / 2, LAP_POS = [0, 0.02, 1.05], LAP_ROT = 3.84, LAP_TAM = 1.3;
 const LAP_N = 10764, LAP_F = 20000, LAP_ESCALA = 1.0;
 let lapEsc = 0; // escala atual do "pop" ao abrir (0 -> 1)
 fetch("assets/models/laptop.bin")
@@ -552,6 +553,7 @@ function desenharTela(dt) {
 const lapLight = new T.PointLight(0x39ff88, 0, 7);
 lapLight.position.set(0, 0.3, 1.5);
 P.add(lapLight);
+const KN = { legP: -1.45, shinP: 1.5, legN: 0.1, shinN: 1.65, arm: -0.55, fore: -0.45, head: 0.45, lean: 0.25, y: -0.42 };
 function animChar(dt, sp) {
   if (!model) return;
   const k = Math.min(1, sp / 9);
@@ -560,8 +562,9 @@ function animChar(dt, sp) {
   const r = Math.max(0, Math.min(1, (sp - 9) / 5));
   wob += dt * (6 + k * 10 + r * 6);
   model.position.y = Math.abs(Math.sin(wob)) * 0.14 * k * (1 + 0.5 * r);
-  const tx = 0.16 * k + 0.14 * r + (hacking ? 0.1 + Math.sin(time * 40) * 0.02 : 0);
+  const tx = hacking ? KN.lean : 0.16 * k + 0.14 * r;
   model.rotation.x += (tx - model.rotation.x) * Math.min(1, dt * 10);
+  if (hacking && bone) model.position.y = KN.y;
   model.rotation.z = Math.sin(wob) * 0.07 * k + Math.sin(time * 1.6) * 0.01 * (1 - k);
   model.rotation.y = Math.sin(wob) * 0.12 * k;
   model.scale.y = 1 + Math.sin(time * 2.2) * 0.012 * (1 - k) + Math.abs(Math.sin(wob)) * 0.02 * k;
@@ -582,6 +585,16 @@ function animChar(dt, sp) {
     bone.spine.rotation.y = -s * 0.18 * k;
     bone.head.rotation.y = s * 0.1 * k;
     bone.head.rotation.x = hk ? 0.12 : 0;
+    // ÂNCORA: pose de hack ajoelhado — perna P à frente (joelho para cima), perna N ajoelhada, mãos no teclado no chão
+    if (hk) {
+      const tA = Math.sin(time * 26), tB = Math.sin(time * 26 + 2.1);
+      bone.legP.rotation.x = KN.legP; bone.shinP.rotation.x = KN.shinP;
+      bone.legN.rotation.x = KN.legN; bone.shinN.rotation.x = KN.shinN;
+      bone.armP.rotation.x = KN.arm + Math.max(0, tA) * 0.08; bone.armN.rotation.x = KN.arm + Math.max(0, tB) * 0.08;
+      bone.foreP.rotation.x = KN.fore - Math.max(0, tA) * 0.12; bone.foreN.rotation.x = KN.fore - Math.max(0, tB) * 0.12;
+      bone.armP.rotation.z = 0.25; bone.armN.rotation.z = -0.25;
+      bone.spine.rotation.y = 0; bone.head.rotation.y = 0; bone.head.rotation.x = KN.head;
+    }
     if (castT > 0) {
       bone.armP.rotation.z = 1.5;
       bone.armN.rotation.z = -1.5;
@@ -1980,6 +1993,11 @@ function loop() {
       let da = ta - P.rotation.y;
       da = Math.atan2(Math.sin(da), Math.cos(da)); // caminho mais curto
       P.rotation.y += da * Math.min(1, dt * 12);
+    } else if (hacking) {
+      // ÂNCORA: ao hackear parado, vira de perfil para a câmera ver a tela do notebook no chão
+      let da = HACK_ANG - P.rotation.y;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      P.rotation.y += da * Math.min(1, dt * 8);
     }
     animChar(dt, sp);
     if (!model) P.position.y = Math.abs(Math.sin(time * 14)) * 0.15 * Math.min(1, sp / 9);
@@ -2122,7 +2140,9 @@ function loop() {
     lapEsc += ((hacking ? 1 : 0) - lapEsc) * Math.min(1, dt * 14);
     lapG.visible = hacking || lapEsc > 0.02;
     if (hacking && lapTela) desenharTela(dt);
-    lapG.scale.setScalar(calm ? (hacking ? 1 : 0.001) : Math.max(0.001, lapEsc));
+    lapG.scale.setScalar(LAP_TAM * (calm ? (hacking ? 1 : 0.001) : Math.max(0.001, lapEsc)));
+    lapG.position.set(LAP_POS[0], LAP_POS[1], LAP_POS[2]);
+    lapG.rotation.y = LAP_ROT;
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
       $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
