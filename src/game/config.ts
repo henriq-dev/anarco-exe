@@ -54,6 +54,14 @@ export const DEFAULT_CONFIG = {
     rageSpeed: 5,
     rageAt: 45,
   },
+  fx: {
+    /** 0=low, 1=medium, 2=high. Cosmetic-only development tuning. */
+    quality: 1,
+    particleDensity: 1,
+    lightIntensity: 1,
+    glitchIntensity: 1,
+    bloomStrength: 1,
+  },
 } as const
 
 // Gameplay always reads active values here. Source defaults remain immutable for

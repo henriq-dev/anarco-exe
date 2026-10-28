@@ -10,45 +10,56 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ANARCO.EXE">
 <meta name="color-scheme" content="dark">
-<link rel="icon" href="favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="assets/img/favicon.png">
-<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="assets/img/icone-180.png">
+<link rel="icon" type="image/svg+xml" href="./assets/share/favicon.svg">
+<link rel="icon" type="image/png" sizes="512x512" href="./assets/share/favicon.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="./assets/share/favicon-180.png">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="ANARCO.EXE 3D">
 <meta property="og:title" content="ANARCO.EXE 3D — Breach Protocol">
-<meta property="og:description" content="Invada torres, fuja dos drones e derrube chefões cyberpunk aprimorados.">
+<meta property="og:description" content="Invada torres, fuja dos drones e derrube chefões cyberpunk. Versão v3.7 com efeitos neon e partículas de combate.">
 <meta property="og:url" content="https://anarcoexe.vercel.app/">
-<meta property="og:image" content="https://anarcoexe.vercel.app/assets/img/og-preview.jpg">
+<meta property="og:image" content="./assets/share/og.png">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://anarcoexe.vercel.app/assets/img/og-preview.jpg">
-<link rel="stylesheet" href="assets/fonts/fonts.css">
-<link rel="stylesheet" href="style.css">
+<meta name="twitter:image" content="./assets/share/og.png">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
+<div id="bootScreen" role="status" aria-live="polite">
+  <div class="boot-card">
+    <img class="boot-icon" src="./assets/share/favicon.png" alt="" width="72" height="72">
+    <span class="boot-kicker">SISTEMA LOCAL // REDE ANARQUISTA</span>
+    <h1>ANARCO<span>.EXE</span></h1>
+    <p>Preparando o ambiente de infiltração...</p>
+    <div class="boot-progress" role="progressbar" aria-label="Carregando o ANARCO.EXE"><span></span></div>
+    <small id="bootStatus">Inicializando o motor gráfico...</small>
+    <button id="bootRetry" type="button" hidden>Tentar novamente</button>
+  </div>
+</div>
 <canvas id="rain"></canvas>
-<div id="hud">
+<div id="screenFx" aria-hidden="true"></div>
+<div id="hud" role="group" aria-label="Painel da operação">
   <h1>ANARCO<span>.EXE</span> 3D</h1>
-  <div class="b" id="lv">NÍVEL 1/5</div>
+  <div class="b" id="lv">NÍVEL 1/6</div>
   <div class="b phase-readout" id="phaseTag"><span id="phaseName">DISTRITO FINANCEIRO</span><small id="phaseThreat">AMEAÇA: VIGILÂNCIA CORPORATIVA</small></div>
   <div class="b" id="tm" aria-label="Tempo da corrida">TEMPO <span id="tmv">00:00.0</span></div>
-  <div class="b"><img id="ic_d" alt="">TORRES <span id="cnt">0/3</span></div>
-  <div class="b"><img id="ic_h" alt="">HACK<i><u id="hk"></u></i></div>
-  <div class="b r"><img id="ic_a" alt="">ALERTA<i><u id="al"></u></i></div>
-  <div class="b" id="drread">DRONES <span id="drstate" aria-live="polite">PATRULHA</span></div>
+  <div class="b" id="towerRead"><img id="ic_d" alt="">TORRES <span id="cnt">0/3</span></div>
+  <div class="b" id="hackRead"><img id="ic_h" alt="">HACK<i><u id="hk"></u></i></div>
+  <div class="b r" id="alertRead"><img id="ic_a" alt="">ALERTA<i><u id="al"></u></i></div>
+  <div class="b" id="drread"><img id="ic_dr" alt="">DRONES <span id="drstate" aria-live="polite">PATRULHA</span></div>
   <div class="b side-readout" id="sideRead"><span>OP. SECUNDÁRIA</span><small id="sideText" aria-live="polite">LOCALIZANDO...</small></div>
   <div class="b route-readout" id="routeRead"><span>ROTA ATIVA</span><small id="routeText" aria-live="polite">RÁPIDA · velocidade +18% · ruído +35%</small></div>
   <div class="b" id="bb" hidden><span id="bn">CHEFÃO</span><i><u id="bh"></u></i></div>
+  <div id="hudActions"><button id="snd" aria-label="Som">🔊</button><button id="pb" aria-label="Pausar">⏸</button></div>
 </div>
 <div id="msg" role="status" aria-live="polite"></div>
 <div id="fxFlash" aria-hidden="true"></div>
 <div id="leakcard" hidden><b>VAZAMENTO CAPTURADO</b><span id="lcc"></span><small id="lcd"></small></div>
 <div id="obj" role="status" aria-live="polite"></div>
-<button id="pb" aria-label="Pausar">⏸</button>
 <div id="pz" hidden><div><h2>PAUS<span>A</span></h2><p>P ou Esc para voltar.</p><button id="pzc">Continuar</button> <button id="pzm">Menu</button></div></div>
 <div id="bf" hidden><div><p class="eyebrow">BRIEFING // REDE ANARQUISTA</p><h2 id="bfh"></h2><p id="bft"></p><div class="brief-grid"><span><b>OBJETIVO</b><strong id="bfo"></strong></span><span><b>AMEAÇA</b><strong id="bfa"></strong></span><span><b>RECOMENDAÇÃO</b><strong id="bfr"></strong></span></div></div></div>
 <div id="mini" hidden><b id="miniTitle">BREACH — digite a sequência</b><small id="miniRule">PROTOCOLO // SETAS</small><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
@@ -56,11 +67,14 @@
 <div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul><button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
 <div id="rk" hidden><div><h2>MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul><button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
 <div id="map-wrap"><canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas><div id="mapLegend"><span><i class="legend-dot tower"></i>torre</span><span><i class="legend-dot drone"></i>drone</span><span><i class="legend-dot item"></i>item</span></div></div>
-<button id="snd" aria-label="Som">🔊</button>
-<button id="bz" aria-label="Usar BREACH; tecla Espaço">BREACH · Espaço</button>
-<button id="hx" title="Habilidade nova: descarga EMP" aria-label="Usar EMP; tecla E">EMP · E</button>
-<button id="vx" title="Habilidade nova: vírus de impacto" aria-label="Usar VÍRUS; tecla Q">VÍRUS · Q</button>
-<button id="rn" type="button" aria-label="Segurar para correr">CORRER</button>
+<div id="touchActions" aria-label="Habilidades e movimento">
+  <button id="bz" aria-label="Usar BREACH; tecla Espaço">BREACH · Espaço</button>
+  <button id="hx" title="Habilidade nova: descarga EMP" aria-label="Usar EMP; tecla E">EMP · E</button>
+  <button id="vx" title="Habilidade nova: vírus de impacto" aria-label="Usar VÍRUS; tecla Q">VÍRUS · Q</button>
+  <button id="dg" title="Esquiva com impulso e invulnerabilidade curta" aria-label="Usar esquiva; tecla C">ESQUIVA · C</button>
+  <button id="gx" title="Habilidade exclusiva da VANTA: nó fantasma" aria-label="Usar NÓ FANTASMA; tecla R">NÓ · VANTA</button>
+  <button id="rn" type="button" aria-label="Segurar para correr">CORRER</button>
+</div>
 <div id="routePicker" aria-label="Escolher rota"><button id="routeFast" type="button" aria-label="Escolher rota rápida">1 RÁPIDA</button><button id="routeSafe" type="button" aria-label="Escolher rota protegida">2 PROTEGIDA</button><button id="routeTech" type="button" aria-label="Escolher rota técnica">3 TÉCNICA</button></div>
 <div id="joy"><b id="nub"></b></div>
 <div id="ov"><div>
@@ -68,29 +82,13 @@
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
   <p>Mova com WASD ou setas, segure Shift para correr. Use BREACH, EMP e VÍRUS para controlar a rede e sobreviver aos chefões. Tudo é ficção.</p>
   <p id="rkres" hidden></p>
+  <label class="fx-settings" for="fxQuality"><span>QUALIDADE DOS EFEITOS</span><select id="fxQuality"><option value="low">Baixa · máximo desempenho</option><option value="medium">Média · bloom seletivo</option><option value="high">Alta · bloom completo opcional</option></select><small id="fxQualityStatus" aria-live="polite">FX · MÉDIA</small><small>Se o desempenho cair, o jogo reduz efeitos e resolução automaticamente.</small></label>
   <div id="stats" hidden><b class="stats-title">RELATÓRIO DA OPERAÇÃO</b><div class="stats-grid"><span><small>TORRES</small><strong id="stTowers">0/3</strong></span><span><small>HACKS</small><strong id="stHacks">0</strong></span><span><small>FALHAS</small><strong id="stFails">0</strong></span><span><small>ALERTAS</small><strong id="stAlerts">0</strong></span><span><small>ITENS</small><strong id="stItems">0</strong></span><span><small>HABILIDADES</small><strong id="stSkills">0</strong></span></div><p id="stProfile"></p></div>
   <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
   <button id="st">Invadir</button>
   <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button><button id="rb">Ranking</button><button id="sk" type="button" aria-label="Trocar a skin do personagem"><img alt="" src="assets/img/skins/capuz.png"><span id="skn">Skin: Capuz</span></button><button id="inst" type="button" hidden>⬇ Instalar</button></div>
 </div></div>
-<script src="assets/lib/three.min.js"></script>
-<script src="assets/dados/manifesto.js"></script>
-<script>
-window.THREE = window.THREE || THREE;
-window.BOSS_MODEL_URLS = {
-  banqueiro: 'assets/models/boss-banqueiro-animated.glb',
-  petroleo: 'assets/models/boss-petroleo-rigged.glb',
-  ceo: 'assets/models/boss-ceo-rigged.glb'
-};
-</script>
-<script type="module">
-  import * as ModuleThree from './assets/lib/three.module.js';
-  import { GLTFLoader } from './assets/lib/GLTFLoader.js';
-  window.THREE = ModuleThree;
-  window.GLTFLoader = GLTFLoader;
-  const script = document.createElement('script');
-  script.src = './script.js';
-  document.body.appendChild(script);
-</script>
+<script src="./assets/dados/manifesto.js"></script>
+<script type="module" src="./src/anarco-entry.ts"></script>
 </body>
 </html>

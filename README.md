@@ -1,95 +1,44 @@
-# game-3d starter (three.js + Rapier)
+# ANARCO.EXE 3D — Breach Protocol (V3.8)
 
-A complete, small 3D game — **Sky Cores**: run, jump and dash across floating islands to collect
-every energy core before the clock runs out, avoiding patrol drones. It exists to be *changed*:
-the engine layer is fixed scaffolding, the game layer is the part you rewrite.
+Atualização do jogo cyberpunk 3D enviado pelo usuário. A v3.7 preserva a jogabilidade, os controles, skins, modelos GLB, fases, progressão, áudio e efeitos herdados da v3.6 e acrescenta efeitos neon/combate e qualidade gráfica escalável. A v3.8 melhora a legibilidade e a responsividade do HUD e acrescenta detalhes ambientais leves às salas existentes.
+
+## Desenvolvimento e build
 
 ```bash
 pnpm install
-pnpm dev      # http://localhost:5173
-pnpm build    # typecheck + production build + JS/font budgets + total-size report
-pnpm test     # unit tests (rules, save, i18n, level)
-pnpm smoke    # after build: headless browser playthrough + screenshots in shots/
+PORT=3000 HOST=0.0.0.0 pnpm dev
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm smoke       # depois do build: verifica a saída estática e os assets requeridos
 ```
 
-## Layout
+`pnpm build` roda TypeScript, copia o runtime atual `script.js` e os assets, empacota `dist/` em formato portátil e aplica os limites de JavaScript/fontes. Para servir a exportação localmente, execute `python3 -m http.server 4173 --directory dist`. A pasta `dist/` pode ser publicada como site estático (por exemplo, em Vercel), sem backend. Não há publicação incluída neste pacote.
 
-| Path | Role | Change it? |
-| --- | --- | --- |
-| `src/engine/loop.ts` | Fixed 60 Hz simulation + interpolated rendering | Rarely |
-| `src/engine/input.ts` | Keyboard/mouse, gamepad, touch → one action state | Add actions here |
-| `src/engine/physics.ts` | Rapier world, collider helpers, render interpolation | Rarely |
-| `src/engine/renderer.ts` | WebGL renderer, quality presets, bloom | Rarely |
-| `src/engine/audio.ts` | Music/SFX buses, synthesized SFX, `load()` for files | Add sounds |
-| `src/engine/save.ts` | Versioned localStorage save + leaderboard | Add fields + parsing |
-| `src/engine/i18n.ts` | en / zh-CN, browser detection, saved choice wins | Rarely |
-| `src/engine/assets.ts` | Cached GLTF/texture loading with progress | Use it for models |
-| `src/game/config.ts` | Source defaults and active gameplay configuration | Yes |
-| `src/game/tuning.ts` | Tweak catalog, atomic validation and activation boundaries | Yes |
-| `src/game/rules.ts` | Pure score/lives/clock/win rules (unit tested) | Yes |
-| `src/game/world.ts` | Level layout, sky, lights, islands, stones, lifts | Yes |
-| `src/game/player.ts` | Character controller + game feel + procedural model | Yes |
-| `src/game/*.ts` | Camera, cores, drones, particles, scene orchestration | Yes |
-| `src/ui/`, `src/styles/main.css` | HTML/CSS title, HUD, pause, settings, results | Yes |
-| `src/i18n/*.json` | All player-facing text (both files, same keys) | Yes |
+## Controles
 
-## Rules for changes
+No teclado: WASD/setas movimentam; Shift corre; Espaço ativa BREACH; E ativa EMP; Q ativa VÍRUS; R ativa NÓ FANTASMA da VANTA; C executa esquiva; Esc pausa. O HUD oferece os mesmos comandos por toque, joystick, botões e ações do minigame de hacking.
 
-- **Simulation in `step()`, visuals in `render()`/`animate()`.** Gameplay state only changes in
-  fixed steps; read presses there with `input.consume(action)`, never `pressed()`.
-- **Rules stay pure.** Scoring, win/lose and progression go in `rules.ts` with tests; scene code
-  reports events and reads state.
-- **Every visible string is an i18n key** in both `en.json` and `zh-CN.json` (a test enforces
-  matching keys and placeholders). English and Chinese use the bundled Manus CC0 fonts in `public/fonts/`;
-  if you add new Chinese text, check it renders (missing glyphs fall back to system fonts).
-- **UI is HTML/CSS**, not canvas. Keep the game look: display font, outlined text, hard offset
-  shadows, skewed buttons, notched panels. Menus must stay keyboard/gamepad navigable
-  (`data-nav` on focusable controls).
-- **Colliders come from the helpers** in `physics.ts` with the same sizes as the meshes.
-- Keep `npm run build` within the JS/font budgets (`scripts/check-size.mjs`) and `npm run smoke` green.
-  Total game asset size is reported without a hard limit.
+O menu permite selecionar qualidade baixa, média e alta. Baixa reduz partículas/luzes e omite bloom completo; média usa bloom seletivo leve; alta habilita bloom de pós-processamento e sombras dinâmicas. A resolução e os efeitos adaptam-se automaticamente quando a taxa de quadros cai. Preferência manual de qualidade fica salva localmente pelo navegador.
 
-## Controls
+## Efeitos neon/combate (v3.7)
 
-Keyboard/mouse: WASD move, mouse look (click to capture), Space jump (hold = higher), Shift
-sprint, F or left click dash, Esc pause. Gamepad: left stick, right stick, A jump, X/RB dash,
-LB sprint, Start pause. Touch: left-side stick, right-side drag to look, JUMP / DASH buttons.
+A camada `src/anarco-fx.ts` mantém partículas em um pool BufferGeometry, luzes temporárias reutilizáveis, rastros/duplicatas da esquiva, flashes/glitches breves, bloom completo opcional e qualidade adaptativa. `script.js` conserva eventos e autoridades da v3.6; seus chamados de VFX são cosméticos, separados da simulação e do solver de colisão.
 
-## Credits
+As fases mantêm suas paletas magenta/azul, laranja, ciano, verde, azul elétrico e rosa/roxo. Diretor-Banqueiro, Barão do Petróleo e CEO MEGACORP recebem elementos visuais específicos. Modelos e arte de gameplay vêm do pacote do usuário; não são baixados nem gerados nesta atualização.
 
-Fonts: ManusCC0 (regular, medium, bold) and ManusCC0 Sans CJK SC — CC0 1.0.
-The bundled Chinese font preserves its 6,547-codepoint repertoire; no font download is required.
-See `public/fonts/ManusCC0-LICENSE.txt`.
-Libraries: three.js (MIT), Rapier (Apache-2.0).
+## HUD e salas (v3.8)
 
-## Preview Tweak
+O HUD foi reorganizado para separar painel superior, objetivo, rota, avisos e controles de toque; inclui posicionamento responsivo conforme a altura observada do painel. Layout foi conferido em Chromium em 1280×720, 390×844, 320×568 e 667×375. O Esconderijo Data/Data Center recebeu detalhes ambientais geométricos leves, sem novos colliders ou alterações de rotas e hacking. A integração dos computadores 3D específicos aguarda os arquivos que o usuário pretende enviar.
 
-`src/game/tuning.ts` is this game's parameter manager. The Addon panel reads its
-catalog; `config.ts` owns source defaults and the active configuration used by gameplay.
-When adapting the game, keep only controls with actual gameplay consumers, and preserve
-stable IDs for unchanged parameters. Define ranges, units and the correct activation
-boundary. Register through `scripts/manus-tuning/adapter.js` only under `import.meta.env.DEV`.
-Keep the Vite plugin and `scripts/__manus__/` helpers intact; production builds exclude
-the browser adapter and never inject the bridge.
+## Tweak de desenvolvimento
 
-Apply changes preview state only. `LIVE` parameters are read in the next game update;
-`NEXT_ACTION` parameters activate at the relevant jump/dash start; `NEXT_RUN` parameters
-activate in `Game.start`. Model/collider size and gravity are not exposed by this version.
-Do not mutate the source defaults or persist Apply to localStorage. Save with Manus
-checks the snapshot against the current catalog and edits `DEFAULT_CONFIG`, then uses
-the normal Three.js Web build/checkpoint workflow. Keep existing gameplay parameter
-managers when extending an older project; do not create a competing store.
+No Preview do Vite o bridge Tweak existente registra os controles cosméticos em `src/game/tuning.ts`: qualidade FX, densidade de partículas, intensidade de luzes temporárias, glitches e bloom alto. Não são expostos parâmetros de movimento, dano, colisão ou recompensa. O painel/adaptador de desenvolvimento não entra no build de produção.
 
-For server-authoritative multiplayer, expose local cosmetic controls only until gameplay
-parameters have explicit server-side development support. The descriptor's GAMEPLAY flag
-is a classification, not server authorization or ranked-score enforcement.
+## Assets e compatibilidade
 
-The preview plugin reads the ignored `.manus-webdev/preview-identity.json` v1 projection
-written by the Runtime when initializing, attaching or restoring this project. It contains
-only the resource ID and canonical project directory; private Host bindings and starter
-receipts are not template dependencies. Missing identity disables the bridge.
-The manager latches `tuning.unranked` when non-default GAMEPLAY values become active and
-resets it only at the next run using that run's active values. `Game` snapshots this onto
-`RunState.unranked`; local results cannot save such runs. Preserve this guard when changing
-scoring. When adding online leaderboards, skip submissions for unranked runs and enforce
-eligibility in the authoritative server too; client flags are not proof of a fair score.
+O runtime legado exige um servidor HTTP/HTTPS — não abra o HTML diretamente por `file://`. O Three.js e os passes de pós-processamento são importados das dependências locais. Os modelos GLB, buffers `.bin`, skins e arte social ficam em `assets/`; os arquivos registrados são recuperáveis pelo armazenamento do projeto, e `pnpm build` copia o conteúdo para `dist/assets/` para manter a exportação portátil. `public/assets/dados/manifesto.js` fornece fallbacks vetoriais locais para os caminhos ausentes do ZIP, sem downloads de mídia externa. O build utiliza `base: './'` para poder ser servido em raiz ou subdiretório.
+
+## Teste e continuação
+
+As verificações automatizadas (`pnpm typecheck`, `pnpm test`, build e smoke) e o playtest desta versão estão documentados em [`RELATORIO-CONTINUIDADE-V3.8.md`](RELATORIO-CONTINUIDADE-V3.8.md). Uma run anterior completou as três invasões do Distrito Financeiro e avançou para a Zona Industrial; na retomada posterior, uma rota exposta atingiu alerta máximo antes do primeiro hack. O ponto de retomada do nível 2/6 está agora pausado no spawn, após restauração pelo bridge local/dev-only — isso não valida progressão nova. Nenhum chefão foi alcançado nesta continuação. A aparência do Data Center ainda precisa ser inspecionada em sua fase, e touch/GPU física/áudio/performance em aparelhos reais seguem para aceite.

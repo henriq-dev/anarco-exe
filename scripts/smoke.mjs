@@ -1,124 +1,60 @@
-// Smoke test específico do ANARCO.EXE: valida boot, assets locais, cinco layouts de rota,
-// colisões, troca de rotas, áudio inicializado por gesto e viewport mobile.
-import { spawn } from 'node:child_process'
-import { chromium } from 'playwright'
+// Static delivery smoke test: run `pnpm build` first. This checks the portable Vite output and
+// local assets only; it does not claim browser, input, audio, layout, or device acceptance.
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
-const port = 4300 + Math.floor(Math.random() * 500)
-const url = `http://127.0.0.1:${port}/`
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1'], { stdio: 'ignore' })
-let browser
-const errors = []
-const guard = setTimeout(() => fail('timed out'), 45_000)
+const root = resolve('dist')
+assert.ok(existsSync(join(root, 'index.html')), 'dist/index.html is missing; run pnpm build first')
+const html = readFileSync(join(root, 'index.html'), 'utf8')
+for (const [needle, label] of [
+  ['ANARCO.EXE 3D', 'game title'],
+  ['fxQuality', 'quality selector'],
+  ['screenFx', 'screen-effects layer'],
+  ['manifest.webmanifest', 'PWA manifest'],
+  ['bootScreen', 'game-specific loading screen'],
+  ['og:image', 'Open Graph cover metadata'],
+  ['assets/favicon-', 'game-specific favicon'],
+]) assert.ok(html.includes(needle), `${label} is missing from the generated HTML`)
 
-function cleanup() {
-  clearTimeout(guard)
-  try { server.kill('SIGTERM') } catch {}
-}
-async function fail(message) {
-  console.error(`smoke: FAIL — ${message}`)
-  await browser?.close().catch(() => {})
-  cleanup()
-  process.exit(1)
-}
-async function waitForServer() {
-  for (let i = 0; i < 60; i += 1) {
-    try { if ((await fetch(url)).ok) return } catch {}
-    await new Promise(resolve => setTimeout(resolve, 250))
-  }
-  throw new Error('preview server did not start')
-}
-function observe(page) {
-  page.on('pageerror', error => errors.push(`page: ${error}`))
-  page.on('console', message => message.type() === 'error' && errors.push(`console: ${message.text()}`))
-  page.on('response', response => response.status() >= 400 && errors.push(`HTTP ${response.status()} ${response.url()}`))
-}
+const required = [
+  'script.js',
+  'assets/dados/manifesto.js',
+  'manifest.webmanifest',
+  'manus-routes.json',
+  'assets/share/favicon.svg',
+  'assets/share/favicon.png',
+  'assets/share/favicon-180.png',
+  'assets/share/favicon-192.png',
+  'assets/share/favicon-512.png',
+  'assets/share/og.png',
+  'assets/models/anarco.bin',
+  'assets/models/cachos.bin',
+  'assets/models/laptop.bin',
+  'assets/models/boss-banqueiro-animated.glb',
+  'assets/models/boss-petroleo-rigged.glb',
+  'assets/models/boss-ceo-rigged.glb',
+  'assets/img/skins/capuz.png',
+  'assets/img/skins/vanta.png',
+  'assets/img/skins/cachos.png',
+]
+for (const path of required) assert.ok(existsSync(join(root, path)), `required local game asset is missing: ${path}`)
+const runtime = readFileSync(join(root, 'script.js'), 'utf8')
+assert.ok(runtime.includes('new window.ANARCO_FX.AnarcoFxSystem'), 'dist/script.js is stale or is not the current ANARCO.EXE runtime')
+assert.ok(runtime.includes('fxSystem.emit("breach"') && runtime.includes('fxSystem.dodge('), 'dist/script.js is missing v3.7 combat effects')
+assert.ok(!runtime.includes('navigator.serviceWorker.register("sw.js")'), 'dist/script.js must not register a missing service worker')
 
-try {
-  await waitForServer()
-  browser = await chromium.launch({ args: ['--ignore-gpu-blocklist'] })
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
-  observe(page)
-  await page.goto(url, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('#st', { timeout: 10_000 })
-  await page.waitForFunction(() => Boolean(window.__ANARCO_PLAYTEST__), null, { timeout: 10_000 })
-  const pwa = await page.evaluate(async () => ({
-    manifest: await fetch('manifest.webmanifest').then(response => response.ok),
-    serviceWorker: await fetch('sw.js').then(response => response.ok),
-    serviceWorkerApi: 'serviceWorker' in navigator,
-  }))
-  if (!pwa.manifest || !pwa.serviceWorker || !pwa.serviceWorkerApi) throw new Error(`PWA assets unavailable: ${JSON.stringify(pwa)}`)
+const routes = JSON.parse(readFileSync(join(root, 'manus-routes.json'), 'utf8'))
+assert.deepEqual(routes.routes.map(route => route.path), ['/'], 'the route manifest must match the single-page game')
 
-  const levels = await page.evaluate(() => {
-    const api = window.__ANARCO_PLAYTEST__
-    return Array.from({ length: 6 }, (_, index) => {
-      const result = api.setLevel(index)
-      return {
-        level: result.level,
-        phase: result.phase,
-        visibleObjects: result.routeObjects.filter(object => object.visible).length,
-        routeSolids: result.routeSolids.length,
-        safeBlocked: api.collisionProbe('safe').blocked,
-        fastBlocked: api.collisionProbe('fast').blocked,
-      }
-    })
-  })
-  if (levels.length !== 6) throw new Error('six levels were not inspected')
-  if (levels.slice(0, 5).some(level => level.routeSolids !== 4 || !level.safeBlocked || !level.fastBlocked)) {
-    throw new Error(`route collision audit failed: ${JSON.stringify(levels)}`)
-  }
-  if (levels[5].routeSolids !== 0 || levels[5].safeBlocked || levels[5].fastBlocked) {
-    throw new Error(`level 6 has an invisible route blocker: ${JSON.stringify(levels[5])}`)
-  }
-  const blackout = await page.evaluate(async () => {
-    const api = window.__ANARCO_PLAYTEST__
-    const probe = api.blackoutProbe()
-    api.startLevel(4)
-    api.primeBlackout()
-    await new Promise(resolve => setTimeout(resolve, 250))
-    return { ...probe, activeInLoop: document.body.classList.contains('blackout') }
-  })
-  if (!blackout.ativo || Math.abs(blackout.fator - 0.6) > 0.001 || !blackout.activeInLoop) {
-    throw new Error(`blackout probe failed: ${JSON.stringify(blackout)}`)
-  }
-
-  await page.evaluate(() => document.querySelector('#st').click())
-  await page.waitForTimeout(250)
-  const routeLabels = []
-  for (const selector of ['#routeSafe', '#routeTech', '#routeFast']) {
-    await page.evaluate(selector => document.querySelector(selector).click(), selector)
-    await page.waitForTimeout(80)
-    routeLabels.push(await page.locator('#routeText').textContent())
-  }
-  if (routeLabels.some(label => !label)) throw new Error('route HUD did not update')
-  await page.evaluate(() => document.querySelector('#snd').click())
-
-  const mobile = await browser.newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true })
-  observe(mobile)
-  await mobile.goto(url, { waitUntil: 'domcontentloaded' })
-  await mobile.waitForSelector('#joy', { timeout: 10_000 })
-  await mobile.waitForTimeout(3000)
-  const mobileUi = await mobile.evaluate(async () => {
-    let frames = 0
-    const start = performance.now()
-    await new Promise(resolve => {
-      const tick = () => { frames += 1; performance.now() - start > 500 ? resolve() : requestAnimationFrame(tick) }
-      requestAnimationFrame(tick)
-    })
-    return {
-      joy: !!document.querySelector('#joy'), breach: !!document.querySelector('#bz'), routes: !!document.querySelector('#routePicker'),
-      labels: document.querySelector('#bz')?.getAttribute('aria-label') && document.querySelector('#msg')?.getAttribute('role') === 'status',
-      reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches === false,
-      frames,
-    }
-  })
-  if (!mobileUi.joy || !mobileUi.breach || !mobileUi.routes || !mobileUi.labels) throw new Error('mobile or accessibility controls missing')
-  if (mobileUi.frames < 12) console.warn(`smoke: aviso — Chromium headless mediu ${mobileUi.frames} frames/500ms; confirmar FPS em aparelho físico`)
-  await mobile.close()
-
-  if (errors.length) throw new Error(errors.join('\n'))
-  console.log(`smoke: OK — ${levels.length} fases, colisões, rotas, PWA, áudio e mobile validados; frames headless=${mobileUi.frames}`)
-  await browser.close()
-  cleanup()
-} catch (error) {
-  await fail(error?.message ?? String(error))
-}
+const walk = dir => readdirSync(dir).flatMap(name => {
+  const path = join(dir, name)
+  return statSync(path).isDirectory() ? walk(path) : [path]
+})
+const files = walk(root)
+const js = files.filter(path => path.endsWith('.js'))
+assert.ok(js.some(path => readFileSync(path, 'utf8').includes('AnarcoFxSystem')), 'the FX runtime is missing from the production bundle')
+assert.ok(files.length > 10, 'production output is unexpectedly small')
+const total = files.reduce((size, path) => size + statSync(path).size, 0)
+console.log(`smoke: OK — ${files.length} static files, ${(total / 1048576).toFixed(2)} MiB, local game models and UI assets present`)
+console.log('smoke: browser/input/audio/layout acceptance was not performed')

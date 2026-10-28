@@ -1,6 +1,104 @@
 {
   "version": 2,
-  "groups": {},
+  "groups": {
+    "chefes": {
+      "name": "Chefões",
+      "order": 20
+    },
+    "identidade-do-jogo": {
+      "name": "Identidade do jogo",
+      "order": 10
+    },
+    "skins-do-jogador": {
+      "name": "Skins do jogador",
+      "order": 30
+    }
+  },
   "bundles": {},
-  "assets": {}
+  "assets": {
+    "assets/img/skins/cachos.png": {
+      "path": "/manus-storage/game/sha256/953c7fa9c9068fb881695db43f2e4ee41c0f27abdff49abd6f49196981cddbe4.png",
+      "sha256": "sha256:953c7fa9c9068fb881695db43f2e4ee41c0f27abdff49abd6f49196981cddbe4",
+      "size": 22028,
+      "assetType": "image",
+      "groupId": "skins-do-jogador"
+    },
+    "assets/img/skins/capuz.png": {
+      "path": "/manus-storage/game/sha256/dced8e1607fe53a84629a38747d7a3b17cd9722067f628b154f9d0555993a578.png",
+      "sha256": "sha256:dced8e1607fe53a84629a38747d7a3b17cd9722067f628b154f9d0555993a578",
+      "size": 16417,
+      "assetType": "image",
+      "groupId": "skins-do-jogador"
+    },
+    "assets/img/skins/vanta.png": {
+      "path": "/manus-storage/game/sha256/ae7398228f8dc50b0e6d78f68ef066da00a68a50a7f255081c9e105640bb7923.png",
+      "sha256": "sha256:ae7398228f8dc50b0e6d78f68ef066da00a68a50a7f255081c9e105640bb7923",
+      "size": 1335,
+      "assetType": "image",
+      "groupId": "skins-do-jogador"
+    },
+    "assets/models/boss-banqueiro-animated.glb": {
+      "path": "/manus-storage/game/sha256/8a14fa3440f506c49f78d587808436cb610a4ae8ebe063b69a36d46cf9496e5b.glb",
+      "sha256": "sha256:8a14fa3440f506c49f78d587808436cb610a4ae8ebe063b69a36d46cf9496e5b",
+      "size": 4321124,
+      "assetType": "model",
+      "groupId": "chefes"
+    },
+    "assets/models/boss-ceo-rigged.glb": {
+      "path": "/manus-storage/game/sha256/38b0faaa368d4491112f48d8d1f8f1cbb4481ad02f84ac72f92ca09494d26e2a.glb",
+      "sha256": "sha256:38b0faaa368d4491112f48d8d1f8f1cbb4481ad02f84ac72f92ca09494d26e2a",
+      "size": 4034124,
+      "assetType": "model",
+      "groupId": "chefes"
+    },
+    "assets/models/boss-petroleo-rigged.glb": {
+      "path": "/manus-storage/game/sha256/80f014fe0a9a2e3ce27f42bbebfcd7afb7bcb483381db08fa1c1c4b4e1d81ab8.glb",
+      "sha256": "sha256:80f014fe0a9a2e3ce27f42bbebfcd7afb7bcb483381db08fa1c1c4b4e1d81ab8",
+      "size": 4036844,
+      "assetType": "model",
+      "groupId": "chefes"
+    },
+    "assets/share/favicon-180.png": {
+      "path": "/manus-storage/game/sha256/ee7b4453259680fb0362b02fcff72fee09eee9449aa9edaecf7ff90f6b0556d5.png",
+      "sha256": "sha256:ee7b4453259680fb0362b02fcff72fee09eee9449aa9edaecf7ff90f6b0556d5",
+      "size": 22827,
+      "assetType": "image",
+      "groupId": "identidade-do-jogo"
+    },
+    "assets/share/favicon-192.png": {
+      "path": "/manus-storage/game/sha256/3a4f7090d90d4a63ba65540050398af52f82a8436aac08203f5391bb6df6d856.png",
+      "sha256": "sha256:3a4f7090d90d4a63ba65540050398af52f82a8436aac08203f5391bb6df6d856",
+      "size": 24377,
+      "assetType": "image",
+      "groupId": "identidade-do-jogo"
+    },
+    "assets/share/favicon-512.png": {
+      "path": "/manus-storage/game/sha256/c077ccd81ae0dc47d120c17d85620acc3241d2728e88e3dcbb3004b83887254b.png",
+      "sha256": "sha256:c077ccd81ae0dc47d120c17d85620acc3241d2728e88e3dcbb3004b83887254b",
+      "size": 12164,
+      "assetType": "image",
+      "groupId": "identidade-do-jogo"
+    },
+    "assets/share/favicon.png": {
+      "path": "/manus-storage/game/sha256/c077ccd81ae0dc47d120c17d85620acc3241d2728e88e3dcbb3004b83887254b.png",
+      "sha256": "sha256:c077ccd81ae0dc47d120c17d85620acc3241d2728e88e3dcbb3004b83887254b",
+      "size": 12164,
+      "assetType": "image",
+      "groupId": "identidade-do-jogo"
+    },
+    "assets/share/favicon.svg": {
+      "path": "/manus-storage/game/sha256/8cf1ad58a72b40a47075720ba3d2e07d56135add139a5a3391571ec797e063fb.svg",
+      "sha256": "sha256:8cf1ad58a72b40a47075720ba3d2e07d56135add139a5a3391571ec797e063fb",
+      "size": 1100,
+      "assetType": "image",
+      "groupId": "identidade-do-jogo"
+    },
+    "assets/share/og.png": {
+      "path": "/manus-storage/game/sha256/e53733f551ad66486033919a5011d0d6b18936a2476872488f1862edd4b25c27.png",
+      "sha256": "sha256:e53733f551ad66486033919a5011d0d6b18936a2476872488f1862edd4b25c27",
+      "size": 1253263,
+      "assetType": "image",
+      "groupId": "identidade-do-jogo"
+    }
+  }
 }

@@ -39,10 +39,31 @@ if (location.protocol === "file:") {
 }
 const T = THREE,
   $ = (id) => document.getElementById(id);
+function syncHudClearance() {
+  const hud = $("hud"), obj = $("obj"), routes = $("routePicker");
+  if (!hud || !obj || !routes) return;
+  const hudBottom = Math.ceil(hud.getBoundingClientRect().bottom);
+  const objHeight = Math.max(30, Math.ceil(obj.getBoundingClientRect().height));
+  const objTop = hudBottom + 8;
+  const routeTop = objTop + objHeight + 8;
+  const routeHeight = Math.ceil(routes.getBoundingClientRect().height) || 38;
+  const portraitControls = matchMedia("(max-width: 980px) and (orientation: portrait)").matches;
+  const eventTop = portraitControls ? routeTop + routeHeight + 10 : objTop + objHeight + 12;
+  const style = document.documentElement.style;
+  style.setProperty("--anarco-objective-top", `${objTop}px`);
+  style.setProperty("--anarco-route-top", `${routeTop}px`);
+  style.setProperty("--anarco-event-top", `${eventTop}px`);
+}
+syncHudClearance();
+window.addEventListener("resize", syncHudClearance, { passive: true });
+if ("ResizeObserver" in window) {
+  const hudObserver = new ResizeObserver(syncHudClearance);
+  [$("hud"), $("obj"), $("routePicker")].forEach((el) => el && hudObserver.observe(el));
+}
 
 // Pacote 1: identidade visual semantica por fase.
 const PHASE_THEME = [
-  { key: "finance", name: "DISTRITO FINANCEIRO", threat: "VIGILANCIA CORPORATIVA", sky: 0x0a0818, fog: 0x0a0818, ground: 0x111114, grid: 0x6a2bd0, sun: 0xff6a5a },
+  { key: "finance", name: "DISTRITO FINANCEIRO", threat: "VIGILANCIA CORPORATIVA", sky: 0x0a0818, fog: 0x0a0818, ground: 0x111114, grid: 0xff3fd0, sun: 0x2fe6ff },
   { key: "industrial", name: "ZONA INDUSTRIAL", threat: "CALOR, FUMACA E DRONES", sky: 0x160d0a, fog: 0x160d0a, ground: 0x1b1412, grid: 0xff6b2d, sun: 0xff9a4a },
   { key: "surveillance", name: "CENTRO DE VIGILANCIA", threat: "CAMERAS E LINHA DE VISAO", sky: 0x07131d, fog: 0x07131d, ground: 0x101b26, grid: 0x2fe6ff, sun: 0x72cfff },
   { key: "hideout", name: "ESCONDERIJO DATA", threat: "REDE INFILTRADA", sky: 0x07170f, fog: 0x07170f, ground: 0x2b2a33, grid: 0x39ff88, sun: 0x64ffb0 },
@@ -56,27 +77,36 @@ function applyPhaseReadout() {
   applyRouteLayout();
   const theme = PHASE_THEME[lvl] || PHASE_THEME[0];
   document.body.dataset.phase = theme.key;
+  if (fxSystem) fxSystem.setPhase(theme.key);
   $("phaseName").textContent = theme.name;
   $("phaseThreat").textContent = "AMEACA: " + theme.threat;
 }
 function applyPhaseKit() {
-  while (phaseKit.children.length) phaseKit.remove(phaseKit.children[0]);
   const theme = PHASE_THEME[lvl] || PHASE_THEME[0];
+  let kit = phaseKitCache.get(theme.key);
+  if (kit) {
+    phaseKitCache.forEach((candidate) => { candidate.visible = candidate === kit; });
+    return;
+  }
+  kit = new T.Group();
+  kit.name = "phase-kit-" + theme.key;
+  phaseKit.add(kit);
+  phaseKitCache.set(theme.key, kit);
   const solid = new T.MeshStandardMaterial({ color: theme.ground, emissive: theme.grid, emissiveIntensity: 0.22, metalness: 0.65, roughness: 0.5 });
   const glow = new T.MeshBasicMaterial({ color: theme.grid, transparent: true, opacity: 0.72, blending: T.AdditiveBlending });
   const addBlock = (x, z, w, h, d, y = h / 2) => {
     const m = new T.Mesh(new T.BoxGeometry(w, h, d), solid);
     m.position.set(x, y, z);
-    phaseKit.add(m);
+    kit.add(m);
     const edge = new T.LineSegments(new T.EdgesGeometry(m.geometry), glow);
     edge.position.copy(m.position);
-    phaseKit.add(edge);
+    kit.add(edge);
   };
   const addPipe = (x, z, h, rot = 0) => {
     const p = new T.Mesh(new T.CylinderGeometry(0.22, 0.3, h, 8), glow);
     p.position.set(x, h / 2, z);
     p.rotation.z = rot;
-    phaseKit.add(p);
+    kit.add(p);
   };
   if (theme.key === "finance") {
     [-28, -20, 20, 28].forEach((x, i) => addBlock(x, -22 + (i % 2) * 7, 3.4, 7 + (i % 3) * 2, 3));
@@ -93,7 +123,7 @@ function applyPhaseKit() {
   } else {
     [-24, -12, 12, 24].forEach((x, i) => { addBlock(x, -27, 2.4, 10 + (i % 2) * 4, 2.4); addPipe(x, -25.6, 4, Math.PI / 2); });
   }
-  phaseKit.visible = true;
+  phaseKitCache.forEach((candidate) => { candidate.visible = candidate === kit; });
 }
 const buzz = (ms = 24) => {
   if (navigator.vibrate) navigator.vibrate(ms);
@@ -121,6 +151,7 @@ $("ic_d").src = ICON.data;
 $("ic_h").src = ICON.hack;
 $("ic_a").src = ICON.drone;
 // ÂNCORA: celular (toque) com tela densa gasta muita GPU: limita os pixels e dispensa o antialias (MSAA)
+let fxSystem = null;
 const toque = matchMedia("(pointer: coarse)").matches;
 const R = new T.WebGLRenderer({ antialias: !(toque && devicePixelRatio >= 2) });
 let pixelRatio = Math.min(devicePixelRatio, toque ? 1.25 : 2);
@@ -131,18 +162,23 @@ S.background = new T.Color(0x0a0818);
 S.fog = new T.Fog(0x0a0818, 30, 90);
 const C = new T.PerspectiveCamera(55, 1, 0.1, 220);
 const phaseKit = new T.Group();
+const phaseKitCache = new Map();
 S.add(phaseKit);
 S.add(new T.HemisphereLight(0xffffff, 0x330a0a, 0.6));
 const sun = new T.DirectionalLight(0xff6a5a, 0.5);
 sun.position.set(-10, 30, 10);
+sun.userData.anarcoKeyLight = true;
 S.add(sun);
 function resize() {
   R.setSize(innerWidth, innerHeight);
   C.aspect = innerWidth / innerHeight;
   C.updateProjectionMatrix();
+  if (fxSystem) fxSystem.resize();
 }
 addEventListener("resize", resize);
 resize();
+fxSystem = new window.ANARCO_FX.AnarcoFxSystem(R, S, C);
+if (window.__ANARCO_DEBUG__) window.__ANARCO_FX_INSTANCE__ = fxSystem;
 
 const ground = new T.Mesh(new T.PlaneGeometry(90, 90), new T.MeshStandardMaterial({ color: 0x111114 }));
 ground.rotation.x = -Math.PI / 2;
@@ -150,6 +186,20 @@ S.add(ground);
 const grid = new T.GridHelper(90, 45, 0x6a2bd0, 0x1a1030);
 grid.position.y = 0.02;
 S.add(grid);
+// V3.6: poças refletivas leves e tiras de neon para aumentar profundidade sem pesar o mobile.
+const puddles = [];
+const puddleColors = [0x2fe6ff, 0xff3fd0, 0x39ff88];
+for (let i = 0; i < 14; i++) {
+  const color = puddleColors[i % puddleColors.length];
+  const mat = new T.MeshStandardMaterial({ color: 0x07101d, emissive: color, emissiveIntensity: 0.14, metalness: 0.92, roughness: 0.12, transparent: true, opacity: 0.58 });
+  const m = new T.Mesh(new T.CircleGeometry(1, 24), mat);
+  m.rotation.x = -Math.PI / 2;
+  m.rotation.z = rnd() * Math.PI;
+  m.scale.set(1.2 + rnd() * 2.2, 0.45 + rnd() * 0.7, 1);
+  m.position.set((rnd() - 0.5) * 60, 0.035, (rnd() - 0.5) * 58);
+  S.add(m);
+  puddles.push({ m, mat, phase: rnd() * 6.28 });
+}
 const routeVisuals = new T.Group();
 S.add(routeVisuals);
 const ROUTE_POINTS = {
@@ -347,6 +397,7 @@ const lap = mk(new T.BoxGeometry(0.7, 0.5, 0.08), 0x220000, 0xe0261c);
 lap.position.set(0, 1.3, -0.55);
 P.add(body, head, hood, e1, e2, lap);
 S.add(P);
+fxSystem.setPlayer(P);
 const sh = new T.Mesh(
   new T.CircleGeometry(0.8, 16).rotateX(-Math.PI / 2),
   new T.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0.5 }),
@@ -434,13 +485,20 @@ const SKINS = {
       [10, -0.22, 0.48, 0, -0.22, 0.05, 0, 0.17],
     ],
   },
+  vanta: {
+    nome: "VANTA",
+    classe: "INFILTRADORA",
+    escala: 1.0,
+    procedural: true,
+  },
 };
 const PROGRESS_KEY = "anarco_progress";
 let progression;
 try { progression = JSON.parse(ler(PROGRESS_KEY) || "{}"); } catch (e) { progression = {}; }
 progression.wins = Number.isFinite(progression.wins) ? progression.wins : 0;
-progression.skins = Array.isArray(progression.skins) ? progression.skins.filter((id) => SKINS[id]) : ["capuz"];
+progression.skins = Array.isArray(progression.skins) ? progression.skins.filter((id) => SKINS[id]) : ["capuz", "vanta"];
 if (!progression.skins.includes("capuz")) progression.skins.unshift("capuz");
+if (!progression.skins.includes("vanta")) progression.skins.push("vanta");
 const saveProgress = () => guardar(PROGRESS_KEY, JSON.stringify(progression));
 function applyRewardCosmetic() {
   document.body.dataset.reward = progression.wins >= 3 ? "glitch" : progression.wins >= 2 ? "neon" : "base";
@@ -449,10 +507,66 @@ let skinAtual = ler("anarco_skin");
 if (!SKINS[skinAtual] || !progression.skins.includes(skinAtual)) skinAtual = "capuz";
 let pedidoSkin = 0, // só o pedido mais recente vale (cliques rápidos não embaralham)
   skinCarregada = null; // skin que está de fato na tela
+function makeVantaModel() {
+  const g = new T.Group();
+  const mat = (color, emissive = 0x000000, intensity = 0) => new T.MeshStandardMaterial({ color, emissive, emissiveIntensity: intensity, roughness: 0.5, metalness: 0.35 });
+  const jacket = mat(0x101522, 0x122b52, 0.45);
+  const dark = mat(0x080a10, 0x160c28, 0.28);
+  const cyan = new T.MeshBasicMaterial({ color: 0x53f6ff, transparent: true, opacity: 0.92, blending: T.AdditiveBlending });
+  const magenta = new T.MeshBasicMaterial({ color: 0xff3fd0, transparent: true, opacity: 0.88, blending: T.AdditiveBlending });
+  const part = (geo, material, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new T.Mesh(geo, material);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    m.castShadow = true;
+    g.add(m);
+    return m;
+  };
+  part(new T.BoxGeometry(0.86, 1.05, 0.48), jacket, 0, 1.48, 0);
+  part(new T.BoxGeometry(0.18, 0.92, 0.54), dark, -0.48, 1.48, 0);
+  part(new T.BoxGeometry(0.18, 0.92, 0.54), dark, 0.48, 1.48, 0);
+  part(new T.SphereGeometry(0.43, 16, 12), dark, 0, 2.32, 0);
+  part(new T.BoxGeometry(0.54, 0.16, 0.06), cyan, 0, 2.34, 0.4);
+  part(new T.BoxGeometry(0.38, 0.05, 0.06), magenta, 0, 2.1, 0.39);
+  part(new T.BoxGeometry(0.08, 0.65, 0.08), cyan, -0.49, 1.65, 0.28);
+  part(new T.BoxGeometry(0.08, 0.65, 0.08), magenta, 0.49, 1.65, 0.28);
+  part(new T.CylinderGeometry(0.09, 0.11, 0.86, 8), dark, -0.58, 1.35, 0, 0, 0, -0.08);
+  part(new T.CylinderGeometry(0.09, 0.11, 0.86, 8), dark, 0.58, 1.35, 0, 0, 0, 0.08);
+  part(new T.BoxGeometry(0.12, 0.62, 0.12), jacket, -0.2, 0.57, 0);
+  part(new T.BoxGeometry(0.12, 0.62, 0.12), jacket, 0.2, 0.57, 0);
+  part(new T.BoxGeometry(0.28, 0.12, 0.5), dark, -0.2, 0.12, 0.08);
+  part(new T.BoxGeometry(0.28, 0.12, 0.5), dark, 0.2, 0.12, 0.08);
+  const halo = new T.Mesh(new T.TorusGeometry(0.64, 0.018, 6, 32), cyan);
+  halo.position.set(0, 1.5, -0.28);
+  halo.rotation.x = Math.PI / 2;
+  g.add(halo);
+  g.userData.vanta = true;
+  return g;
+}
+function instalarModelo(novo, id, novoBone = null) {
+  if (model) {
+    P.remove(model);
+    model.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+  } else P.remove(body, head, hood, e1, e2, lap);
+  model = novo;
+  bone = novoBone;
+  P.add(model);
+  skinCarregada = id;
+}
 async function carregarModelo(id = skinAtual) {
   const cfg = SKINS[id],
     pedido = ++pedidoSkin;
   try {
+    if (cfg.procedural) {
+      const novo = makeVantaModel();
+      novo.scale.setScalar(cfg.escala);
+      if (pedido !== pedidoSkin) return;
+      instalarModelo(novo, id);
+      return;
+    }
     const N = cfg.n,
       F = cfg.f;
     const resp = await fetch(cfg.arq); // precisa de servidor (Vercel, Netlify, Live Server)
@@ -532,18 +646,8 @@ async function carregarModelo(id = skinAtual) {
     sm.bind(new T.Skeleton(NOMES_OSSOS.map((n) => B[n])));
     sm.frustumCulled = false;
     novo.add(sm);
-    // troca de uma vez só: o personagem nunca fica sem corpo no meio da troca
-    if (model) {
-      P.remove(model);
-      model.traverse((o) => {
-        if (o.geometry) o.geometry.dispose();
-        if (o.material) o.material.dispose();
-      });
-    } else P.remove(body, head, hood, e1, e2, lap);
-    model = novo;
-    bone = B;
-    P.add(model);
-    skinCarregada = id;
+    // troca atômica: o personagem nunca fica sem corpo durante a troca
+    instalarModelo(novo, id, B);
   } catch (err) {
     console.warn("modelo não carregou", err); // mantém o que já estava na tela (ou o boneco simples)
     if (pedido === pedidoSkin && skinCarregada && skinCarregada !== id) {
@@ -559,7 +663,7 @@ carregarModelo();
 const ordemSkins = Object.keys(SKINS);
 function rotuloSkin() {
   const total = Object.keys(SKINS).length;
-  $("skn").textContent = "Skin: " + SKINS[skinAtual].nome + " · " + progression.skins.length + "/" + total;
+  $("skn").textContent = "Operador: " + SKINS[skinAtual].nome + " · " + (SKINS[skinAtual].classe || "HACKER") + " · " + progression.skins.length + "/" + total;
   $("sk").querySelector("img").src = "assets/img/skins/" + skinAtual + ".png";
 }
 $("sk").onclick = () => {
@@ -611,7 +715,7 @@ fetch("assets/models/laptop.bin")
     g.setAttribute("uv", new T.BufferAttribute(uv, 2));
     g.setIndex(new T.BufferAttribute(new Uint16Array(buf, LAP_N * 10, LAP_F * 3), 1));
     g.computeVertexNormals();
-    new T.TextureLoader().load("assets/img/props/laptop.webp", (tex) => {
+    new T.TextureLoader().load(PR.laptop.src, (tex) => {
       // ÂNCORA: tela "digitando" — a textura vira um canvas; a área da tela (topo do atlas) recebe um terminal
       // que escreve letra por letra durante o hack, e teclas do teclado (base do atlas) acendem como se fossem apertadas.
       const cv = document.createElement("canvas");
@@ -833,25 +937,9 @@ const drones = [
   return g;
 });
 
-// particles
-const N = 400,
-  pp = new Float32Array(N * 3).fill(-999),
-  pv = Array.from({ length: N }, () => ({ v: new T.Vector3(), l: 0 }));
-const pg = new T.BufferGeometry();
-pg.setAttribute("position", new T.BufferAttribute(pp, 3));
-const particleMat = new T.PointsMaterial({ color: 0xff4a3d, size: 0.55, transparent: true, opacity: 0.95 });
-S.add(
-  new T.Points(pg, particleMat),
-);
-let pi = 0;
-function burst(x, y, z, color = 0xff4a3d, count = 110, force = 14) {
-  particleMat.color.set(color);
-  for (let k = 0; k < count; k++) {
-    const j = pi++ % N;
-    pp.set([x, y, z], j * 3);
-    pv[j].v.set((Math.random() - 0.5) * force, Math.random() * force * 0.85, (Math.random() - 0.5) * force);
-    pv[j].l = 1.4;
-  }
+// V3.7: o pool de pontos, cores por partícula, vida, gravidade e reutilização está em AnarcoFxSystem.
+function burst(x, y, z, color = 0xff4a3d, count = 44, force = 12) {
+  if (fxSystem) fxSystem.burstAt(new T.Vector3(x, y, z), color, count, force);
 }
 const playerFx = new T.Mesh(
   new T.RingGeometry(0.7, 0.86, 32).rotateX(-Math.PI / 2),
@@ -999,7 +1087,8 @@ function reset(keep) {
   sideMission = { ...(SIDE_MISSIONS[lvl] || SIDE_MISSIONS[0]), done: false };
   renderSideMission();
   $("mini").hidden = true;
-  emp = boost = empCd = virusCd = 0;
+  emp = boost = empCd = virusCd = ghostCd = ghostT = dodgeT = dodgeCd = dodgeInv = 0;
+  dodgeVx = dodgeVz = 0;
   $("msg").textContent = "";
   applyLevel();
   resetSceneProps();
@@ -1113,6 +1202,9 @@ function hackDone(t) {
   t.spr.visible = true;
   t.glitch = 1.2;
   t.wt = 0;
+  fxSystem.emit("code", new T.Vector3(t.x, t.h, t.z), 0.9);
+  fxSystem.lightAt(new T.Vector3(t.x, 2, t.z), "#39ff88", 2.8, 0.32, 14);
+  fxSystem.flash("hack", 280);
   burst(t.x, t.h, t.z);
   const doc = addLeak(t.n);
   leakCard(t.n, doc);
@@ -1381,6 +1473,8 @@ function spawnPickups() {
 }
 function getPick(t) {
   runStats.items++;
+  fxSystem.emit("pickup", new T.Vector3(P.position.x, 1.4, P.position.z), 0.7);
+  fxSystem.lightAt(new T.Vector3(P.position.x, 1.2, P.position.z), "#39ff88", 1.5, 0.2, 8);
   if (!sideMission.done && t === sideMission.type) {
     sideMission.done = true;
     runStats.side++;
@@ -1512,6 +1606,8 @@ function destroyPropNear(x, z) {
   } else {
     target.destroyed = true;
     target.node.visible = false;
+    fxSystem.emit(target.kind === "crate" || target.kind === "panel" ? "metal" : "code", new T.Vector3(target.x, target.kind === "door" ? 2.2 : 1, target.z), 1.25);
+    fxSystem.lightAt(new T.Vector3(target.x, 1.2, target.z), "#ff8a48", 2.2, 0.22, 10);
     burst(target.x, target.kind === "door" ? 2.2 : 1, target.z, fx.color, 130, fx.force);
     flashFeedback("hack");
     triggerPlayerFx(0xff3fd0, 0.9);
@@ -1848,13 +1944,33 @@ const mural = new T.Mesh(
 );
 mural.position.set(0, 17, -36.4);
 roomG.add(mural);
+// Camada arquitetural do Data Center: detalhes decorativos, sem registro em solids.
+const roomMetal = new T.MeshStandardMaterial({ color: 0x111a1b, metalness: 0.72, roughness: 0.42 });
+const roomGlow = new T.MeshBasicMaterial({ color: 0x39ff88, transparent: true, opacity: 0.48, depthWrite: false });
+const roomCyan = new T.MeshBasicMaterial({ color: 0x2fe6ff, transparent: true, opacity: 0.38, depthWrite: false });
+function addRoomRail(w, h, d, x, y, z, material) {
+  const rail = new T.Mesh(new T.BoxGeometry(w, h, d), material);
+  rail.position.set(x, y, z);
+  rail.renderOrder = material === roomGlow || material === roomCyan ? 2 : 0;
+  roomG.add(rail);
+  return rail;
+}
+[-27, -14, 0, 14, 27].forEach((z) => {
+  [-1, 1].forEach((side) => addRoomRail(0.22, 11.2, 0.34, side * 36.2, 6.2, z, roomMetal));
+});
+[-1, 1].forEach((side) => {
+  addRoomRail(0.12, 0.08, 62, side * 3.1, 0.065, 0, roomGlow);
+  addRoomRail(0.42, 0.2, 60, side * 31, 9.1, 0, roomMetal);
+  addRoomRail(0.14, 0.04, 57, side * 31, 8.98, 0, roomCyan);
+});
+[-23, -11, 11, 23].forEach((z) => addRoomRail(12, 0.025, 0.07, 0, 0.07, z, roomCyan));
 // ESCONDERIJO: mesas, racks e caixas (obstáculo + cobertura)
 const HIDE = [];
 {
   const mTab = new T.MeshStandardMaterial({ color: 0x3a2a20, roughness: 0.8 }),
-    mRack = new T.MeshStandardMaterial({ color: 0x18181d, emissive: 0x2fe6ff, emissiveIntensity: 0.12 }),
+    mRack = new T.MeshStandardMaterial({ color: 0x10191b, emissive: 0x2fe6ff, emissiveIntensity: 0.18, metalness: 0.58, roughness: 0.46 }),
     mBox = new T.MeshStandardMaterial({ color: 0x6b5435, roughness: 1 }),
-    edge = new T.LineBasicMaterial({ color: 0xff3fd0 });
+    edge = new T.LineBasicMaterial({ color: 0x39ff88 });
   const add = (kind, x, z, w, h, d, rot) => {
     const g = new T.Group();
     if (kind === "mesa") {
@@ -1888,7 +2004,7 @@ const HIDE = [];
         for (let k = 0; k < 6; k++) {
           const led = new T.Mesh(
             new T.BoxGeometry(w * 0.7, 0.08, 0.05),
-            new T.MeshBasicMaterial({ color: k % 2 ? 0x39ff88 : 0xff3fd0 }),
+            new T.MeshBasicMaterial({ color: k % 2 ? 0x39ff88 : 0x2fe6ff }),
           );
           led.position.set(0, 0.6 + k * (h / 7), d / 2 + 0.03);
           g.add(led);
@@ -2021,6 +2137,13 @@ let bz = 0,
   drops = [],
   empCd = 0,
   virusCd = 0,
+  ghostCd = 0,
+  ghostT = 0,
+  dodgeT = 0,
+  dodgeCd = 0,
+  dodgeInv = 0,
+  dodgeVx = 0,
+  dodgeVz = 0,
   bossHazards = [],
   bossTelegraph = null;
 const rc = $("rain"),
@@ -2105,6 +2228,12 @@ function startBossAttack(b) {
   const radius = b.cfg.r * (index === 2 ? 0.9 : 0.62);
   const delay = index === 0 ? 1.15 : index === 1 ? 0.8 : 0.55;
   const label = b.cfg.attacks[index];
+  const at = new T.Vector3(targetX, 1, targetZ);
+  fxSystem.emit(b.cfg.model === "banqueiro" ? "paper" : b.cfg.model === "petroleo" ? "oil" : "data", at, 0.8);
+  if (b.cfg.model === "petroleo") fxSystem.emit("industrial", at.clone().add(new T.Vector3(0, 0.25, 0)), 0.72);
+  fxSystem.lightAt(at, "#" + b.cfg.c.toString(16).padStart(6, "0"), 2.6, 0.32, 15);
+  const screenFx = b.cfg.model === "ceo" && index === 2 ? "collapse" : b.cfg.model === "petroleo" ? "industrial" : index === 2 && fxSystem.effectiveQuality === "high" ? "chromatic" : "boss";
+  fxSystem.flash(screenFx, screenFx === "collapse" ? 560 : 420);
   createBossHazard(targetX, targetZ, radius, b.cfg.c, delay, 1.3, label);
   if (b.cfg.model === "banqueiro" && index === 1) {
     createBossHazard(targetX - 4.2, targetZ, radius * 0.55, b.cfg.c, delay + 0.12, 1.05, "MURALHA LATERAL");
@@ -2128,6 +2257,24 @@ function bossSignature(kind, color) {
       const seal = new T.Mesh(new T.CylinderGeometry(0.55, 0.55, 0.12, 6), glow);
       seal.rotation.x = Math.PI / 2; seal.position.set(side * 2.35, 1.35, 0.35); g.add(seal);
     });
+    const paperMat = new T.MeshBasicMaterial({ color: 0xf3f0e8, transparent: true, opacity: 0.76, side: T.DoubleSide });
+    const inkMat = new T.MeshBasicMaterial({ color: 0xe0261c, transparent: true, opacity: 0.92 });
+    for (let i = 0; i < 5; i++) {
+      const sheet = new T.Group();
+      const page = new T.Mesh(new T.PlaneGeometry(0.55, 0.78), paperMat.clone());
+      const rule = new T.Mesh(new T.BoxGeometry(0.34, 0.025, 0.012), inkMat);
+      rule.position.set(0, -0.05, 0.012);
+      sheet.add(page, rule);
+      sheet.position.set(Math.sin(i * 1.26) * 2.2, 2.8 + (i % 2) * 0.45, Math.cos(i * 1.26) * 1.2);
+      sheet.rotation.set(0.25 + i * 0.1, i * 0.8, 0.22 - i * 0.09);
+      sheet.userData.visualPaper = true;
+      g.add(sheet);
+    }
+    [-1, 0, 1].forEach((x) => {
+      const dataLine = new T.Mesh(new T.BoxGeometry(1.1, 0.025, 0.018), new T.MeshBasicMaterial({ color: x ? 0xefffff : 0xff3b52, transparent: true, opacity: 0.75 }));
+      dataLine.position.set(x * 1.05, 2.25, -0.9);
+      g.add(dataLine);
+    });
   } else if (kind === "petroleo") {
     [-0.85, 0.85].forEach((side) => {
       const stack = new T.Mesh(new T.CylinderGeometry(0.3, 0.46, 3.2, 10), mat);
@@ -2135,11 +2282,32 @@ function bossSignature(kind, color) {
       const flame = new T.Mesh(new T.ConeGeometry(0.22, 0.8, 8), glow);
       flame.position.set(side * 1.05, 4.2, -0.25); g.add(flame);
     });
+    [-1, 1].forEach((side) => {
+      const oil = new T.Mesh(new T.CircleGeometry(1.25, 28).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0x100d12, transparent: true, opacity: 0.5, depthWrite: false }));
+      oil.position.set(side * 2.2, -0.13, 0.2);
+      oil.scale.set(1.45, 0.72, 1);
+      const rim = new T.Mesh(new T.RingGeometry(1.15, 1.25, 28).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xff8a00, transparent: true, opacity: 0.52, blending: T.AdditiveBlending, depthWrite: false }));
+      rim.position.copy(oil.position);
+      rim.scale.copy(oil.scale);
+      g.add(oil, rim);
+    });
   } else {
     const crown = new T.Mesh(new T.ConeGeometry(2.05, 1.0, 5), glow);
     crown.position.y = 3.4; crown.rotation.y = Math.PI / 5; g.add(crown);
     const cage = new T.Mesh(new T.BoxGeometry(4.8, 5.2, 0.12), glow);
     cage.position.z = -1.6; cage.position.y = 2.15; g.add(cage);
+    for (let i = 0; i < 7; i++) {
+      const cube = new T.Mesh(new T.BoxGeometry(0.36 + (i % 2) * 0.14, 0.36 + (i % 2) * 0.14, 0.36 + (i % 2) * 0.14), new T.MeshBasicMaterial({ color: i % 2 ? 0x2fe6ff : 0xff3fd0, transparent: true, opacity: 0.7, wireframe: true }));
+      const a = i * Math.PI * 2 / 7;
+      cube.position.set(Math.cos(a) * 3.1, 1.1 + (i % 3) * 0.95, Math.sin(a) * 2.5);
+      cube.userData.dataCube = true;
+      g.add(cube);
+    }
+    for (let i = 0; i < 4; i++) {
+      const scan = new T.Mesh(new T.BoxGeometry(4.5, 0.018, 0.025), new T.MeshBasicMaterial({ color: 0xff3fd0, transparent: true, opacity: 0.5 }));
+      scan.position.set(0, 0.6 + i * 0.82, -1.48);
+      g.add(scan);
+    }
   }
   return g;
 }
@@ -2160,7 +2328,7 @@ function updateBossHazards(dt) {
       h.ring.material.opacity = 0.68 + Math.sin(time * 28) * 0.2;
       h.core.material.opacity = 0.11;
       h.pillar.material.opacity = 0.16;
-      if (!h.hit && Math.hypot(P.position.x - h.x, P.position.z - h.z) < h.r) {
+      if (!h.hit && dodgeInv <= 0 && Math.hypot(P.position.x - h.x, P.position.z - h.z) < h.r) {
         h.hit = true;
         alert_ = Math.min(0.96, alert_ + 0.28);
         note = h.label + " atingiu a área!";
@@ -2224,6 +2392,7 @@ function spawnBoss(i) {
   disc.position.set(0, 0.08, -26);
   S.add(g, disc);
   boss = { g, disc, aura, signature, hp: 100, fz: 0, cfg: c, atkT: 2.1, attackIndex: 0 };
+  fxSystem.bossEvent(c.model, g.position, false);
   cameraMoment("boss", g.position.x, g.position.z, 1.8);
   sfx("bossIn", i);
   const modelUrl = BOSS_MODEL_URLS[c.model];
@@ -2239,8 +2408,8 @@ function spawnBoss(i) {
       art.position.set(-(box.min.x + box.max.x) * k * 0.5, -box.min.y * k, -(box.min.z + box.max.z) * k * 0.5);
       art.traverse((o) => {
         if (o.isMesh) {
-          o.castShadow = true;
-          o.receiveShadow = true;
+          o.castShadow = fxSystem.effectiveQuality === "high";
+          o.receiveShadow = fxSystem.effectiveQuality === "high";
         }
       });
       g.add(art);
@@ -2278,6 +2447,8 @@ function hitBoss(d) {
   if (!boss) return;
   boss.hp -= d;
   boss.fz = 3;
+  fxSystem.emit(boss.cfg.model === "banqueiro" ? "paper" : boss.cfg.model === "petroleo" ? "oil" : "data", boss.g.position.clone().add(new T.Vector3(0, 1, 0)), 0.72);
+  if (boss.hp <= 0) fxSystem.bossEvent(boss.cfg.model, boss.g.position, true);
   burst(boss.g.position.x, boss.g.position.y, boss.g.position.z);
   if (!calm) shake = 0.5;
   if (boss.hp > 0) {
@@ -2314,6 +2485,9 @@ function breach() {
   castT = 0.6;
   ringM.position.x = P.position.x;
   ringM.position.z = P.position.z;
+  fxSystem.emit("breach", new T.Vector3(P.position.x, 0.5, P.position.z), 1.15);
+  fxSystem.lightAt(new T.Vector3(P.position.x, 1.3, P.position.z), "#2fe6ff", 3.5, 0.35, 16);
+  fxSystem.flash("breach", 460);
   sfx("freeze");
   if (!calm) shake = 0.3;
   const R = 16,
@@ -2324,6 +2498,7 @@ function breach() {
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && near(d.position.x, d.position.z)) {
       d.fz = 4;
+      fxSystem.emit("code", d.position.clone().add(new T.Vector3(0, 1, 0)), 0.34);
       nDr++;
     }
   });
@@ -2356,11 +2531,15 @@ function empAttack() {
   ringM.material.color.set(0x39ff88);
   ringM.position.x = P.position.x;
   ringM.position.z = P.position.z;
+  fxSystem.emit("emp", new T.Vector3(P.position.x, 0.7, P.position.z), 1.15);
+  fxSystem.lightAt(new T.Vector3(P.position.x, 1.5, P.position.z), "#39ff88", 3.2, 0.4, 15);
+  fxSystem.flash("emp", 330);
   const R = 12;
   let frozen = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < R) {
       d.fz = 4.5;
+      fxSystem.emit("drone", d.position.clone().add(new T.Vector3(0, 1, 0)), 0.38);
       frozen++;
     }
   });
@@ -2377,6 +2556,9 @@ function virusAttack() {
   buzz(26);
   virusCd = 10 * routeTune().cd;
   flashFeedback("virus");
+  fxSystem.emit("virus", new T.Vector3(P.position.x, 1, P.position.z), 1.1);
+  fxSystem.lightAt(new T.Vector3(P.position.x, 1.5, P.position.z), "#ff3fd0", 2.7, 0.34, 13);
+  fxSystem.flash("virus", 360);
   triggerPlayerFx(0xff3fd0, 1.1);
   ringT = 0;
   ringM.material.color.set(0xff3fd0);
@@ -2405,7 +2587,60 @@ function virusAttack() {
   sfx("pulse");
   if (!calm) shake = 0.3;
 }
+function dodge() {
+  if (state !== "play" || dodgeCd > 0 || mini || dodgeT > 0) return;
+  const ix = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0) + jx;
+  const iz = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0) + jz;
+  const l = Math.hypot(ix, iz);
+  const dx = l > 0.1 ? ix / l : Math.sin(P.rotation.y);
+  const dz = l > 0.1 ? iz / l : Math.cos(P.rotation.y);
+  dodgeT = 0.28;
+  dodgeInv = 0.36;
+  dodgeCd = 1.35 * routeTune().cd;
+  dodgeVx = dx * 21;
+  dodgeVz = dz * 21;
+  fxSystem.dodge(P, dx, dz, skinAtual === "vanta");
+  vel.x = dodgeVx * 0.42;
+  vel.z = dodgeVz * 0.42;
+  flashFeedback("dodge");
+  triggerPlayerFx(0x53f6ff, 1.5);
+  note = "ESQUIVA: impulso e invulnerabilidade curta.";
+  noteT = 0.8;
+  buzz(18);
+}
+function ghostAttack() {
+  if (skinAtual !== "vanta") {
+    note = "NÓ FANTASMA: selecione a operadora VANTA.";
+    noteT = 1.6;
+    return;
+  }
+  if (state !== "play" || ghostCd > 0 || mini) return;
+  runStats.skills++;
+  ghostCd = 12 * routeTune().cd;
+  ghostT = 4.2;
+  fxSystem.emit("ghost", new T.Vector3(P.position.x, 1, P.position.z), 0.9);
+  fxSystem.lightAt(new T.Vector3(P.position.x, 1.5, P.position.z), "#53f6ff", 2.4, 0.34, 12);
+  fxSystem.flash("ghost", 300);
+  alert_ = Math.max(0, alert_ - 0.28);
+  ringM.material.color.set(0x53f6ff);
+  ringM.position.x = P.position.x;
+  ringM.position.z = P.position.z;
+  ringT = 0;
+  flashFeedback("ghost");
+  note = "NÓ FANTASMA: VANTA saiu do radar por 4s.";
+  noteT = 2.1;
+  sfx("pulse");
+  if (!calm) shake = 0.18;
+}
 addEventListener("keydown", (e) => {
+  if (e.code === "KeyC") {
+    e.preventDefault();
+    dodge();
+  }
+  if (e.code === "KeyR") {
+    e.preventDefault();
+    ghostAttack();
+  }
   if (e.code === "Space" || e.key.toLowerCase() === "b") {
     e.preventDefault();
     breach();
@@ -2431,6 +2666,14 @@ $("vx").onpointerdown = (e) => {
   e.preventDefault();
   virusAttack();
 };
+$("gx").onpointerdown = (e) => {
+  e.preventDefault();
+  ghostAttack();
+};
+$("dg").onpointerdown = (e) => {
+  e.preventDefault();
+  dodge();
+};
 let bzShown = "",
   bzAntes = 0,
   chuvaFade = 0; // segundos de rastro restantes; 0 = canvas limpo e parado
@@ -2439,14 +2682,25 @@ function fxTick(dt) {
   if (state === "play" || state === "menu") {
     empCd = Math.max(0, empCd - dt);
     virusCd = Math.max(0, virusCd - dt);
+    ghostCd = Math.max(0, ghostCd - dt);
+    ghostT = Math.max(0, ghostT - dt);
+    dodgeCd = Math.max(0, dodgeCd - dt);
+    dodgeInv = Math.max(0, dodgeInv - dt);
+    dodgeT = Math.max(0, dodgeT - dt);
   }
-  const hx = $("hx"), vx = $("vx");
+  const hx = $("hx"), vx = $("vx"), gx = $("gx"), dg = $("dg");
   hx.textContent = empCd > 0 ? "EMP · " + Math.ceil(empCd) + "s" : "EMP · E";
   vx.textContent = virusCd > 0 ? "VÍRUS · " + Math.ceil(virusCd) + "s" : "VÍRUS · Q";
   hx.classList.toggle("cooldown", empCd > 0);
   vx.classList.toggle("cooldown", virusCd > 0);
   hx.classList.toggle("ready", empCd <= 0 && state === "play");
   vx.classList.toggle("ready", virusCd <= 0 && state === "play");
+  gx.textContent = skinAtual === "vanta" ? (ghostCd > 0 ? "NÓ · " + Math.ceil(ghostCd) + "s" : "NÓ FANTASMA · R") : "NÓ · VANTA";
+  gx.classList.toggle("cooldown", ghostCd > 0 || skinAtual !== "vanta");
+  gx.classList.toggle("ready", ghostCd <= 0 && skinAtual === "vanta" && state === "play");
+  dg.textContent = dodgeCd > 0 ? "ESQUIVA · " + Math.ceil(dodgeCd) + "s" : "ESQUIVA · C";
+  dg.classList.toggle("cooldown", dodgeCd > 0);
+  dg.classList.toggle("ready", dodgeCd <= 0 && state === "play");
   // ÂNCORA: botão mostra os segundos restantes; ao zerar, avisa que está pronto (som + brilho)
   const txt = bz > 0 ? "BREACH · " + Math.ceil(bz) + "s" : "BREACH · Espaço";
   if (txt !== bzShown) {
@@ -2494,25 +2748,14 @@ function fxTick(dt) {
     if (ringT > 0.9) ringT = -1;
   } else ringM.material.opacity = 0;
 }
-let slowT = 0;
+let slowT = 0,
+  collisionFxCd = 0;
 const clock = new T.Clock();
 let time = 0;
 let ultimoQuadro = performance.now();
-// ÂNCORA: resolução dinâmica — se mais da metade dos quadros de uma janela de 90 passa de 25 ms (< 40 FPS),
-// reduz o pixelRatio em 0,25 (mínimo 0,75). Nunca sobe de volta, para não ficar oscilando.
-const PR_MIN = 0.75;
-let janelaQ = 0,
-  lentosQ = 0;
 function ajustarResolucao(dtReal) {
-  if (state !== "play" || dtReal >= 1) return; // pausa, menu e retorno de aba escondida não contam
-  janelaQ++;
-  if (dtReal > 0.025) lentosQ++;
-  if (janelaQ < 90) return;
-  if (lentosQ / janelaQ > 0.5 && pixelRatio > PR_MIN) {
-    pixelRatio = Math.max(PR_MIN, pixelRatio - 0.25);
-    R.setPixelRatio(pixelRatio); // refaz o tamanho do canvas; o CSS continua ocupando a tela toda
-  }
-  janelaQ = lentosQ = 0;
+  // Janela móvel de 90 quadros: reduz primeiro o preset de FX e depois a resolução.
+  if (fxSystem) fxSystem.samplePerformance(dtReal, state === "play");
 }
 function loop() {
   requestAnimationFrame(loop);
@@ -2523,7 +2766,7 @@ function loop() {
   ultimoQuadro = agora;
   ajustarResolucao(dtReal);
   if (state === "pause") {
-    R.render(S, C);
+    fxSystem.render();
     return;
   }
   if (state === "play" && !(endT > 0)) {
@@ -2538,6 +2781,7 @@ function loop() {
   slowT = Math.max(0, slowT - rawDt);
   time += dt;
   updatePlayerFx(dt);
+  puddles.forEach(({ mat, phase }) => { mat.emissiveIntensity = 0.1 + Math.abs(Math.sin(time * 1.8 + phase)) * 0.12; });
   syncAudioLayers();
   drones.forEach((d) => {
     d.rg.rotation.z += dt * 6;
@@ -2596,24 +2840,14 @@ function loop() {
       t.mesh.material.emissiveIntensity = 0.9 + t.pulse * 2;
     }
   });
-  for (let j = 0; j < N; j++) {
-    const q = pv[j];
-    if (q.l > 0) {
-      q.l -= dt;
-      q.v.y -= 18 * dt;
-      pp[j * 3] += q.v.x * dt;
-      pp[j * 3 + 1] += q.v.y * dt;
-      pp[j * 3 + 2] += q.v.z * dt;
-      if (q.l <= 0 || pp[j * 3 + 1] < 0) pp[j * 3 + 1] = -999;
-    }
-  }
-  pg.attributes.position.needsUpdate = true;
+  // O pool cosmético é atualizado uma vez por quadro no fim do loop.
 
   if (state === "play") tutTick(dt);
   if (state === "play") {
     emp = Math.max(0, emp - dt);
     boost = Math.max(0, boost - dt);
     noteT -= dt;
+    collisionFxCd = Math.max(0, collisionFxCd - dt);
     let ix = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0) + jx,
       iz = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0) + jz;
     if (mini) {
@@ -2639,10 +2873,18 @@ function loop() {
         }
       }
     }
-    vel.x += (ix * SP - vel.x) * Math.min(1, dt * 10);
-    vel.z += (iz * SP - vel.z) * Math.min(1, dt * 10);
-    P.position.x = Math.max(-34, Math.min(34, P.position.x + vel.x * dt));
-    P.position.z = Math.max(-34, Math.min(34, P.position.z + vel.z * dt));
+    if (dodgeT > 0) {
+      // Impulso físico curto: mantém o controle durante a esquiva e ainda passa pelo solver de colisão.
+      vel.x += (dodgeVx - vel.x) * Math.min(1, dt * 18);
+      vel.z += (dodgeVz - vel.z) * Math.min(1, dt * 18);
+    } else {
+      vel.x += (ix * SP - vel.x) * Math.min(1, dt * 10);
+      vel.z += (iz * SP - vel.z) * Math.min(1, dt * 10);
+    }
+    const moveX = Math.max(-34, Math.min(34, P.position.x + vel.x * dt));
+    const moveZ = Math.max(-34, Math.min(34, P.position.z + vel.z * dt));
+    P.position.x = moveX;
+    P.position.z = moveZ;
     for (let passada = 0; passada < 2; passada++) {
       solids.forEach((s) => {
         if (s.w) return collideBox(s);
@@ -2655,6 +2897,11 @@ function loop() {
           P.position.z = s.z + (dz / d) * m;
         }
       });
+    }
+    if (collisionFxCd <= 0 && Math.hypot(P.position.x - moveX, P.position.z - moveZ) > 0.035) {
+      fxSystem.emit("metal", new T.Vector3(P.position.x, 0.48, P.position.z), 0.42);
+      fxSystem.lightAt(new T.Vector3(P.position.x, 0.9, P.position.z), "#e5faff", 1.2, 0.14, 6);
+      collisionFxCd = 0.22;
     }
     const sp = Math.hypot(vel.x, vel.z);
     // rotação suave: o personagem só vira quando está em movimento
@@ -2704,7 +2951,7 @@ function loop() {
       d.virus = Math.max(0, (d.virus || 0) - dt);
       const frz = emp > 0 || d.fz > 0;
       const virus = d.virus > 0;
-      d.chase = alert_ > 0.35 && pd < 12 ? 1 : alert_ < 0.1 ? 0 : d.chase;
+      d.chase = ghostT > 0 ? 0 : alert_ > 0.35 && pd < 12 ? 1 : alert_ < 0.1 ? 0 : d.chase;
       let gx,
         gz,
         s2 = d.sp * LV[lvl].sp;
@@ -2730,7 +2977,7 @@ function loop() {
       d.disc.position.set(d.position.x, 0.08, d.position.z);
       const k = visR / VIS_BASE; // disco e cone acompanham o raio efetivo, inclusive durante o blecaute
       d.disc.scale.set(k, 1, k);
-      const sees = !frz && pd < visR && !covered;
+      const sees = !frz && pd < visR && !covered && ghostT <= 0 && dodgeInv <= 0;
       if (sees) inside = true;
       // vermelho patrulha · amarelo te viu · laranja perseguindo · ciano congelado
       d.state = virus ? "virus" : frz ? "frozen" : sees ? "detected" : d.chase ? "chase" : "patrol";
@@ -2783,6 +3030,16 @@ function loop() {
       b.aura.rotation.z += dt * 0.18;
       b.aura.children.forEach((ring, k) => {
         ring.material.opacity = (b.fz > 0 ? 0.08 : 0.18) + Math.abs(Math.sin(time * (3 + k))) * 0.12;
+      });
+      b.signature.children.forEach((part, k) => {
+        if (part.userData.visualPaper) {
+          part.position.y = 2.8 + (k % 2) * 0.45 + Math.sin(time * 2.6 + k) * 0.12;
+          part.rotation.z += dt * (k % 2 ? -0.32 : 0.32);
+        }
+        if (part.userData.dataCube) {
+          part.rotation.x += dt * 0.35;
+          part.rotation.y += dt * 0.6;
+        }
       });
       b.disc.position.set(b.g.position.x, 0.08, b.g.position.z);
       b.disc.material.color.set(b.fz > 0 ? 0x2fe6ff : b.cfg.c);
@@ -2916,9 +3173,20 @@ function loop() {
     C.position.y += (Math.random() - 0.5) * shake;
   }
   C.lookAt(lookX, lookY, lookZ);
+  fxSystem.update(rawDt, {
+    player: P,
+    boss: boss ? boss.g : null,
+    playing: state === "play",
+    dodge: dodgeT > 0,
+    ghost: ghostT > 0,
+    alert: alert_,
+    hacking,
+    blackout: blackoutOn,
+    phase: (PHASE_THEME[lvl] || PHASE_THEME[0]).key,
+  });
   fxTick(dt);
   drawMap();
-  R.render(S, C);
+  fxSystem.render();
 }
 C.position.set(0, 14, 36);
 loop();
@@ -3164,7 +3432,6 @@ $("pzm").onclick = () => {
   let pedido = null; // o navegador entrega o "evento de instalação"; guardamos para usar no clique
   const instalado = () => matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || navigator.standalone;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !instalado();
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
   addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault(); // segura o aviso automático para mostrar só quando clicar
     pedido = e;
@@ -3210,9 +3477,20 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.hostname.en
       return this.inspect();
     },
     inspect() {
+      const theme = PHASE_THEME[lvl] || PHASE_THEME[0];
       return {
         level: lvl + 1,
-        phase: LV[lvl].name,
+        phase: theme.name,
+        phaseKey: theme.key,
+        state,
+        player: { x: Math.round(P.position.x * 10) / 10, z: Math.round(P.position.z * 10) / 10 },
+        alert: Math.round(alert_ * 100) / 100,
+        blackout: !!blackoutOn,
+        room: !!roomG.visible,
+        towers: towers.map((t) => ({ name: t.n, x: Math.round(t.x * 10) / 10, z: Math.round(t.z * 10) / 10, done: !!t.done, progress: Math.round((t.p || 0) * 100) / 100 })),
+        minigame: mini ? { mode: mini.mode, position: mini.pos, sequence: mini.seq.map((d) => DIRS[d]), remaining: Math.round(mini.left * 10) / 10 } : null,
+        boss: boss ? { name: boss.cfg.n, model: boss.cfg.model, hp: Math.max(0, Math.round(boss.hp)), index: bi + 1 } : null,
+        won,
         routeObjects: routeGeometry.map((o) => ({ kind: o.kind, shape: o.shape, x: o.x, z: o.z, visible: o.mesh.visible, solid: o.solid })),
         routeSolids: solids.filter((s) => routeGeometry.includes(s)).map((s) => ({ kind: s.kind, shape: s.shape, visible: s.mesh.visible })),
       };
@@ -3243,7 +3521,7 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.hostname.en
       blackoutClock = 9.6;
       blackoutOn = false;
       document.body.classList.remove("blackout");
-      return { level: lvl + 1, phase: LV[lvl].name };
+      return { level: lvl + 1, phase: (PHASE_THEME[lvl] || PHASE_THEME[0]).name };
     },
   };
 }
