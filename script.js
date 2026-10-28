@@ -88,7 +88,6 @@ function applyPhaseKit() {
   } else if (theme.key === "hideout") {
     [-26, -13, 13, 26].forEach((x) => { addBlock(x, -28, 2.8, 5.5, 1.2); addBlock(x, -27.3, 2.1, 0.08, 0.08, 3.8); });
   } else if (theme.key === "grid") {
-    // ÂNCORA: subestação = transformadores (blocos) + cabos (tubos) em linha
     [-26, -13, 13, 26].forEach((x, i) => { addBlock(x, -28, 3, 4.5 + (i % 2) * 1.5, 2.4); addPipe(x, -26.6, 6 + (i % 2) * 2, 0.04); });
     addBlock(0, -31, 18, 0.25, 0.25, 7);
   } else {
@@ -189,7 +188,6 @@ const ROUTE_LAYOUTS = [
   { safe: [[-18, 15], [17, -2]], fast: [[-5, 2], [5, -14]], tech: [[-22, 3], [20, 10]] },
   { safe: [[-22, 9], [19, 17]], fast: [[0, 4], [0, -15]], tech: [[-14, -7], [14, -7]] },
   { safe: [[-8, 15], [8, -15]], fast: [[-20, 0], [20, 0]], tech: [[-18, 12], [18, -12]] },
-  { safe: [[-14, 16], [14, 16]], fast: [[0, -6], [0, 10]], tech: [[-20, -4], [20, -4]] },
   { safe: [[-16, 18], [16, 18]], fast: [[-16, -12], [16, -12]], tech: [[-7, 1], [7, 1]] },
 ];
 function applyRouteLayout() {
@@ -1209,7 +1207,6 @@ const LV = [
   { dr: 5, sp: 1.4, seq: 6, t: 7, vis: 4.2, mode: 2, blackout: true },
   { dr: 2, sp: 1.1, seq: 5, t: 7, vis: 3.6, boss: true, mode: 4 },
 ];
-// ÂNCORA: BLECAUTE (só fase com blackout:true) — a cada 12 s, 2,5 s de drones quase cegos
 let blackoutClock = 0, blackoutOn = false;
 const VIS_BASE = 3.4; // raio com que o disco e o cone foram modelados
   routeMode = "fast";
@@ -1362,9 +1359,6 @@ function spawnPickups() {
   pick.length = 0;
   ["e", "k", "u"].forEach((t) => {
     let x, z, tentativas = 0;
-    // ÂNCORA: as coberturas/bloqueios das rotas só têm largura (w) e profundidade (d), sem raio (r).
-    // Antes, "s.r + 2" virava NaN, a condição nunca era verdadeira e o laço rodava para sempre (jogo congelava).
-    // Agora o raio é calculado a partir de w/d, e o laço tem limite de tentativas.
     const raio = (s) => (Number.isFinite(s.r) ? s.r : Math.hypot(s.w || 0, s.d || 0) / 2);
     do {
       x = (Math.random() - 0.5) * 60;
@@ -1615,7 +1609,6 @@ let actx = null,
 $("snd").onclick = () => {
   mute = !mute;
   $("snd").textContent = mute ? "🔇" : "🔊";
-  // ÂNCORA: o mudo também desliga a trilha ambiente (antes só os efeitos calavam)
   if (audioLayers && actx) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.1);
   audioStateShown = "";
 };
@@ -1694,19 +1687,20 @@ function sfx(n, i) {
   } else if (n === "alarm") tone(300, 0.12, "sawtooth", 0.06);
   else if (n === "lose") [400, 300, 200, 120].forEach((f, k) => tone(f, 0.25, "sawtooth", 0.08, k * 0.15));
   else if (n === "bossIn") {
-    const r = BOSS_SND[i] ? BOSS_SND[i].root : 60;
-    sweep(r * 4, r, 0.9, "sawtooth", 0.12);
-    tone(r, 1.1, BOSS_SND[i] ? BOSS_SND[i].wave : "square", 0.14, 0.1);
+    const snd = BOSS_SND[i] || BOSS_SND[0];
+    sweep(snd.root * 4, snd.root, 0.9, "sawtooth", 0.12);
+    tone(snd.root, 1.1, snd.wave, 0.14, 0.1);
     noise(0.6, 0.18, 700 + (i || 0) * 500, 0.05);
   } else if (n === "bossAtk") {
-    const r = BOSS_SND[i] ? BOSS_SND[i].root : 60;
-    sweep(r * 6, r * 2, 0.35, BOSS_SND[i] ? BOSS_SND[i].wave : "square", 0.1);
+    const snd = BOSS_SND[i] || BOSS_SND[0];
+    sweep(snd.root * 6, snd.root * 2, 0.35, snd.wave, 0.1);
     noise(0.3, 0.14, 1500 + (i || 0) * 900);
   } else if (n === "bossDie") {
-    const r = BOSS_SND[i] ? BOSS_SND[i].root : 60;
-    [4, 3, 2, 1].forEach((m, k) => sweep(r * m * 3, r * m, 0.5, "sawtooth", 0.1, k * 0.16));
+    const snd = BOSS_SND[i] || BOSS_SND[0];
+    [4, 3, 2, 1].forEach((m, k) => sweep(snd.root * m * 3, snd.root * m, 0.5, "sawtooth", 0.1, k * 0.16));
     noise(1.0, 0.2, 1800);
-  } else if (n === "win") [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, 0.2, "square", 0.07, k * 0.1));
+  }
+  else if (n === "win") [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, 0.2, "square", 0.07, k * 0.1));
 }
 function ensureAudioLayers() {
   if (!actx || audioLayers) return;
@@ -1732,7 +1726,6 @@ function ensureAudioLayers() {
     alert: make(92, "sawtooth", 0.045),
     chase: make(184, "square", 0.035),
     route: make(330, "triangle", 0.018),
-    // ÂNCORA: trilha de chefão — grave contínuo + pulso (gain modulado por um LFO no ritmo do chefão)
     bossBass: make(65, "square", 0.05),
     bossPulse: make(130, "triangle", 0),
   };
@@ -1740,7 +1733,7 @@ function ensureAudioLayers() {
   lfo.frequency.value = 2;
   lfoG.gain.value = 0.0001;
   lfo.connect(lfoG);
-  lfoG.connect(audioLayers.bossPulse.g.gain); // o LFO soma ao ganho do pulso: liga e desliga no tempo
+  lfoG.connect(audioLayers.bossPulse.g.gain);
   lfo.start();
   audioLayers.bossLfo = { o: lfo, g: lfoG };
 }
@@ -1766,7 +1759,6 @@ function syncAudioLayers() {
   const alert = playing ? danger * 0.7 : 0;
   const chase = playing && threat ? Math.max(0.18, danger) : 0;
   const routeTone = playing ? (routeId === "fast" ? 0.8 : routeId === "tech" ? 0.55 : 0.25) : 0;
-  // ÂNCORA: com chefão vivo, o clima de exploração abaixa e a trilha do chefão sobe
   const onBoss = state === "play" && !!boss;
   const snd = BOSS_SND[Math.min(bi, BOSS_SND.length - 1)] || BOSS_SND[0];
   if (onBoss) {
@@ -1777,7 +1769,7 @@ function syncAudioLayers() {
     audioLayers.bossLfo.o.frequency.setTargetAtTime(snd.tempo, now, 0.05);
   }
   const bossLevel = onBoss ? 0.05 : 0;
-  target(audioLayers.bossBass, bossLevel);
+  target(audioLayers.bossBass, audioLayers.bossBass.base * bossLevel);
   target(audioLayers.bossPulse, bossLevel * 0.5);
   audioLayers.bossLfo.g.gain.setTargetAtTime(bossLevel * 0.5, now, 0.2);
   target(audioLayers.explore, audioLayers.explore.base * explore * (onBoss ? 0.3 : 1));
@@ -2052,11 +2044,10 @@ const ringM = new T.Mesh(
 );
 ringM.position.y = 0.15;
 S.add(ringM);
-// ÂNCORA: assinatura sonora de cada chefão — root = nota grave (Hz), tempo = batidas/s do pulso, wave = timbre
 const BOSS_SND = [
-  { root: 65, tempo: 2.0, wave: "square", pulse: "triangle" }, // Banqueiro: marcha seca de escritório
-  { root: 55, tempo: 2.7, wave: "sawtooth", pulse: "square" }, // Barão: grave pesado e sujo
-  { root: 49, tempo: 3.6, wave: "sawtooth", pulse: "sawtooth" }, // CEO: rápido e dissonante
+  { root: 65, tempo: 2.0, wave: "square", pulse: "triangle" },
+  { root: 55, tempo: 2.7, wave: "sawtooth", pulse: "square" },
+  { root: 49, tempo: 3.6, wave: "sawtooth", pulse: "sawtooth" },
 ];
 const BOSS = [
   { n: "DIRETOR-BANQUEIRO", sp: 2.2, r: 5.5, s: 1, c: 0xe0261c, model: "banqueiro", attacks: ["AUDITORIA DE DÍVIDA", "MURALHA DE CONTRATOS", "EXECUÇÃO FISCAL"] },
@@ -2234,7 +2225,7 @@ function spawnBoss(i) {
   S.add(g, disc);
   boss = { g, disc, aura, signature, hp: 100, fz: 0, cfg: c, atkT: 2.1, attackIndex: 0 };
   cameraMoment("boss", g.position.x, g.position.z, 1.8);
-  sfx("bossIn", bi);
+  sfx("bossIn", i);
   const modelUrl = BOSS_MODEL_URLS[c.model];
   if (modelUrl && BossGLTFLoader) {
     const loader = new BossGLTFLoader();
@@ -2313,18 +2304,11 @@ function hitBoss(d) {
     noteT = 2.5;
   }
 }
-// ÂNCORA: balanceamento das 3 habilidades num só lugar (cada uma com um papel diferente)
-// BREACH = golpe grande e raro · EMP = trava curta e frequente · VÍRUS = sequestro/dano preciso e lento
-const SKILLS = {
-  breach: { cd: 10, bossCd: 7, R: 16, freeze: 4.5, bossDmg: 34, alertCut: 0.2, towerBoost: 0.4 },
-  emp: { cd: 8, R: 12, freeze: 3.5, bossDmg: 20, alertCut: 0.25 },
-  virus: { cd: 10, R: 18, bossR: 20, hijack: 6, bossDmg: 20 },
-};
 function breach() {
   if (state !== "play" || bz > 0 || mini) return;
   runStats.skills++;
   buzz(32);
-  bz = LV[lvl].boss ? SKILLS.breach.bossCd : SKILLS.breach.cd;
+  bz = LV[lvl].boss ? 6 : 10;
   rainT = calm ? 0 : 2.2; // sem chuva de código se o sistema pede menos movimento
   ringT = 0;
   castT = 0.6;
@@ -2332,24 +2316,24 @@ function breach() {
   ringM.position.z = P.position.z;
   sfx("freeze");
   if (!calm) shake = 0.3;
-  const R = SKILLS.breach.R,
+  const R = 16,
     near = (x, z) => Math.hypot(P.position.x - x, P.position.z - z) < R;
   // ÂNCORA: conta o que o BREACH atingiu para mostrar ao jogador (antes ele não sabia se valeu a pena)
   let nDr = 0,
     nTo = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && near(d.position.x, d.position.z)) {
-      d.fz = SKILLS.breach.freeze;
+      d.fz = 4;
       nDr++;
     }
   });
   towers.forEach((t) => {
     if (!t.done && near(t.x, t.z)) {
-      t.p = Math.min(0.95, t.p + SKILLS.breach.towerBoost);
+      t.p = Math.min(0.95, t.p + 0.4);
       nTo++;
     }
   });
-  alert_ = Math.max(0, alert_ - SKILLS.breach.alertCut);
+  alert_ = Math.max(0, alert_ - 0.3);
   const partes = [];
   const wrecked = destroyPropNear(P.position.x, P.position.z);
   if (wrecked) partes.push(wrecked + " desativado");
@@ -2357,7 +2341,7 @@ function breach() {
   if (nTo) partes.push(nTo + (nTo === 1 ? " torre +40%" : " torres +40%"));
   note = "BREACH: " + (partes.length ? partes.join(" · ") : "nada ao alcance (raio 16)");
   noteT = 2;
-  if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(SKILLS.breach.bossDmg);
+  if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(34);
   else if (boss) {
     note = "BREACH longe demais! Chegue a menos de 16.";
     noteT = 1.8;
@@ -2367,21 +2351,21 @@ function empAttack() {
   if (state !== "play" || empCd > 0 || mini) return;
   runStats.skills++;
   buzz(26);
-  empCd = SKILLS.emp.cd * routeTune().cd;
+  empCd = 7 * routeTune().cd;
   ringT = 0;
   ringM.material.color.set(0x39ff88);
   ringM.position.x = P.position.x;
   ringM.position.z = P.position.z;
-  const R = SKILLS.emp.R;
+  const R = 12;
   let frozen = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < R) {
-      d.fz = SKILLS.emp.freeze;
+      d.fz = 4.5;
       frozen++;
     }
   });
-  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(SKILLS.emp.bossDmg);
-  alert_ = Math.max(0, alert_ - SKILLS.emp.alertCut);
+  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(18);
+  alert_ = Math.max(0, alert_ - 0.35);
   note = frozen ? "EMP: " + frozen + " drone(s) travado(s)!" : "EMP: firewall inimigo drenado.";
   noteT = 1.8;
   sfx("freeze");
@@ -2391,7 +2375,7 @@ function virusAttack() {
   if (state !== "play" || virusCd > 0 || mini) return;
   runStats.skills++;
   buzz(26);
-  virusCd = SKILLS.virus.cd * routeTune().cd;
+  virusCd = 10 * routeTune().cd;
   flashFeedback("virus");
   triggerPlayerFx(0xff3fd0, 1.1);
   ringT = 0;
@@ -2404,8 +2388,8 @@ function virusAttack() {
     const d = Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z);
     if (d < distance) { distance = d; target = boss; }
   }
-  if (target && distance < SKILLS.virus.bossR) {
-    hitBoss(SKILLS.virus.bossDmg);
+  if (target && distance < 20) {
+    hitBoss(12);
     note = "VÍRUS: blindagem do chefão corrompida!";
   } else {
     let best = null;
@@ -2414,8 +2398,8 @@ function virusAttack() {
       const d2 = Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z);
       if (d2 < distance) { distance = d2; best = d; }
     });
-    if (best && distance < SKILLS.virus.R) { best.fz = SKILLS.virus.hijack; best.virus = SKILLS.virus.hijack; }
-    note = best && distance < SKILLS.virus.R ? "VÍRUS: drone sequestrado por " + SKILLS.virus.hijack + "s." : "VÍRUS lançado na rede.";
+    if (best && distance < 18) { best.fz = 6; best.virus = 6; }
+    note = best && distance < 18 ? "VÍRUS: drone sequestrado por 6s." : "VÍRUS lançado na rede.";
   }
   noteT = 1.8;
   sfx("pulse");
@@ -2700,7 +2684,6 @@ function loop() {
       noteT = 0.3;
     }
     grace = Math.max(0, grace - dt);
-    // ÂNCORA: relógio do blecaute — ligado só no último 2,5 s de cada ciclo de 12 s
     const blackoutWas = blackoutOn;
     blackoutClock += dt;
     blackoutOn = !!LV[lvl].blackout && blackoutClock % 12 > 9.5;
@@ -2708,7 +2691,7 @@ function loop() {
       document.body.classList.toggle("blackout", blackoutOn);
       if (blackoutOn) { note = "BLECAUTE — drones cegos"; noteT = 1.8; buzz(40); }
     }
-    const visR = LV[lvl].vis * (blackoutOn ? 0.6 : 1); // raio de visão efetivo neste quadro
+    const visR = LV[lvl].vis * (blackoutOn ? 0.6 : 1);
     drones.forEach((d, n) => {
       const on = n < LV[lvl].dr;
       d.visible = on;
@@ -2745,7 +2728,7 @@ function loop() {
         }
       }
       d.disc.position.set(d.position.x, 0.08, d.position.z);
-      const k = visR / VIS_BASE; // o disco (e o cone/anel, filhos dele) cresce com o raio de visão da fase
+      const k = visR / VIS_BASE; // disco e cone acompanham o raio efetivo, inclusive durante o blecaute
       d.disc.scale.set(k, 1, k);
       const sees = !frz && pd < visR && !covered;
       if (sees) inside = true;

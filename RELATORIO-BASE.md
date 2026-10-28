@@ -1,0 +1,212 @@
+# ANARCO.EXE 3D — Relatório de ajustes
+
+Base: pasta `anarco/` enviada por você (já separada em index.html, style.css e script.js).
+
+## Ordem executada (do que foi pedido)
+| # | Nível | Ajuste | Onde |
+|---|-------|--------|------|
+| 0 | Médio | Caixas da cidade somem no esconderijo (fase 4) e colisão roda em 2 passadas | `script.js` (crates, applyLevel, laço de colisão) |
+| 1 | Fácil | Armazenamento seguro: `guardar`, `ler`, `apagar` no lugar de `localStorage` direto | `script.js` (topo e 7 usos) |
+| 2 | Fácil | Publicação: descrição, favicon (.ico/.svg), ícone 180 px, preview 1200x630, tags og/twitter | `index.html`, `favicon.ico`, `assets/img/` |
+| 3 | Fácil | Acessibilidade: respeita "Reduzir movimento" (CSS + JS, atualiza ao vivo) | `style.css`, `script.js` |
+| 4 | Médio | Botão CORRER no celular (segurar = Shift), só em telas de toque | `index.html`, `style.css`, `script.js` |
+| 5 | Médio | Drones mudam de cor por estado: **já existia** (verificado em 4 estados); o piscar do feixe agora respeita "Reduzir movimento" | `script.js` |
+| 6 | Médio | Feedback ao concluir o hack: **já existia** (som, partículas, onda, pulso, tremor, câmera lenta 0,2 s, cartão); o crescimento de 25% da torre agora respeita "Reduzir movimento" | `script.js` |
+| A | Difícil | Imagens em Base64 viram arquivos reais (6 ícones, 5 props, mural); manifesto de caminhos; aviso ao abrir por duplo clique | `assets/img/`, `assets/dados/manifesto.js`, `index.html`, `script.js`, `style.css` |
+| B | Difícil | Modelo 3D deixa de ser Base64: `assets/models/anarco.bin` carregado por `fetch` (assíncrono, com plano B) | `assets/models/`, `script.js` (`carregarModelo`), `index.html` |
+| C | Difícil | Ranking por tempo: cronômetro no HUD, top 5 só de vitórias, botão Ranking, aviso de recorde na tela final | `script.js` (`fmtTempo`, `registrarTempo`, `showRank`, `loop`), `index.html`, `style.css` |
+| D | Fácil | 5 sons novos sintetizados por código: clique de botão, sirene ao ser visto, golpe no chefão, congelar drones no BREACH e fanfarra de recorde | `script.js` (`sfx`, `sweep`, `noise`) |
+| E | Fácil | Publicação: `og:url`, `og:image` e `twitter:image` com o endereço `https://anarcoexe.vercel.app/` | `index.html` |
+| F | Médio | Feedback do BREACH: aviso do que foi atingido, contagem regressiva no botão, som e brilho quando fica pronto, aviso mais alto no toque | `script.js` (`breach`, `fxTick`, `sfx`), `style.css` |
+| G | Médio | Dificuldade dos drones: raio de visão cresce por fase (3,4 / 3,6 / 3,8 / 4,0 m; chefão 3,6 m), definido em `LV`; disco e cone acompanham | `script.js` (`LV`, laço dos drones) |
+| H | Difícil | Otimização para celular: menos pixels e sem antialias no toque, resolução dinâmica, chuva de código que só desenha quando há chuva | `script.js` (`R`, `pixelRatio`, `ajustarResolucao`, `fxTick`) |
+| I | Fácil/Médio/Difícil | Ajuste do personagem 3D: 15% maior (Fácil), contorno neon + realce (Médio), animação de corrida diferente da de andar (Difícil) | `script.js` (`CHAR_ESCALA`, `RIM_FORCA`, `carregarModelo`, `animChar`) |
+| J | Fácil/Médio/Difícil | Nova skin "Cachos" a partir do seu .glb do Meshy: redução de 1,67 milhão para 45 mil triângulos (Fácil), pintura por regiões (Médio), esqueleto de 11 ossos, carregador com várias skins e botão no menu com escolha guardada (Difícil) | `assets/models/cachos.bin`, `assets/img/skins/`, `script.js` (`SKINS`, `carregarModelo`, `rotuloSkin`), `index.html`, `style.css` |
+
+## Conceitos praticados
+- Colisão iterativa (várias passadas resolvem obstáculos encostados) e estado por nível.
+- `try/catch` e funções utilitárias para falhas do ambiente (armazenamento bloqueado).
+- Metadados HTML: `meta description`, `theme-color`, Open Graph, favicon e `apple-touch-icon`.
+- Media query `prefers-reduced-motion` e `matchMedia(...).addEventListener("change")`.
+- `fetch` + `arrayBuffer()`, funções `async/await`, validação do tamanho do binário e plano B quando o carregamento falha.
+- Extração de Base64 para arquivos (decodificação de data URLs), manifesto de assets e detecção de `file://`.
+- Pointer Events (`setPointerCapture`), media query `(pointer: coarse)` e toque simulado por CDP nos testes.
+- `Date`/`performance.now()` para tempo real, `Array.sort`, `JSON.parse/stringify` com validação, `padStart`/`toFixed` para formatar mm:ss.d.
+- Media query de largura (`max-width: 600px`) para reposicionar elementos fixos quando o HUD quebra em linhas.
+- Web Audio API: `OscillatorNode`, `GainNode`, rampas exponenciais (`exponentialRampToValueAtTime`), `AudioBufferSourceNode` com ruído e `BiquadFilterNode` passa-baixa; política de autoplay (áudio só nasce após gesto do usuário); delegação de eventos (`document.addEventListener("click")`).
+- Contadores dentro de `forEach`, detecção de transição (valor anterior x atual, `bzAntes`), reinício de animação CSS (`classList.remove` + `offsetWidth` + `add`) e `@keyframes`.
+- Simulação por computador: trajetórias dos drones em passo fixo, busca no espaço e no tempo (BFS com dilatação binária de um disco) e bisseção para achar a maior margem de segurança.
+- `matchMedia("(pointer: coarse)")` para detectar toque, `devicePixelRatio`, `setPixelRatio`, MSAA (antialias), resolução dinâmica por janela de quadros, `clearRect` x `destination-out` e `renderer.info` para medir chamadas de desenho e triângulos.
+- Escala de malha (`scale` no `SkinnedMesh`), shader customizado com `onBeforeCompile` (efeito Fresnel/rim light, produto escalar entre normal e direção da câmera), material emissivo e interpolação por fator (`r`) para misturar animações.
+- Simplificação de malha (colapso de arestas por erro quadrático), normalização de modelo (escala, origem, orientação), cor por vértice por regiões (elipsoide da cabeça, faixas de altura, máscaras), carregador orientado a dados (objeto `SKINS`), `async` com "pedido mais recente vence" (evita corrida entre cliques) e liberação de memória (`dispose`) ao trocar de modelo.
+
+## Justificativa da lógica
+- **Caixas:** as da cidade usavam as mesmas posições na fase 4 e invadiam as mesas. Movê-las para x/z = 999 reaproveita o padrão que o projeto já usava (`HIDE`).
+- **Armazenamento:** a leitura do tutorial estava dentro do clique de "Invadir"; com o navegador bloqueando o armazenamento, o jogo nem começava. Agora só deixa de lembrar tutorial, finais e vazamentos.
+- **Acessibilidade:** o JS já respeitava a preferência na tremida de câmera. Entraram também a chuva de código, o tremor das torres, o piscar das luzes (3,8 a 4,8 vezes por segundo) e o pulso rápido do anel. No CSS, animações e transições ficam quase instantâneas e o canvas da chuva some.
+
+- **Drones:** o disco, a borda, o feixe e o olho já mudavam de cor (vermelho patrulha, laranja perseguindo, amarelo viu você, ciano congelado). Não havia o que construir; só o piscar do feixe (3 vezes por segundo) ficava de fora da regra de movimento reduzido.
+- **Feedback do hack:** `hackDone` já tocava o som, soltava partículas, abria a onda, pulsava a torre, tremia, abria o cartão de vazamento e aplicava câmera lenta de 0,2 s (`slowT`). Em modo reduzido a torre agora só brilha, sem crescer; o brilho é único (não repetido), então fica como confirmação visual.
+- **Imagens sem Base64:** os nomes `ICON`, `PR` e `SCENE` foram mantidos num pequeno `manifesto.js`, então o código do jogo não mudou. O mural era idêntico (mesmo hash) ao `fundo-briefing.jpg`; ficou um arquivo só. Texturas WebGL não carregam de `file://`, por isso o aviso "abra por um servidor".
+- **Modelo sem Base64:** o bloco síncrono que decodificava o Base64 virou `async function carregarModelo()`. Tudo que usa `model` já checava `if (!model)`, então o boneco simples aparece por instantes e o personagem entra quando o arquivo chega. O tamanho do `.bin` é conferido (n*6 + f*6 + n*3) antes de usar; se falhar (por exemplo em `file://`), cai no plano B sem quebrar o jogo. O `.bin` gerado é idêntico (hash) ao `anarco.bin` do build React original.
+- **Correr no celular:** o jogo só lia a tecla Shift, então quem joga no toque nunca corria. O botão liga `keys.shift` pelo mesmo caminho do teclado, sem duplicar a lógica de velocidade, ruído e alerta. `setPointerCapture` mantém o botão ativo mesmo se o dedo escorregar.
+- **Ranking por tempo:** o cronômetro soma o tempo REAL do quadro (`performance.now`), não o `dt` do jogo, que é limitado a 0,05 s e câmera lenta; assim o relógio não atrasa. Só conta com `state === "play"` e o chefão em pé (`endT` = 0); pausa, menu e a queda do chefão não contam. O quadro é limitado a 1 s para uma aba escondida não somar minutos. Só vitórias entram, top 5 em `localStorage` (`anarco_rank`); empate fica atrás do mais antigo. `fmtTempo` arredonda ANTES de dividir (59,95 s vira 01:00.0, nunca 00:60.0). Dados corrompidos ou armazenamento bloqueado caem em lista vazia.
+- **HUD no celular:** o objetivo ficava em `top:64px` e cobria TORRES/TEMPO quando o HUD quebrava em linhas; em telas até 600 px ele desce para 150 px.
+- **Sons por código:** nenhum arquivo de áudio, então o peso do jogo não muda e o deploy continua simples. `sweep` desliza a frequência (sirene, zap), `noise` gera ruído aleatório que some aos poucos e passa por um filtro passa-baixa para soar como impacto. Todos os sons passam por `sfx`, que já respeita o botão de som (`mute`). O clique usa delegação: um único ouvinte no `document` cobre todos os botões, inclusive os criados depois. Esse primeiro clique também cria o `AudioContext`, porque o navegador só libera áudio após um gesto. A sirene `spot` toca uma vez quando o alerta cruza 50% (`alertAnt` guarda o valor do quadro anterior); depois disso segue o `alarm` repetido de sempre.
+- **Feedback do BREACH:** o jogo já tinha barra de recarga, anel, chuva de código, tremor e som; faltava o jogador saber se o golpe valeu a pena. `breach()` agora conta drones congelados e torres ajudadas e mostra, por exemplo, "2 drones congelados · 1 torre +40%" ou "nada ao alcance (raio 16)" (recarga desperdiçada). O botão mostra os segundos restantes e, quando a recarga zera, toca um som suave e brilha por 0,7 s. O aviso só dispara na transição de `bz > 0` para 0 e só em jogo (pausa e menu não avisam). O brilho é CSS, então o modo de movimento reduzido já o encurta. No toque o `#msg` sobe para não ficar atrás de CORRER, BREACH e minimapa.
+- **Dificuldade dos drones:** medi antes de mexer. (1) O raio de visão era fixo (3,4 m) nas 5 fases; só mudavam quantidade e velocidade. (2) Em toda torre existe um ponto de hack que nenhum drone vê (janela de 900 s, o limite da simulação), então o hack nunca é injusto. (3) No espaço aberto, quem espera o drone se afastar chega a qualquer torre com mais de 13 m de folga; por isso a furtividade quase não escalava da fase 1 para a 3. Como não há como medir "graça" sem jogador de verdade, fiz um ajuste pequeno e reversível: o raio de visão sobe 0,2 m por fase (3,4 -> 4,0 m, +38% de área na fase 4). Os valores ficam num só lugar (`vis` em `LV`). Re-simulei com raios ainda maiores (3,7 / 4,0 / 4,3): todas as torres continuam hackeáveis (pior caso: fase 4 com janela segura de 17 s contra 6,2 s exigidos).
+- **Limites do que medi:** a simulação ignora prédios e caixas (otimista para o jogador) e a perseguição; o tempo por tecla do hack é uma estimativa (0,45 s/tecla + 0,5 s). A sequência da fase 4 deixa só 0,86 s por tecla (7 teclas em 6 s), o ponto mais apertado do jogo; não mexi, mas é o primeiro candidato se a fase 4 parecer injusta.
+- **Otimização para celular:** medi antes (celular simulado, densidade 3): o canvas 3D tinha 780x1560 px (1,2 milhão de pixels) com antialias; a cena faz só 9 chamadas de desenho, e dos 50.046 triângulos quase tudo é o personagem; o canvas 2D da chuva fazia um preenchimento de tela cheia em TODO quadro, mesmo sem chuva. Mudanças: (1) no toque o `pixelRatio` passa de 2 para 1,5 (43% menos pixels) e o antialias é desligado quando a tela já é densa (DPR >= 2), onde as bordas serrilhadas quase não aparecem; no PC nada muda; (2) resolução dinâmica: se mais da metade de 90 quadros passa de 25 ms (abaixo de 40 FPS), o `pixelRatio` cai 0,25 (mínimo 0,75) e nunca sobe de volta, para não oscilar; pausa, menu e retorno de aba escondida não contam; (3) a chuva só desenha enquanto há chuva ou rastro (1,5 s), depois limpa o canvas uma vez e para. O HUD é HTML, então continua nítido em qualquer resolução.
+- **O que não fiz:** reduzir o modelo de 50 mil triângulos (um LOD) exigiria regerar o `anarco.bin` e mexer na animação; é o próximo passo se o seu celular ainda engasgar. Desligar o antialias só vale para telas densas; um celular DPR 1,5 mantém o antialias.
+- **Personagem maior:** a escala vai no `SkinnedMesh` (`CHAR_ESCALA = 1.15`), não no grupo, porque `animChar` mexe na escala do grupo todo quadro. A colisão usa um raio fixo, então só o visual cresce. Como a escala é em torno da origem, os pés ficam no chão (altura 2,81 -> 3,23 m, pés em -0,01).
+- **Contorno neon:** o personagem é quase todo preto sobre chão escuro. `mat.emissive` (0x0a0614) levanta de leve as sombras; `onBeforeCompile` troca a linha final do fragment shader do Three.js r128 para somar uma cor nas bordas (pouca luz onde a superfície está de frente para a câmera, muita onde está de lado), rosa de um lado e ciano do outro. O primeiro teste com emissivo forte lavou as cores; baixei e o contorno faz o trabalho. `RIM_FORCA = 0` desliga o contorno.
+- **Corrida:** `k = min(1, sp/9)` parava em 1, então correr (14) animava igual a andar (9). Criei `r = clamp((sp-9)/5, 0, 1)`: andando r = 0 (nada muda); correndo r = 1: passos 37% mais rápidos, pernas e braços 30-40% mais amplos, cotovelos dobrados, quique maior e inclinação de 0,16 para 0,30 rad. O boost de energia (13) já mostra r = 0,8.
+- **Skin Cachos:** o .glb tinha 836 mil vértices e 1,67 milhão de triângulos, sem cor, textura, esqueleto nem animação. Reduzi para 45 mil triângulos e 22.351 vértices (mesmo peso do personagem atual, 471 KB), escalei para 2,81 de altura com os pés em y=0 e de frente para +z, como o boneco original. A pintura é por regiões, medidas no próprio modelo: pele (rosto, pescoço, braços abaixo da manga), cabelo marrom-escuro com sombreamento por profundidade (por dentro mais escuro) e poucos cachos com reflexo roxo, olhos, sobrancelhas, lábios e bochechas, camiseta escura com barra ciano nas mangas, calça cargo, cinto, botas com sola rosa. Descartei um emblema rosa no peito: a malha da camiseta é pouco detalhada, então o desenho virava um borrão.
+- **Esqueleto:** o corpo é "chibi" (cabeça e cabelo ~45% da altura, braços curtos), então medi os pontos do próprio modelo (quadril em 0,95, ombros em 1,52, cotovelos em 1,06, joelhos em 0,48, pescoço em 1,75) e montei os mesmos 11 ossos e cápsulas de peso do boneco atual. Assim `animChar` (andar, correr, hackear, BREACH) funciona sem mudança. A cápsula da cabeça é larga (raio 0,5) para o cabelo inteiro virar junto.
+- **Várias skins:** `carregarModelo(id)` lê tudo de `SKINS[id]` (arquivo, vértices, triângulos, escala, ossos e pesos). O corpo novo é montado inteiro antes de trocar o antigo, e o antigo é descartado da memória. Um contador de pedidos (`pedidoSkin`) garante que cliques rápidos não deixem dois corpos na cena. Se o arquivo falhar, o botão volta sozinho à skin que está de fato na tela.
+- **Escala por skin:** Capuz 1,15 (como já aprovado) e Cachos 1,05, porque a cabeça grande já ocupa muito espaço na câmera de cima.
+
+## Como criar mais uma skin (passo a passo)
+1. Reduza o .glb para ~45 mil triângulos (limite do formato: 65.535 vértices) e normalize: altura 2,81, pés em y=0, de frente para +z, centro em x=0.
+2. Pinte por regiões com `pintar-cachos.py` (use como modelo: ajuste as medidas e as cores) e grave o `.bin` (Int16 posições/10000, Uint16 índices, Uint8 cores).
+3. Em `SKINS`, copie uma entrada e troque `nome`, `arq`, `n`, `f`, `escala`, `ossos` e `SG` com as medidas do corpo novo.
+4. Gere a miniatura em `assets/img/skins/<id>.png`. O botão do menu já percorre todas as skins da lista.
+
+## Testes (navegador de teste, renderização por software)
+- Fase 4: 0 falhas em 20 mil pontos sorteados (antes: 65, penetração de até 0,4). Fases 1, 2, 3 e 5: 0 falhas. Sala 100% alcançável e 3 torres acessíveis.
+- Armazenamento bloqueado: antes o jogo não iniciava e dava erro; agora inicia sem erro. Armazenamento normal: vazamentos e tutorial persistem após recarregar.
+- `<head>`: todas as tags presentes, 6 arquivos referenciados existem, sem 404.
+- Correr no celular (toque real simulado): botão `none` no desktop e `block` no celular; velocidade andando 8,86, segurando o botão 13,87 e soltando 9,08 (esperado 9 / 13,95 / 9).
+- Drones (testado nos 4 estados, disco e olho): `0xe0261c` / `0xff8a00` / `0xffe14a` / `0x2fe6ff`. Variação do feixe ao ver o jogador: 0,116 em modo normal e 0,000 em modo reduzido.
+- Hack concluído (normal / reduzido): contador 0 -> 1, câmera lenta 0,2 s -> 0; escala máx da torre 1,249 / 1,000; brilho máx 2,84 nos dois; tremor 0,24 / 0; tremida de câmera 0,7 / 0.
+- Regressão final: colisão 0 falhas nos 5 níveis, sala 100% alcançável, pausa, armazenamento bloqueado e movimento reduzido sem erros.
+- Etapa A: os 6 ícones extraídos são idênticos (hash) ao Base64 original; com servidor, HUD, texturas dos ícones, 10 sprites de props e mural carregam (16 imagens baixadas, 0 respostas 4xx/5xx, 0 erros). Em `file://` o aviso aparece e fecha ao clicar. Peso da pasta: 2248 KB -> 2088 KB (`assets/dados`: 1016 -> 692 KB).
+- Etapa B: com servidor, 24.953 vértices, 50.000 triângulos, esqueleto de 11 ossos e animação de corrida iguais ao Base64; `anarco.bin` baixado, 0 respostas 4xx e 0 erros. Em `file://`: plano B ativo, aviso visível, jogo roda sem erro. Pasta: 2088 KB -> 1924 KB; `assets/dados` agora só tem o manifesto.
+- Etapa C: top 5, empate, recorde, armazenamento corrompido/bloqueado, derrota não registra, persistência após recarregar e modal com destaque, tudo OK, 0 erros. Precisão do relógio contra o tempo real: -0,2% (janela leve) e +4% (janela pesada, ~3 FPS no teste por software); pausa e chefão caído: diferença 0,00 s. Antes eu tinha limitado o quadro a 0,25 s e o relógio perdia 36% em FPS muito baixo; corrigido para 1 s. Capturas do modal e do HUD no celular conferidas.
+- Etapa D: antes do 1º clique não há áudio e depois dele o contexto fica `running`; cada som novo cria os nós esperados (tick 1, spot 2, boss 1+ruído, freeze 1+ruído, record 4) e os 8 antigos seguem iguais; no modo mudo, 0 nós criados; BREACH em jogo dispara o som de congelar; 0 erros. Não dá para "ouvir" no teste: a qualidade e o volume ficam para você avaliar no fone/caixa.
+- Etapa F (modo normal e reduzido, `fxTick` chamado à mão para ser determinístico): 2 drones + 1 torre -> "2 drones congelados · 1 torre +40%" (drones congelados, torre 0,4, alerta -0,3); 1 drone -> "1 drone congelado"; sem alvo -> "nada ao alcance"; contagem 10s/3s/2s/1s -> "BREACH · Espaço"; som de pronto 1 vez (não repete); pausa e menu não avisam nem contam; animação 0,7 s normal e ~0 em modo reduzido; 0 erros. No celular (390x780) o botão cabe (129x38 px) e o aviso ficou acima de CORRER.
+- Etapa G (jogo real, 1 drone parado): jogador 0,3 m fora do raio -> alerta 0; 0,3 m dentro -> alerta sobe, nas 5 fases; escala do disco = raio/3,4 em cada fase (1,000 / 1,059 / 1,118 / 1,176 / 1,059); 0 erros. Captura da fase 4 conferida.
+- Etapa H: configuração (celular DPR 3: pixelRatio 1,5, antialias off, canvas 585x1170; celular DPR 1,5: antialias on; PC DPR 1 e DPR 2: igual a antes); chuva: 0 preenchimentos em 2,5 s parado, desenha durante o BREACH, depois 0 chamadas e 0 pixels visíveis; resolução dinâmica (determinística): 100 FPS não cai, aba escondida e pausa ignoradas, 33% de quadros lentos não cai, lento sustentado 1,5 -> 1,25 -> 1 -> 0,75 e para no piso; canvas 292x585 com CSS 390x780; 0 erros. Capturas a 1,5 e a 0,75 conferidas.
+- Etapa I: altura 3,23 e pés em -0,01; escala 1,15 só no SkinnedMesh; shader sem erro (0 console.error); andando igual ao anterior (perna 0,9, braço 0,7, canela 1,1); correndo perna 1,17, braço 0,98, canela 1,43, cotovelos -1,29/-0,64, quique 0,209; energia (13) perna 1,12; inclinação parado 0 / andando 0,16 / correndo 0,299; cadência 16 -> 21,9 rad/s; corrida real com Shift: velocidade 13,9, inclinação 0,29; menu e fim de jogo sem erros. Capturas conferidas (antes/depois e andar x correr).
+- Etapa J: redução 1.672.382 -> 45.000 triângulos; .bin com tamanho exato (22351*6 + 45000*6 + 22351*3 = 471.159 bytes); corpo novo com 11 ossos; animações conferidas por imagem em parado, andar, correr e hackear (malha sem esticar); menu: rótulo e miniatura corretos, troca em ~1,5 s no navegador de teste (software), guarda em `anarco_skin`, persiste ao recarregar, valor inválido cai em Capuz, 5 cliques rápidos terminam com 1 corpo e vértices coerentes, `cachos.bin` com 404 mantém a skin antiga e o botão volta sozinho, armazenamento bloqueado funciona; partida completa no celular simulado (hack, BREACH, fim de jogo, ranking) com 0 erros; botão cabe na tela de 390 px.
+- Movimento reduzido: chuva 2,2 -> 0, tremor da torre 0,247 -> 0, animação do cartão 0,25 s -> ~0, canvas da chuva `block` -> `none`. A preferência muda ao vivo, sem recarregar.
+
+## Publicação
+`og:url`, `og:image` e `twitter:image` já apontam para `https://anarcoexe.vercel.app/` (endereço completo, como WhatsApp e outros apps exigem). Se o domínio mudar, troque esses três. Depois do deploy, confira o preview colando o link no WhatsApp ou num depurador de compartilhamento; os apps guardam cache, então pode demorar a atualizar.
+
+## Não testado
+As cores da skin Cachos no seu celular (a luz neon da cena muda o tom: a pele fica esverdeada perto da luz ciano e durante o hack), o tempo de troca de skin em celular fraco (calcula 22 mil x 11 pesos) e volume e timbre dos sons (só verifiquei que disparam), **FPS em celular e GPU reais** (o teste usa renderização por software, então só medi configuração e custo relativo, não o FPS final) e a dificuldade dos drones (medida, não jogada) (só renderização por software no teste), e o piscar das luzes em modo reduzido foi verificado só pelo código.
+
+## O que ainda falta
+- Médio: nenhum item pendente.
+- O bloco Difícil (Base64, ranking e sons) está concluído.
+- Tudo o que estava na lista foi feito. Próximo candidato, só se o celular ainda engasgar: LOD do modelo 3D.
+- Dificuldade: só medi, não joguei. Se a fase 2, 3 ou 4 parecer fácil ou injusta, mude `vis` em `LV` (um número por fase).
+
+
+## Item K — Notebook 3D do usuário (Difícil)
+
+**O que mudou:** o notebook de duas caixas que aparece na frente do personagem ao hackear foi trocado pelo modelo 3D do Henriq (`assets/models/laptop.bin` + textura `assets/img/props/laptop.webp`). Funciona nas duas skins. Ao começar o hack ele "salta" (escala 0 → 1 em ~0,2 s) e some ao parar; com "Reduzir movimento" ele só aparece/some. A luz verde (`lapLight`) continua.
+
+**Ordem:** (1) Fácil: ler o OBJ/MTL e a textura 4096²; (2) Médio: separar a malha em *ilhas de textura* (118 pedaços com UV contínuo); (3) Difícil: decimar cada ilha sozinha (50.000 → 12.447 triângulos) e recalcular o UV de cada vértice novo a partir do ponto mais próximo da mesma ilha; (4) Médio: gravar `.bin` (Int16 posição, Uint16 UV, Uint16 índice = 147.612 bytes) e textura 1024² WebP (~60 KB); (5) Fácil: carregar no jogo com `fetch` + `TextureLoader`, com plano B (notebook de caixas se falhar).
+
+**Conceitos:** BufferGeometry manual, UV e `flipY`, `emissiveMap` (a tela brilha), componentes conexos, decimação de malha, interpolação exponencial (`lapEsc += (alvo - lapEsc) * k`), carregamento assíncrono com fallback.
+
+**Justificativa:** decimar a malha inteira misturava as ilhas (teclado aparecia na tela). Decimar por ilha mantém o UV coerente. Peso total ~207 KB contra ~16 MB do original.
+
+
+## Item L — Notebook com a arte do Kali (Difícil)
+
+**O que mudou:** o notebook do item K (textura neon) foi trocado pela malha limpa `white_mesh_1.glb` (20.000 triângulos, com teclado e dobradiças reais) texturizada com as suas artes: corpo verde-oliva, tela com o terminal Kali (`root@kali-anarc`, hydra, `[SUCCESS]`), teclado, adesivos SYS DOWN / NO CTRL e o símbolo da anarquia. `white_mesh_3.glb` não foi usada: ela traz duas cópias do notebook em poses diferentes e uma placa solta, não tampa e base separadas.
+
+**Ordem:** (1) Fácil: ler a malha e descobrir a orientação (tampa em z<0 virada para +z; teclado em y baixo); (2) Médio: separar *tampa* e *teclado* por posição (distância ao plano da tampa), porque as normais da malha são ruidosas e deixavam manchas; (3) Difícil: projeção planar de cada região em um atlas 1024² (tampa em cima, teclado embaixo, faixa de cor oliva para o resto); (4) Médio: gravar `laptop.bin` (10.764 vértices, 20.000 triângulos, 227.640 bytes) e `laptop.webp` (~46 KB); (5) Fácil: ajustar `LAP_N/LAP_F` no `script.js` e testar nas duas skins.
+
+**Conceitos:** projeção planar de UV, atlas de textura, `flipY` do Three.js (o visualizador de teste estava com `flipY` desligado e parecia que a textura estava de cabeça para baixo), classificação de faces por distância a um plano, vértices duplicados por região.
+
+**Limite:** o notebook continua sendo uma peça só (aberto); para a tampa abrir de verdade seria preciso o modelo com tampa e base separadas. As manchas escuras nas dobradiças são pequenas e quase invisíveis no tamanho do jogo.
+
+## Pacotes 1 e 2 — estado
+- Build: aprovado em 2026-10-27.
+- Preview: carregamento aprovado; HUD de fase, drones e missão secundária visível.
+- Observação: o aviso de build sobre scripts clássicos permanece informativo; os assets locais resolvem corretamente.
+
+## Pacote 3 — protocolos de hack e validação
+- **Hack por fase:** o minigame agora comunica cinco protocolos: SETAS (livre), RELE (sem repetir o último sinal), PULSO (ritmo alternado), NUCLEO (sequência fixa curta) e CHEFAO (memorização/reação). A fase 4 permanece com sete entradas e seis segundos, sem aumentar a carga além da versão recebida.
+- **Testes:** `pnpm test --run` aprovado: 11 arquivos, 78 testes. `pnpm build` aprovado. `/manus-routes.json` respondeu HTTP 200.
+- **Preview:** HUD, missão secundária e overlay de entrada carregaram; console sem erros após o último build.
+- **Limite conhecido:** `pnpm smoke` não executou porque a distribuição `chrome` não está instalada no ambiente do runner; não é falha do jogo.
+
+## Pacote 4 — direção de arte dos drones
+O drone deixou de ser uma esfera simples: agora usa silhueta quadrada, olho emissivo e quatro hélices em anéis ciano. A cor é semântica e muda junto com o estado de gameplay — amarelo para detecção, laranja para perseguição, ciano para congelamento e magenta para VÍRUS. A melhoria usa geometria procedural leve e não adiciona modelos pesados.
+
+## Pacote 5 — feedback visual de ações
+Foi adicionada uma camada de leitura imediata: hack gera pulso magenta, coleta gera pulso verde e detecção gera flash vermelho. A personagem também emite um anel 3D expansivo no chão, sincronizado com a ação. O efeito é leve, usa geometria procedural, não bloqueia controles e desaparece em modo de movimento reduzido.
+
+## Pacote 6 — destruição visual do cenário
+Foi criado um kit procedural leve com painéis tecnológicos, caixas, cabos e uma porta. O BREACH agora pode desativar o elemento destrutível mais próximo dentro do raio de ação. O objeto desaparece, gera partículas e feedback visual, enquanto o reset da fase restaura todos os elementos. O preview confirmou 17 props registrados — incluindo os sprites existentes e os novos elementos procedurais — sem erros de runtime.
+
+## Pacote 7 — chefões e telegraph
+Os três chefões receberam uma aura procedural em anéis de energia, com cor própria para cada identidade: vermelho para o Diretor-Banqueiro, laranja para o Barão do Petróleo e magenta para o CEO MegaCorp. Os anéis preservam a silhueta dos GLB e reagem ao congelamento. O telegraph agora informa o nome do chefão e o ataque, enquanto o jogador recebe flash e pulso vermelho quando entra em uma área de hazard.
+
+## Pacote 8 — infecção visual do VÍRUS
+Cada drone agora recebe três anéis/tentáculos magenta emissivos durante a infecção. O efeito gira, pulsa e acompanha a mudança de olho e hélices para magenta. A ativação da habilidade também produz flash magenta e pulso 3D na personagem. O runtime confirmou a presença do efeito nos cinco drones da fase inicial.
+
+## Pacote 9 — silhuetas e ataques exclusivos dos chefões
+Os chefões agora têm assinaturas procedurais próprias sem substituir os modelos GLB: o Diretor-Banqueiro recebe ombros largos e selos contratuais; o Barão do Petróleo recebe duas chaminés com chamas; o CEO MegaCorp recebe uma coroa e uma cage de dados. Os ataques também foram diferenciados: a Muralha de Contratos gera hazards laterais, a Maré de Petróleo gera áreas secundárias diagonais e o Protocolo Zero cria um núcleo adicional. O runtime confirmou os três perfis, três ataques por perfil, a função de assinatura e o sistema de ataque exclusivo.
+
+## Pacote 10 — rotas alternativas
+As arenas agora exibem três caminhos visuais e o jogador pode alternar entre eles por botões ou teclas 1, 2 e 3. RÁPIDA aumenta a velocidade, mas também ruído e alerta; PROTEGIDA reduz detecção e recupera alerta mais rápido, com pequena perda de velocidade; TÉCNICA mantém velocidade neutra, reduz o cooldown de EMP/VÍRUS e controla melhor o alerta. O runtime confirmou três linhas de rota, três botões e troca real para PROTEGIDA com atualização do HUD.
+
+## Pacote 11 — balanceamento por fase e geometria de rotas
+Foi criada uma tabela de tuning para as cinco fases. A rota RÁPIDA fica mais arriscada nas fases de vigilância, esconderijo e núcleo; a PROTEGIDA recebe maior recuperação e menor detecção; a TÉCNICA mantém o alerta controlado e reduz cooldowns de EMP/VÍRUS. Cada fase agora recebe duas coberturas verdes, dois bloqueios vermelhos e dois marcadores de atalho técnico magenta, reposicionados por `applyLevel` e registrados no sistema de colisão quando aplicável. O build e os 78 testes passaram. Ainda falta o playtest completo dos cinco percursos para calibrar eventuais pontos de bloqueio.
+
+## Pacote 12 — playtest completo, áudio por estado e offline real
+O playtest específico do ANARCO.EXE foi executado em Chromium. Os níveis 1 a 4 exibiram os seis marcadores de rota e mantiveram quatro objetos físicos ativos: duas coberturas PROTEGIDA e dois bloqueios RÁPIDA. As sondas de colisão confirmaram reposicionamento do jogador ao entrar nesses volumes. O nível 5 foi validado com seis marcadores visuais, mas zero sólidos de rota: as coberturas e barreiras invisíveis foram removidas do conjunto de colisão, eliminando o bloqueio excessivo encontrado no audit.
+
+Foi adicionada uma camada de áudio procedural Web Audio. A exploração usa um drone grave discreto; alerta aumenta a camada de tensão; detecção, perseguição e chefão acrescentam uma camada mais agressiva; cada rota altera a assinatura tonal. O áudio só é inicializado após gesto do usuário e respeita mute, transições suaves e `prefers-reduced-motion` indiretamente pela ausência de dependências visuais adicionais.
+
+O primeiro playtest também revelou que o build não copiava `assets/` nem o `script.js` referenciado pelo HTML. Isso foi corrigido com cópias públicas locais, garantindo que Three.js, modelos, texturas, script e service worker existam no `dist`. O cache PWA foi atualizado para `anarco-v2.3-audio` e passou a pré-carregar os modelos principais. O smoke herdado do template ainda não é uma validação válida do ANARCO.EXE: ele procura seletores `data-screen` e `window.__game`, inexistentes neste projeto.
+
+## Pacote 13 — validação automatizada e checkpoint v2.4
+O smoke herdado foi substituído por um teste específico do ANARCO.EXE. A nova rotina inicia o preview de produção, verifica o boot, audita as cinco fases, confirma quatro colisores de rota nos níveis 1–4, confirma ausência de bloqueadores ocultos no nível 5, testa as três trocas de rota, inicializa o áudio por gesto e verifica os controles essenciais em viewport mobile. Resultado: `smoke: OK — 5 fases, colisões, rotas, áudio e mobile validados`.
+
+A versão foi salva no remoto canônico como checkpoint v2.4, commit `50832e8`. O ZIP de entrega permanece local e não é incluído no histórico Git para evitar duplicar o pacote binário no repositório.
+
+## Pacote 14 — câmera cinematográfica e apresentações
+Foi implementada uma câmera de momentos curtos. Ao iniciar o minigame, a câmera aproxima o terminal; ao completar o hack, enquadra a torre por menos de um segundo; ao criar um chefão, faz uma entrada focalizada na silhueta e na aura. A interpolação usa easing, retorna automaticamente ao enquadramento normal e não executa quando `prefers-reduced-motion` está ativo. O pacote foi validado com 78 testes, build e smoke específico aprovados.
+
+## Pacote 15 — destruição parcial e estados quebrados
+O BREACH agora possui dois estágios para props do cenário. O primeiro impacto deixa painel, caixa, cabo, porta ou prop visualmente danificado, com inclinação, escala reduzida, feedback amarelo e partículas menores. O segundo impacto desmonta o objeto, oculta sua geometria e gera o impacto magenta completo. O reinício da fase restaura dano, escala, rotação e visibilidade. O pacote foi validado com 78 testes, build e smoke aprovados.
+
+## Pacote 16 — partículas específicas por tipo de prop
+O sistema de partículas agora usa assinaturas por tipo de objeto. Painéis produzem faíscas ciano, caixas fragmentos âmbar, cabos descargas magenta, portas impactos amarelos e props da base efeitos verdes/cianos. O primeiro impacto usa menos partículas e menor força; a destruição final usa um burst maior. O material é compartilhado para preservar o desempenho mobile. Testes, build e smoke permanecem aprovados.
+
+## Pacote 17 — kit modular e ambientação procedural por fase
+Foi criado um grupo visual reutilizável para a ambientação das cinco fases, separado do sistema de colisão. O Distrito Financeiro recebe blocos verticais de skyline; a Zona Industrial recebe tubos e base de maquinário; o Centro de Vigilância recebe mastros e barras de monitoramento; o Esconderijo Data recebe módulos de rack/arquivo verdes; e o Núcleo MegaCorp recebe pilares magenta e tubos de segurança. O kit é reconstruído na troca de fase, usa a cor temática e não cria colisores adicionais. Testes, build e smoke aprovados.
+
+## Pacote 18 — progressão e desbloqueios offline
+Foi criado um sistema de progressão local persistido em `localStorage`. A conclusão da primeira campanha registra a vitória e desbloqueia a skin CACHOS, enquanto CAPUZ permanece sempre disponível. O seletor indica a quantidade de skins liberadas, saves antigos continuam compatíveis e o ranking usa armazenamento separado, portanto a progressão não altera os tempos registrados nem bloqueia fases.
+
+## Pacote 19 — validação PWA, mobile e acessibilidade
+O smoke foi ampliado para verificar manifest, service worker, controles touch e um ciclo de frames após aquecimento. O pixel ratio inicial em telas touch foi reduzido para 1.25 para priorizar desempenho. O teste passou com PWA, rotas, áudio e mobile validados. O Chromium headless mediu 5 frames/500 ms por renderização de software; isso é mantido como aviso e não como medição de aparelho real. A confirmação final de FPS sustentado, áudio e instalação PWA permanece pendente em dispositivo físico.
+
+## Pacote 20 — recompensas cosméticas e revisão de acessibilidade
+Foram adicionadas duas recompensas cosméticas persistentes: o HUD NEON após duas vitórias e o HUD GLITCH após três. Elas são apenas visuais e não alteram ranking, dificuldade ou regras. A revisão de acessibilidade adicionou rótulos contextuais a BREACH, EMP, VÍRUS e rotas, além de regiões `status` com `aria-live` para mensagens e objetivos. O foco visível e o modo `prefers-reduced-motion` permanecem ativos. Build, 78 testes e smoke aprovados. A validação física continua necessária para FPS, áudio e instalação PWA.
+
+## Pacote 21 — auditoria final e release candidate
+Foi adicionado `pnpm audit:release`, uma auditoria determinística que verifica os arquivos essenciais, manifest, display PWA, service worker, assets Three.js/modelo locais, rótulos de ações e regiões de feedback acessíveis. Resultado: `release-audit: OK — 11 arquivos, PWA offline, acessibilidade e assets locais verificados`. O build, 78 testes e smoke também foram aprovados. A versão v3.2 está preparada como release candidate; a validação física e a autorização de publicação continuam pendentes.
+
+## Pacote 22 — offline release e aceite físico preparado
+O service worker foi atualizado de `anarco-v2.3-audio` para `anarco-v3.3-release` e passou a pré-cachear dados, fontes, ícones, props, skins e modelos críticos, além do shell principal. A versão pública do service worker foi sincronizada. Build, auditoria e smoke seguem aprovados. Foi criado `TESTE-DISPOSITIVO.md` com o roteiro para instalação PWA, modo avião, FPS, áudio, redução de movimento e leitor de tela. A execução exige um aparelho físico e permanece pendente.
+
+## Pacote 23 — análise da ANARCO.EXE v3.4 recebida
+A versão recebida foi extraída fora do projeto e comparada sem sobrescrever a v3.3. Ela é sintaticamente válida e compatível com a base, mas não deve substituir o repositório: não contém package, lockfile, testes, smoke ou checklist, e o service worker regrede o pré-cache ampliado. As novidades úteis são a sexta fase Subestação Elétrica, a mecânica de blecaute, áudio específico dos chefões e uma correção importante no posicionamento de pickups que evita risco de loop indefinido quando um sólido possui largura/profundidade mas não raio. O notebook 3D já está presente na nossa base. A análise detalhada e a ordem de integração seletiva estão em `ANALISE-V34.md`.
+
+## Pacote 24 — junção seletiva v3.4: bugfix de pickups
+A primeira integração da versão recebida foi concluída sem substituir a base atual. O `spawnPickups` agora calcula o raio de objetos de rota a partir de `w/d` quando `r` não existe e limita o posicionamento a 400 tentativas, eliminando o risco de loop indefinido identificado na v3.4. A auditoria de release verifica essa proteção. Os 78 testes, build, auditoria e smoke das cinco fases foram aprovados. O áudio específico de chefões e a sexta fase permanecem isolados para os próximos pacotes.
+
+## Pacote 25 — junção seletiva v3.4: áudio de chefões
+Foi integrado o sistema de áudio específico da v3.4 sem substituir as camadas já existentes. Cada chefão possui assinatura própria de entrada, ataque e derrota; durante o combate entra uma camada grave com pulso LFO e a exploração é reduzida. O botão de mudo agora silencia também a trilha ambiente. O sistema mantém a política de áudio após gesto do usuário e foi validado com 78 testes, build, auditoria e smoke das cinco fases.
+
+## Pacote 26 — junção seletiva v3.4: estrutura da sexta fase
+A Subestação Elétrica foi integrada seletivamente: tema azul, kit procedural de transformadores/cabos, rotas próprias, missão do gerador, protocolo PULSO, briefings e contagem dinâmica de seis fases. O Núcleo MegaCorp agora é a fase 6. O smoke foi atualizado e aprovou seis fases, colisões, rotas, PWA, áudio e mobile. O BLECAUTE já está implementado no loop, mas ainda precisa de validação de gameplay controlado e o service worker ainda será atualizado em pacote próprio.

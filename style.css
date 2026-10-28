@@ -572,8 +572,6 @@ body[data-reward="neon"] .b { border-color: #39ff88; }
 body[data-reward="neon"] #phaseTag { box-shadow: 0 0 18px rgba(57, 255, 136, .22); }
 body[data-reward="glitch"] .b { border-color: #ff3fd0; text-shadow: 1px 0 #2fe6ff, -1px 0 #ff3fd0; }
 body[data-reward="glitch"] #phaseTag { box-shadow: 0 0 20px rgba(255, 63, 208, .28); }
-
-/* ÂNCORA: fase 5 (subestação) — borda azul no HUD e escurecimento durante o blecaute */
 body[data-phase="grid"] #hud { border-top: 3px solid #6ea8ff; }
 body.blackout canvas { filter: brightness(0.55); }
 @media (prefers-reduced-motion: reduce) { body.blackout canvas { filter: none; } }
