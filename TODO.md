@@ -336,3 +336,32 @@
 - [x] Smoke validou seis fases, rotas, colisões, PWA, áudio e mobile.
 - [ ] Validar BLECAUTE com gameplay controlado.
 - [ ] Atualizar e testar cache offline específico da fase 6.
+
+## Pacote 27 — BLECAUTE validado e cache offline da fase 6
+- [x] Probe local confirma ativação do BLECAUTE na Subestação.
+- [x] Janela de oportunidade validada com visão reduzida para exatamente 60%.
+- [x] Disco/cone dos drones acompanham o raio efetivo.
+- [x] Feedback textual e vibração opcional preservados.
+- [x] Movimento reduzido evita filtro visual agressivo.
+- [x] Service worker versionado como `anarco-v3.4-merge3`.
+- [x] Pré-cache completo da v3.3 preservado para a fase 6.
+- [x] 78 testes, build, auditoria e smoke de seis fases aprovados.
+- [ ] Playtest manual de dificuldade e áudio em dispositivo físico.
+
+## Pacote 28 — playtest real da Subestação e BLECAUTE
+- [x] Entrada local de playtest inicia qualquer fase sem tutorial.
+- [x] Playtest real iniciou a Subestação no loop de gameplay.
+- [x] Janela BLECAUTE ativada no loop e classe visual confirmada.
+- [x] Playtest sem erros de página ou console.
+- [x] Smoke automatizado agora verifica a transição visual real.
+- [x] 78 testes, build, auditoria e smoke de seis fases aprovados.
+- [ ] Aceite manual em aparelho físico: FPS, áudio e instalação PWA.
+
+## Pacote 29 — release candidate v3.4 preparado
+- [x] Roteiro físico atualizado para seis fases e BLECAUTE.
+- [x] Documento `RELEASE-CANDIDATE-v3.4.md` criado.
+- [x] Auditoria de release repetida.
+- [x] Smoke de seis fases repetido.
+- [x] Pacote pronto para aceite físico.
+- [ ] Confirmar FPS, áudio e instalação PWA em aparelho real.
+- [ ] Autorizar publicação.

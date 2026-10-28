@@ -1,5 +1,5 @@
 /* ÂNCORA: service worker = "porteiro" que guarda os arquivos no aparelho. Depois da 1ª visita o jogo abre até sem internet. */
-const VERSAO = "anarco-v3.3-release";
+const VERSAO = "anarco-v3.4-merge3";
 const BASICO = ["./", "index.html", "style.css", "script.js", "manifest.webmanifest", "sw.js",
   "assets/dados/cena.js", "assets/dados/icones.js", "assets/dados/manifesto.js", "assets/dados/modelo.js", "assets/dados/props.js",
   "assets/lib/three.min.js", "assets/lib/three.module.js", "assets/lib/three.core.js", "assets/lib/GLTFLoader.js",

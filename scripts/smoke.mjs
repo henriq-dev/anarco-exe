@@ -69,6 +69,17 @@ try {
   if (levels[5].routeSolids !== 0 || levels[5].safeBlocked || levels[5].fastBlocked) {
     throw new Error(`level 6 has an invisible route blocker: ${JSON.stringify(levels[5])}`)
   }
+  const blackout = await page.evaluate(async () => {
+    const api = window.__ANARCO_PLAYTEST__
+    const probe = api.blackoutProbe()
+    api.startLevel(4)
+    api.primeBlackout()
+    await new Promise(resolve => setTimeout(resolve, 250))
+    return { ...probe, activeInLoop: document.body.classList.contains('blackout') }
+  })
+  if (!blackout.ativo || Math.abs(blackout.fator - 0.6) > 0.001 || !blackout.activeInLoop) {
+    throw new Error(`blackout probe failed: ${JSON.stringify(blackout)}`)
+  }
 
   await page.evaluate(() => document.querySelector('#st').click())
   await page.waitForTimeout(250)

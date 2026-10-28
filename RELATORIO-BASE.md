@@ -210,3 +210,12 @@ Foi integrado o sistema de áudio específico da v3.4 sem substituir as camadas 
 
 ## Pacote 26 — junção seletiva v3.4: estrutura da sexta fase
 A Subestação Elétrica foi integrada seletivamente: tema azul, kit procedural de transformadores/cabos, rotas próprias, missão do gerador, protocolo PULSO, briefings e contagem dinâmica de seis fases. O Núcleo MegaCorp agora é a fase 6. O smoke foi atualizado e aprovou seis fases, colisões, rotas, PWA, áudio e mobile. O BLECAUTE já está implementado no loop, mas ainda precisa de validação de gameplay controlado e o service worker ainda será atualizado em pacote próprio.
+
+## Pacote 27 — BLECAUTE validado e cache offline da fase 6
+O BLECAUTE foi validado por probe local determinístico: a Subestação ativa a janela no ciclo previsto e reduz o raio de visão dos drones para exatamente 60%, com disco/cone sincronizados. O modo `prefers-reduced-motion` evita o filtro escuro agressivo. O service worker foi versionado para `anarco-v3.4-merge3`, mantendo o pré-cache completo de dados, fontes, ícones, props, skins e modelos. 78 testes, build, auditoria e smoke das seis fases foram aprovados.
+
+## Pacote 28 — playtest real da Subestação e BLECAUTE
+Foi criado um ponto de entrada de diagnóstico local para iniciar a fase sem tutorial. O playtest real iniciou a Subestação, preparou a janela do BLECAUTE no relógio do jogo e confirmou a ativação da classe visual no loop em 700 ms, sem erros de página ou console. O smoke foi ampliado para testar também essa transição visual real. A validação automatizada permanece com 78 testes, build, auditoria e seis fases aprovadas.
+
+## Pacote 29 — release candidate v3.4 preparado
+O roteiro de aceite físico foi atualizado para seis fases, incluindo Subestação, BLECAUTE e PULSO. O documento `RELEASE-CANDIDATE-v3.4.md` consolida recursos, validações, pendências físicas e a regra de não publicar sem autorização explícita. Auditoria de release e smoke foram repetidos com sucesso.

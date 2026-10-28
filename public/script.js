@@ -3188,6 +3188,12 @@ $("pzm").onclick = () => {
 // e colisões sem alterar o fluxo normal do jogador ou depender de estado global.
 if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.hostname.endsWith(".manus.computer")) {
   window.__ANARCO_PLAYTEST__ = {
+    startLevel(index) {
+      tut = -1;
+      lvl = Math.max(0, Math.min(LV.length - 1, index | 0));
+      reset(true);
+      return this.inspect();
+    },
     setLevel(index) {
       lvl = Math.max(0, Math.min(LV.length - 1, index | 0));
       // Apenas troca o layout para auditoria; não reinicia a partida. No núcleo,
@@ -3218,6 +3224,26 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.hostname.en
       const before = P.position.clone();
       collideBox(target);
       return { kind, blocked: P.position.distanceTo(before) > 0.001, x: P.position.x, z: P.position.z };
+    },
+    blackoutProbe() {
+      const anterior = { lvl, blackoutClock, blackoutOn };
+      lvl = Math.min(4, LV.length - 1);
+      blackoutClock = 9.6;
+      blackoutOn = !!LV[lvl].blackout && blackoutClock % 12 > 9.5;
+      const ativo = blackoutOn;
+      const visNormal = LV[lvl].vis;
+      const visBlecaute = visNormal * (blackoutOn ? 0.6 : 1);
+      lvl = anterior.lvl;
+      blackoutClock = anterior.blackoutClock;
+      blackoutOn = anterior.blackoutOn;
+      return { ativo, visNormal, visBlecaute, fator: visBlecaute / visNormal };
+    },
+    primeBlackout() {
+      lvl = Math.min(4, LV.length - 1);
+      blackoutClock = 9.6;
+      blackoutOn = false;
+      document.body.classList.remove("blackout");
+      return { level: lvl + 1, phase: LV[lvl].name };
     },
   };
 }

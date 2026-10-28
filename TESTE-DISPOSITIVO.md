@@ -14,9 +14,9 @@ Este roteiro cobre as três validações que não podem ser comprovadas pelo Chr
 ## 2. FPS e toque
 
 1. Teste em orientação retrato e paisagem.
-2. Inicie uma partida e percorra as cinco fases.
+2. Inicie uma partida e percorra as seis fases, incluindo a Subestação Elétrica.
 3. Use joystick, CORRER, BREACH, EMP, VÍRUS e seletor de rotas.
-4. Observe travamentos ao trocar de fase, abrir o minigame e entrar em chefões.
+4. Observe travamentos ao trocar de fase, abrir o minigame, ativar o BLECAUTE e entrar em chefões.
 5. Registre o modelo do aparelho, sistema, navegador e se houve queda perceptível de frames.
 6. Em aparelhos Android, use o painel de desempenho do navegador ou gravação de tela para estimar estabilidade; não usar apenas a sensação subjetiva como número exato.
 

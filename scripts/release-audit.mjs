@@ -12,6 +12,7 @@ if (missing.length) throw new Error(`release files missing: ${missing.join(', ')
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
 const gameScript = fs.readFileSync(path.join(root, 'script.js'), 'utf8')
+const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8')
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8'))
 const checks = {
   manifestIdentity: Boolean(manifest.name && manifest.short_name && manifest.start_url),
@@ -22,6 +23,8 @@ const checks = {
   localThree: fs.existsSync(path.join(root, 'public/assets/lib/three.min.js')),
   localModel: fs.existsSync(path.join(root, 'public/assets/models/anarco.bin')),
   pickupLoopGuard: gameScript.includes('tentativas < 400') && gameScript.includes('Number.isFinite(s.r)'),
+  blackoutProbe: gameScript.includes('blackoutProbe') && gameScript.includes('visBlecaute'),
+  phase6Cache: serviceWorker.includes('anarco-v3.4-merge3'),
 }
 const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name)
 if (failed.length) throw new Error(`release checks failed: ${failed.join(', ')}`)
