@@ -34,34 +34,41 @@
 <div id="hud">
   <h1>ANARCO<span>.EXE</span> 3D</h1>
   <div class="b" id="lv">NÍVEL 1/5</div>
+  <div class="b phase-readout" id="phaseTag"><span id="phaseName">DISTRITO FINANCEIRO</span><small id="phaseThreat">AMEAÇA: VIGILÂNCIA CORPORATIVA</small></div>
   <div class="b" id="tm" aria-label="Tempo da corrida">TEMPO <span id="tmv">00:00.0</span></div>
   <div class="b"><img id="ic_d" alt="">TORRES <span id="cnt">0/3</span></div>
   <div class="b"><img id="ic_h" alt="">HACK<i><u id="hk"></u></i></div>
   <div class="b r"><img id="ic_a" alt="">ALERTA<i><u id="al"></u></i></div>
+  <div class="b" id="drread">DRONES <span id="drstate" aria-live="polite">PATRULHA</span></div>
+  <div class="b side-readout" id="sideRead"><span>OP. SECUNDÁRIA</span><small id="sideText" aria-live="polite">LOCALIZANDO...</small></div>
+  <div class="b route-readout" id="routeRead"><span>ROTA ATIVA</span><small id="routeText" aria-live="polite">RÁPIDA · velocidade +18% · ruído +35%</small></div>
   <div class="b" id="bb" hidden><span id="bn">CHEFÃO</span><i><u id="bh"></u></i></div>
 </div>
-<div id="msg"></div>
+<div id="msg" role="status" aria-live="polite"></div>
+<div id="fxFlash" aria-hidden="true"></div>
 <div id="leakcard" hidden><b>VAZAMENTO CAPTURADO</b><span id="lcc"></span><small id="lcd"></small></div>
-<div id="obj"></div>
+<div id="obj" role="status" aria-live="polite"></div>
 <button id="pb" aria-label="Pausar">⏸</button>
 <div id="pz" hidden><div><h2>PAUS<span>A</span></h2><p>P ou Esc para voltar.</p><button id="pzc">Continuar</button> <button id="pzm">Menu</button></div></div>
-<div id="bf" hidden><div><h2 id="bfh"></h2><p id="bft"></p></div></div>
-<div id="mini" hidden><b>BREACH — digite a sequência</b><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
+<div id="bf" hidden><div><p class="eyebrow">BRIEFING // REDE ANARQUISTA</p><h2 id="bfh"></h2><p id="bft"></p><div class="brief-grid"><span><b>OBJETIVO</b><strong id="bfo"></strong></span><span><b>AMEAÇA</b><strong id="bfa"></strong></span><span><b>RECOMENDAÇÃO</b><strong id="bfr"></strong></span></div></div></div>
+<div id="mini" hidden><b id="miniTitle">BREACH — digite a sequência</b><small id="miniRule">PROTOCOLO // SETAS</small><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
 <div id="tut" hidden><span id="tutx"></span><button id="tuts">pular</button></div>
 <div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul><button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
 <div id="rk" hidden><div><h2>MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul><button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
-<canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas>
+<div id="map-wrap"><canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas><div id="mapLegend"><span><i class="legend-dot tower"></i>torre</span><span><i class="legend-dot drone"></i>drone</span><span><i class="legend-dot item"></i>item</span></div></div>
 <button id="snd" aria-label="Som">🔊</button>
-<button id="bz">BREACH · Espaço</button>
-<button id="hx" title="Habilidade nova: descarga EMP">EMP · E</button>
-<button id="vx" title="Habilidade nova: vírus de impacto">VÍRUS · Q</button>
+<button id="bz" aria-label="Usar BREACH; tecla Espaço">BREACH · Espaço</button>
+<button id="hx" title="Habilidade nova: descarga EMP" aria-label="Usar EMP; tecla E">EMP · E</button>
+<button id="vx" title="Habilidade nova: vírus de impacto" aria-label="Usar VÍRUS; tecla Q">VÍRUS · Q</button>
 <button id="rn" type="button" aria-label="Segurar para correr">CORRER</button>
+<div id="routePicker" aria-label="Escolher rota"><button id="routeFast" type="button" aria-label="Escolher rota rápida">1 RÁPIDA</button><button id="routeSafe" type="button" aria-label="Escolher rota protegida">2 PROTEGIDA</button><button id="routeTech" type="button" aria-label="Escolher rota técnica">3 TÉCNICA</button></div>
 <div id="joy"><b id="nub"></b></div>
 <div id="ov"><div>
   <h2 id="ot">ANARCO<span>.EXE</span></h2>
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
   <p>Mova com WASD ou setas, segure Shift para correr. Use BREACH, EMP e VÍRUS para controlar a rede e sobreviver aos chefões. Tudo é ficção.</p>
   <p id="rkres" hidden></p>
+  <div id="stats" hidden><b class="stats-title">RELATÓRIO DA OPERAÇÃO</b><div class="stats-grid"><span><small>TORRES</small><strong id="stTowers">0/3</strong></span><span><small>HACKS</small><strong id="stHacks">0</strong></span><span><small>FALHAS</small><strong id="stFails">0</strong></span><span><small>ALERTAS</small><strong id="stAlerts">0</strong></span><span><small>ITENS</small><strong id="stItems">0</strong></span><span><small>HABILIDADES</small><strong id="stSkills">0</strong></span></div><p id="stProfile"></p></div>
   <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
   <button id="st">Invadir</button>
   <div class="mb2"><button id="tb">Tutorial</button><button id="lb">Vazamentos</button><button id="rb">Ranking</button><button id="sk" type="button" aria-label="Trocar a skin do personagem"><img alt="" src="assets/img/skins/capuz.png"><span id="skn">Skin: Capuz</span></button><button id="inst" type="button" hidden>⬇ Instalar</button></div>

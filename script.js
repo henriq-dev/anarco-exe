@@ -39,6 +39,77 @@ if (location.protocol === "file:") {
 }
 const T = THREE,
   $ = (id) => document.getElementById(id);
+
+// Pacote 1: identidade visual semantica por fase.
+const PHASE_THEME = [
+  { key: "finance", name: "DISTRITO FINANCEIRO", threat: "VIGILANCIA CORPORATIVA", sky: 0x0a0818, fog: 0x0a0818, ground: 0x111114, grid: 0x6a2bd0, sun: 0xff6a5a },
+  { key: "industrial", name: "ZONA INDUSTRIAL", threat: "CALOR, FUMACA E DRONES", sky: 0x160d0a, fog: 0x160d0a, ground: 0x1b1412, grid: 0xff6b2d, sun: 0xff9a4a },
+  { key: "surveillance", name: "CENTRO DE VIGILANCIA", threat: "CAMERAS E LINHA DE VISAO", sky: 0x07131d, fog: 0x07131d, ground: 0x101b26, grid: 0x2fe6ff, sun: 0x72cfff },
+  { key: "hideout", name: "ESCONDERIJO DATA", threat: "REDE INFILTRADA", sky: 0x07170f, fog: 0x07170f, ground: 0x2b2a33, grid: 0x39ff88, sun: 0x64ffb0 },
+  { key: "grid", name: "SUBESTACAO ELETRICA", threat: "BLECAUTE E CAMPOS ELETRICOS", sky: 0x060d1f, fog: 0x060d1f, ground: 0x0e1626, grid: 0x6ea8ff, sun: 0x9cc4ff },
+  { key: "megacorp", name: "NUCLEO MEGACORP", threat: "TRES CHEFOES CORPORATIVOS", sky: 0x180719, fog: 0x180719, ground: 0x160f1d, grid: 0xff3fd0, sun: 0xff3fd0 },
+];
+function applyPhaseReadout() {
+  routeGeometry.forEach((o) => {
+    if (o.solid && !solids.includes(o)) solids.push(o);
+  });
+  applyRouteLayout();
+  const theme = PHASE_THEME[lvl] || PHASE_THEME[0];
+  document.body.dataset.phase = theme.key;
+  $("phaseName").textContent = theme.name;
+  $("phaseThreat").textContent = "AMEACA: " + theme.threat;
+}
+function applyPhaseKit() {
+  while (phaseKit.children.length) phaseKit.remove(phaseKit.children[0]);
+  const theme = PHASE_THEME[lvl] || PHASE_THEME[0];
+  const solid = new T.MeshStandardMaterial({ color: theme.ground, emissive: theme.grid, emissiveIntensity: 0.22, metalness: 0.65, roughness: 0.5 });
+  const glow = new T.MeshBasicMaterial({ color: theme.grid, transparent: true, opacity: 0.72, blending: T.AdditiveBlending });
+  const addBlock = (x, z, w, h, d, y = h / 2) => {
+    const m = new T.Mesh(new T.BoxGeometry(w, h, d), solid);
+    m.position.set(x, y, z);
+    phaseKit.add(m);
+    const edge = new T.LineSegments(new T.EdgesGeometry(m.geometry), glow);
+    edge.position.copy(m.position);
+    phaseKit.add(edge);
+  };
+  const addPipe = (x, z, h, rot = 0) => {
+    const p = new T.Mesh(new T.CylinderGeometry(0.22, 0.3, h, 8), glow);
+    p.position.set(x, h / 2, z);
+    p.rotation.z = rot;
+    phaseKit.add(p);
+  };
+  if (theme.key === "finance") {
+    [-28, -20, 20, 28].forEach((x, i) => addBlock(x, -22 + (i % 2) * 7, 3.4, 7 + (i % 3) * 2, 3));
+  } else if (theme.key === "industrial") {
+    [-26, -18, 18, 26].forEach((x, i) => addPipe(x, -21, 7 + (i % 2) * 3, i % 2 ? 0.06 : -0.06));
+    addBlock(0, -30, 16, 1.2, 1.2, 0.6);
+  } else if (theme.key === "surveillance") {
+    [-25, -13, 13, 25].forEach((x) => { addBlock(x, -27, 0.7, 10, 0.7, 5); addBlock(x, -21, 3.4, 0.18, 0.4, 8.6); });
+  } else if (theme.key === "hideout") {
+    [-26, -13, 13, 26].forEach((x) => { addBlock(x, -28, 2.8, 5.5, 1.2); addBlock(x, -27.3, 2.1, 0.08, 0.08, 3.8); });
+  } else if (theme.key === "grid") {
+    // ÂNCORA: subestação = transformadores (blocos) + cabos (tubos) em linha
+    [-26, -13, 13, 26].forEach((x, i) => { addBlock(x, -28, 3, 4.5 + (i % 2) * 1.5, 2.4); addPipe(x, -26.6, 6 + (i % 2) * 2, 0.04); });
+    addBlock(0, -31, 18, 0.25, 0.25, 7);
+  } else {
+    [-24, -12, 12, 24].forEach((x, i) => { addBlock(x, -27, 2.4, 10 + (i % 2) * 4, 2.4); addPipe(x, -25.6, 4, Math.PI / 2); });
+  }
+  phaseKit.visible = true;
+}
+const buzz = (ms = 24) => {
+  if (navigator.vibrate) navigator.vibrate(ms);
+};
+let flashTimer = 0;
+function flashFeedback(kind) {
+  const el = $("fxFlash");
+  if (!el) return;
+  el.dataset.kind = kind;
+  el.classList.remove("pulse");
+  void el.offsetWidth;
+  el.classList.add("pulse");
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => el.classList.remove("pulse"), 420);
+}
 // gerador com semente: o cenário decorativo é sempre igual
 let SEED = 1337;
 const rnd = () => {
@@ -53,13 +124,15 @@ $("ic_a").src = ICON.drone;
 // ÂNCORA: celular (toque) com tela densa gasta muita GPU: limita os pixels e dispensa o antialias (MSAA)
 const toque = matchMedia("(pointer: coarse)").matches;
 const R = new T.WebGLRenderer({ antialias: !(toque && devicePixelRatio >= 2) });
-let pixelRatio = Math.min(devicePixelRatio, toque ? 1.5 : 2);
+let pixelRatio = Math.min(devicePixelRatio, toque ? 1.25 : 2);
 R.setPixelRatio(pixelRatio);
 document.body.prepend(R.domElement);
 const S = new T.Scene();
 S.background = new T.Color(0x0a0818);
 S.fog = new T.Fog(0x0a0818, 30, 90);
 const C = new T.PerspectiveCamera(55, 1, 0.1, 220);
+const phaseKit = new T.Group();
+S.add(phaseKit);
 S.add(new T.HemisphereLight(0xffffff, 0x330a0a, 0.6));
 const sun = new T.DirectionalLight(0xff6a5a, 0.5);
 sun.position.set(-10, 30, 10);
@@ -78,6 +151,62 @@ S.add(ground);
 const grid = new T.GridHelper(90, 45, 0x6a2bd0, 0x1a1030);
 grid.position.y = 0.02;
 S.add(grid);
+const routeVisuals = new T.Group();
+S.add(routeVisuals);
+const ROUTE_POINTS = {
+  fast: [[0, 22], [0, 10], [-13, -2], [-18, -20]],
+  safe: [[0, 22], [12, 16], [22, 5], [18, -18]],
+  tech: [[0, 22], [-10, 14], [-4, 2], [8, -12]],
+};
+Object.entries(ROUTE_POINTS).forEach(([kind, points]) => {
+  const color = kind === "fast" ? 0x2fe6ff : kind === "safe" ? 0x39ff88 : 0xff3fd0;
+  const line = new T.Line(
+    new T.BufferGeometry().setFromPoints(points.map(([x, z]) => new T.Vector3(x, 0.045, z))),
+    new T.LineBasicMaterial({ color, transparent: true, opacity: 0.2, depthWrite: false }),
+  );
+  line.userData.route = kind;
+  routeVisuals.add(line);
+});
+const routeObjects = [];
+function makeRouteObject(kind, shape) {
+  const color = kind === "fast" ? 0x2fe6ff : kind === "safe" ? 0x39ff88 : 0xff3fd0;
+  const geo = shape === "cover" ? new T.BoxGeometry(3.4, 1.6, 2.2) : shape === "block" ? new T.BoxGeometry(7.5, 1.1, 1.1) : new T.TorusGeometry(1.25, 0.08, 8, 24);
+  const mat = new T.MeshStandardMaterial({ color: shape === "block" ? 0xff244d : color, emissive: color, emissiveIntensity: 0.7, transparent: true, opacity: 0.72 });
+  const mesh = new T.Mesh(geo, mat);
+  mesh.visible = false;
+  routeVisuals.add(mesh);
+  const item = { kind, shape, mesh, x: 999, z: 999, w: shape === "cover" ? 3.4 : shape === "block" ? 7.5 : 0, d: shape === "cover" ? 2.2 : shape === "block" ? 1.1 : 0, rot: 0, solid: shape !== "shortcut" };
+  routeObjects.push(item);
+  return item;
+}
+const routeGeometry = [
+  makeRouteObject("safe", "cover"), makeRouteObject("safe", "cover"),
+  makeRouteObject("fast", "block"), makeRouteObject("fast", "block"),
+  makeRouteObject("tech", "shortcut"), makeRouteObject("tech", "shortcut"),
+];
+const ROUTE_LAYOUTS = [
+  { safe: [[-9, 13], [9, 4]], fast: [[-3, 7], [14, -9]], tech: [[-12, 7], [5, -8]] },
+  { safe: [[-18, 15], [17, -2]], fast: [[-5, 2], [5, -14]], tech: [[-22, 3], [20, 10]] },
+  { safe: [[-22, 9], [19, 17]], fast: [[0, 4], [0, -15]], tech: [[-14, -7], [14, -7]] },
+  { safe: [[-8, 15], [8, -15]], fast: [[-20, 0], [20, 0]], tech: [[-18, 12], [18, -12]] },
+  { safe: [[-14, 16], [14, 16]], fast: [[0, -6], [0, 10]], tech: [[-20, -4], [20, -4]] },
+  { safe: [[-16, 18], [16, 18]], fast: [[-16, -12], [16, -12]], tech: [[-7, 1], [7, 1]] },
+];
+function applyRouteLayout() {
+  const layout = ROUTE_LAYOUTS[lvl] || ROUTE_LAYOUTS[0];
+  const safe = routeGeometry.filter((o) => o.kind === "safe");
+  const fast = routeGeometry.filter((o) => o.kind === "fast");
+  const tech = routeGeometry.filter((o) => o.kind === "tech");
+  [ [safe, "safe"], [fast, "fast"], [tech, "tech"] ].forEach(([items, kind]) => {
+    items.forEach((o, i) => {
+      const pt = layout[kind][i];
+      o.x = pt[0]; o.z = pt[1]; o.mesh.position.set(o.x, o.shape === "cover" ? 0.8 : o.shape === "block" ? 0.55 : 0.08, o.z);
+      o.mesh.rotation.y = kind === "tech" ? (i ? Math.PI / 2 : 0) : i * 0.35;
+      o.mesh.visible = lvl < LV.length - 1 || kind === "tech";
+      if (o.solid) { o.rot = o.mesh.rotation.y; }
+    });
+  });
+}
 
 function winTex(h) {
   const c = document.createElement("canvas");
@@ -176,6 +305,8 @@ const towers = TD.map((d) => {
   d.done = false;
   d.glitch = 0;
   d.wt = -1;
+  d.state = "patrol";
+  d.virus = 0;
   return d;
 });
 
@@ -306,8 +437,18 @@ const SKINS = {
     ],
   },
 };
+const PROGRESS_KEY = "anarco_progress";
+let progression;
+try { progression = JSON.parse(ler(PROGRESS_KEY) || "{}"); } catch (e) { progression = {}; }
+progression.wins = Number.isFinite(progression.wins) ? progression.wins : 0;
+progression.skins = Array.isArray(progression.skins) ? progression.skins.filter((id) => SKINS[id]) : ["capuz"];
+if (!progression.skins.includes("capuz")) progression.skins.unshift("capuz");
+const saveProgress = () => guardar(PROGRESS_KEY, JSON.stringify(progression));
+function applyRewardCosmetic() {
+  document.body.dataset.reward = progression.wins >= 3 ? "glitch" : progression.wins >= 2 ? "neon" : "base";
+}
 let skinAtual = ler("anarco_skin");
-if (!SKINS[skinAtual]) skinAtual = "capuz";
+if (!SKINS[skinAtual] || !progression.skins.includes(skinAtual)) skinAtual = "capuz";
 let pedidoSkin = 0, // só o pedido mais recente vale (cliques rápidos não embaralham)
   skinCarregada = null; // skin que está de fato na tela
 async function carregarModelo(id = skinAtual) {
@@ -419,16 +560,19 @@ carregarModelo();
 // ÂNCORA: o botão do menu passa para a próxima skin da lista, lembra a escolha e recarrega o corpo
 const ordemSkins = Object.keys(SKINS);
 function rotuloSkin() {
-  $("skn").textContent = "Skin: " + SKINS[skinAtual].nome;
+  const total = Object.keys(SKINS).length;
+  $("skn").textContent = "Skin: " + SKINS[skinAtual].nome + " · " + progression.skins.length + "/" + total;
   $("sk").querySelector("img").src = "assets/img/skins/" + skinAtual + ".png";
 }
 $("sk").onclick = () => {
-  skinAtual = ordemSkins[(ordemSkins.indexOf(skinAtual) + 1) % ordemSkins.length];
+  const desbloqueadas = ordemSkins.filter((id) => progression.skins.includes(id));
+  skinAtual = desbloqueadas[(desbloqueadas.indexOf(skinAtual) + 1) % desbloqueadas.length];
   guardar("anarco_skin", skinAtual);
   rotuloSkin();
   carregarModelo(skinAtual);
 };
 rotuloSkin();
+applyRewardCosmetic();
 // luzes neon que seguem o jogador
 const rig = new T.Group();
 S.add(rig);
@@ -618,11 +762,31 @@ const drones = [
   rect(-12, 12, 14, 8),
 ].map((path, i) => {
   const g = new T.Group();
-  g.add(mk(new T.SphereGeometry(0.6, 16, 12), 0x200000, 0xe0261c));
-  const rg = new T.Mesh(new T.TorusGeometry(0.95, 0.07, 8, 24), new T.MeshBasicMaterial({ color: 0xffffff }));
-  rg.rotation.x = Math.PI / 2;
+  const body = new T.Mesh(
+    new T.BoxGeometry(1.05, 0.48, 1.05),
+    new T.MeshStandardMaterial({ color: 0x15151d, emissive: 0xe0261c, emissiveIntensity: 0.8, roughness: 0.45, metalness: 0.55 }),
+  );
+  body.position.y = 0.05;
+  g.add(body);
+  const eye = new T.Mesh(
+    new T.SphereGeometry(0.22, 12, 8),
+    new T.MeshStandardMaterial({ color: 0xff3fd0, emissive: 0xff3fd0, emissiveIntensity: 2.2 }),
+  );
+  eye.position.set(0, 0.02, 0.56);
+  g.add(eye);
+  const rg = new T.Group();
+  [[-0.68, -0.68], [0.68, -0.68], [-0.68, 0.68], [0.68, 0.68]].forEach(([x, z]) => {
+    const rotor = new T.Mesh(
+      new T.TorusGeometry(0.22, 0.045, 6, 12),
+      new T.MeshBasicMaterial({ color: 0x2fe6ff }),
+    );
+    rotor.rotation.x = Math.PI / 2;
+    rotor.position.set(x, 0.08, z);
+    rg.add(rotor);
+  });
   g.add(rg);
   g.rg = rg;
+  g.eye = eye;
   const disc = new T.Mesh(
     new T.CircleGeometry(3.4, 32).rotateX(-Math.PI / 2),
     new T.MeshBasicMaterial({ color: 0xe0261c, transparent: true, opacity: 0.25 }),
@@ -645,7 +809,21 @@ const drones = [
   );
   beam.position.y = 2.5;
   disc.add(beam);
+  const virusFx = new T.Group();
+  for (let k = 0; k < 3; k++) {
+    const tendril = new T.Mesh(
+      new T.TorusGeometry(0.82 + k * 0.13, 0.035, 6, 18),
+      new T.MeshBasicMaterial({ color: 0xff3fd0, transparent: true, opacity: 0.8, blending: T.AdditiveBlending }),
+    );
+    tendril.rotation.set(k * 0.8, k * 0.45, k * 0.3);
+    virusFx.add(tendril);
+  }
+  virusFx.visible = false;
+  g.add(virusFx);
+  g.virusFx = virusFx;
   g.scale.setScalar(1.35);
+  g.state = "patrol";
+  g.virus = 0;
   S.add(g, disc);
   g.disc = disc;
   g.edge = edgeR;
@@ -663,17 +841,41 @@ const N = 400,
   pv = Array.from({ length: N }, () => ({ v: new T.Vector3(), l: 0 }));
 const pg = new T.BufferGeometry();
 pg.setAttribute("position", new T.BufferAttribute(pp, 3));
+const particleMat = new T.PointsMaterial({ color: 0xff4a3d, size: 0.55, transparent: true, opacity: 0.95 });
 S.add(
-  new T.Points(pg, new T.PointsMaterial({ color: 0xff4a3d, size: 0.55, transparent: true, opacity: 0.95 })),
+  new T.Points(pg, particleMat),
 );
 let pi = 0;
-function burst(x, y, z) {
-  for (let k = 0; k < 110; k++) {
+function burst(x, y, z, color = 0xff4a3d, count = 110, force = 14) {
+  particleMat.color.set(color);
+  for (let k = 0; k < count; k++) {
     const j = pi++ % N;
     pp.set([x, y, z], j * 3);
-    pv[j].v.set((Math.random() - 0.5) * 14, Math.random() * 12, (Math.random() - 0.5) * 14);
+    pv[j].v.set((Math.random() - 0.5) * force, Math.random() * force * 0.85, (Math.random() - 0.5) * force);
     pv[j].l = 1.4;
   }
+}
+const playerFx = new T.Mesh(
+  new T.RingGeometry(0.7, 0.86, 32).rotateX(-Math.PI / 2),
+  new T.MeshBasicMaterial({ color: 0x2fe6ff, transparent: true, opacity: 0, depthWrite: false }),
+);
+playerFx.position.y = 0.08;
+playerFx.renderOrder = 8;
+S.add(playerFx);
+let playerFxT = 0;
+function triggerPlayerFx(color, strength = 1) {
+  playerFx.material.color.set(color);
+  playerFx.material.opacity = 0.9;
+  playerFx.scale.setScalar(0.8 + strength * 0.2);
+  playerFxT = 0.5;
+}
+function updatePlayerFx(dt) {
+  if (playerFxT <= 0) { playerFx.material.opacity = 0; return; }
+  playerFxT = Math.max(0, playerFxT - dt);
+  const k = 1 - playerFxT / 0.5;
+  playerFx.position.set(P.position.x, 0.08, P.position.z);
+  playerFx.scale.setScalar(0.8 + k * 1.5);
+  playerFx.material.opacity = (1 - k) * 0.9;
 }
 
 // input
@@ -734,27 +936,84 @@ let state = "menu",
   alert_ = 0,
   shake = 0,
   grace = 0,
-  endT = 0;
+  endT = 0,
+  camFx = null;
+const runStats = { hacks: 0, failedHacks: 0, alerts: 0, items: 0, skills: 0, side: 0 };
+const SIDE_MISSIONS = [
+  { type: "e", text: "ENERGIA: atravesse a rota rapida", reward: "corrida silenciosa por 6s" },
+  { type: "k", text: "KEYCARD: abra a rota tecnica", reward: "torres +50%" },
+  { type: "u", text: "USB: proteja a rota segura", reward: "drones congelados por 5s" },
+  { type: "e", text: "ENERGIA: recupere o backup", reward: "velocidade extra" },
+  { type: "u", text: "USB: religue o gerador reserva", reward: "drones congelados por 5s" },
+  { type: "k", text: "KEYCARD: invada o nucleo", reward: "torres +50%" },
+];
+let sideMission = { type: "e", text: "LOCALIZANDO...", reward: "" , done: false };
+function renderSideMission() {
+  const el = $("sideText");
+  if (!el) return;
+  el.textContent = sideMission.done ? "CONCLUIDA · " + sideMission.reward : sideMission.text;
+  $("sideRead").style.color = sideMission.done ? "#39ff88" : "#ffe14a";
+}
+function resetStats() {
+  runStats.hacks = 0;
+  runStats.failedHacks = 0;
+  runStats.alerts = 0;
+  runStats.items = 0;
+  runStats.skills = 0;
+  runStats.side = 0;
+}
+function renderStats() {
+  $("stTowers").textContent = (won ? 3 : cnt) + "/3";
+  $("stHacks").textContent = runStats.hacks;
+  $("stFails").textContent = runStats.failedHacks;
+  $("stAlerts").textContent = runStats.alerts;
+  $("stItems").textContent = runStats.items;
+  $("stSkills").textContent = runStats.skills;
+  const score = runStats.failedHacks === 0 && runStats.alerts === 0 ? "FANTASMA" : runStats.alerts <= 2 ? "INFILTRADOR" : "AGENTE DE RUPTURA";
+  $("stProfile").textContent = "PERFIL // " + score + (runStats.side ? " · OP. SECUNDARIA OK" : "");
+}
 const vel = new T.Vector3();
 // ÂNCORA: calm = true quando o sistema pede menos movimento (acessibilidade); atualiza ao vivo
 const reduzMov = matchMedia("(prefers-reduced-motion:reduce)");
 let calm = reduzMov.matches;
 reduzMov.addEventListener("change", (e) => (calm = e.matches));
+function cameraMoment(kind, x, z, duration) {
+  if (calm) { camFx = null; return; }
+  camFx = { kind, x, z, t: duration, duration };
+}
+function cameraShot(kind, x, z) {
+  const shot = kind === "boss"
+    ? { x: x + 10, y: 10, z: z + 12, lookY: 2.2 }
+    : kind === "tower"
+      ? { x: x + 6, y: 9, z: z + 8, lookY: 1.5 }
+      : { x: x + 4.5, y: 7.5, z: z + 6.5, lookY: 1.1 };
+  return shot;
+}
 function reset(keep) {
-  if (!keep) lvl = 0;
+  if (!keep) {
+    lvl = 0;
+    resetStats();
+  }
   mini = null;
+  blackoutClock = 0;
+  blackoutOn = false;
+  document.body.classList.remove("blackout");
+  sideMission = { ...(SIDE_MISSIONS[lvl] || SIDE_MISSIONS[0]), done: false };
+  renderSideMission();
   $("mini").hidden = true;
   emp = boost = empCd = virusCd = 0;
   $("msg").textContent = "";
   applyLevel();
+  resetSceneProps();
   spawnPickups();
-  $("lv").textContent = "NÍVEL " + (lvl + 1) + "/5";
+  $("lv").textContent = "NÍVEL " + (lvl + 1) + "/" + LV.length;
   won = false;
   if (model) model.rotation.set(0, 0, 0);
   cnt = 0;
   alert_ = 0;
   grace = 1.5;
   shake = 0;
+  camFx = null;
   vel.set(0, 0, 0);
   P.position.set(0, 0, 22);
   towers.forEach((t) => {
@@ -770,10 +1029,14 @@ function reset(keep) {
   drones.forEach((d) => {
     d.i = 0;
     d.chase = 0;
+    d.state = "patrol";
+    d.virus = 0;
     d.position.set(d.path[0][0], 5, d.path[0][1]);
   });
   $("cnt").textContent = LV[lvl].boss ? "—" : "0/3";
   state = "play";
+  applyPhaseReadout();
+  $("stats").hidden = true;
   $("ov").style.display = "none";
 }
 function chooseEnd(k) {
@@ -794,6 +1057,13 @@ function chooseEnd(k) {
 }
 $("cCaos").onclick = () => chooseEnd("caos");
 $("cSomb").onclick = () => chooseEnd("sombrio");
+function registerCampaignProgress() {
+  progression.wins++;
+  if (progression.wins >= 1 && !progression.skins.includes("cachos") && SKINS.cachos) progression.skins.push("cachos");
+  saveProgress();
+  rotuloSkin();
+  applyRewardCosmetic();
+}
 function end(win) {
   $("ch").hidden = true;
   $("st").hidden = false;
@@ -809,7 +1079,10 @@ function end(win) {
     : "Os drones te localizaram. Troque de proxy e tente de novo.";
   $("st").textContent = win ? "Jogar de novo" : "Tentar de novo";
   $("rkres").hidden = true;
+  $("stats").hidden = false;
+  renderStats();
   if (win) {
+    registerCampaignProgress();
     const r = registrarTempo(runT);
     $("rkres").hidden = false;
     $("rkres").innerHTML =
@@ -830,6 +1103,9 @@ function end(win) {
 }
 function hackDone(t) {
   sfx("done");
+  buzz(42);
+  cameraMoment("tower", t.x, t.z, 0.9);
+  runStats.hacks++;
   t.done = true;
   cnt++;
   $("cnt").textContent = cnt + "/3";
@@ -930,9 +1206,46 @@ const LV = [
   { dr: 4, sp: 1.15, seq: 5, t: 7, vis: 3.6 },
   { dr: 5, sp: 1.3, seq: 6, t: 7, vis: 3.8 },
   { dr: 5, sp: 1.35, seq: 7, t: 6, vis: 4.0, room: true },
-  { dr: 2, sp: 1.1, seq: 5, t: 7, vis: 3.6, boss: true },
+  { dr: 5, sp: 1.4, seq: 6, t: 7, vis: 4.2, mode: 2, blackout: true },
+  { dr: 2, sp: 1.1, seq: 5, t: 7, vis: 3.6, boss: true, mode: 4 },
 ];
+// ÂNCORA: BLECAUTE (só fase com blackout:true) — a cada 12 s, 2,5 s de drones quase cegos
+let blackoutClock = 0, blackoutOn = false;
 const VIS_BASE = 3.4; // raio com que o disco e o cone foram modelados
+  routeMode = "fast";
+const ROUTE_BALANCE = [
+  { fast: { speed: 1.18, noise: 1.35, alertGain: 1.35, alertRecovery: 0.9, cd: 1 }, safe: { speed: 0.92, noise: 0.65, alertGain: 0.65, alertRecovery: 1.25, cd: 1 }, tech: { speed: 1, noise: 0.9, alertGain: 0.82, alertRecovery: 1, cd: 0.82 } },
+  { fast: { speed: 1.24, noise: 1.42, alertGain: 1.42, alertRecovery: 0.88, cd: 1 }, safe: { speed: 0.9, noise: 0.6, alertGain: 0.6, alertRecovery: 1.3, cd: 1 }, tech: { speed: 0.98, noise: 0.84, alertGain: 0.78, alertRecovery: 1.04, cd: 0.8 } },
+  { fast: { speed: 1.2, noise: 1.55, alertGain: 1.5, alertRecovery: 0.82, cd: 1 }, safe: { speed: 0.88, noise: 0.55, alertGain: 0.55, alertRecovery: 1.38, cd: 1 }, tech: { speed: 1, noise: 0.8, alertGain: 0.75, alertRecovery: 1.08, cd: 0.78 } },
+  { fast: { speed: 1.15, noise: 1.65, alertGain: 1.6, alertRecovery: 0.8, cd: 1 }, safe: { speed: 0.86, noise: 0.5, alertGain: 0.5, alertRecovery: 1.45, cd: 1 }, tech: { speed: 0.96, noise: 0.76, alertGain: 0.7, alertRecovery: 1.1, cd: 0.75 } },
+  { fast: { speed: 1.12, noise: 1.7, alertGain: 1.65, alertRecovery: 0.78, cd: 1 }, safe: { speed: 0.88, noise: 0.54, alertGain: 0.54, alertRecovery: 1.4, cd: 1 }, tech: { speed: 0.95, noise: 0.74, alertGain: 0.69, alertRecovery: 1.1, cd: 0.73 } },
+  { fast: { speed: 1.1, noise: 1.72, alertGain: 1.72, alertRecovery: 0.76, cd: 1 }, safe: { speed: 0.9, noise: 0.58, alertGain: 0.58, alertRecovery: 1.32, cd: 1 }, tech: { speed: 0.94, noise: 0.72, alertGain: 0.68, alertRecovery: 1.12, cd: 0.72 } },
+];
+function routeTune() { return (ROUTE_BALANCE[lvl] || ROUTE_BALANCE[0])[routeMode]; }
+const ROUTES = {
+  fast: { label: "RÁPIDA", text: "velocidade +18% · ruído +35%", speed: 1.18, noise: 1.35, alertGain: 1.35, alertRecovery: 0.9, color: "#2fe6ff" },
+  safe: { label: "PROTEGIDA", text: "detecção -35% · velocidade -8%", speed: 0.92, noise: 0.65, alertGain: 0.65, alertRecovery: 1.25, color: "#39ff88" },
+  tech: { label: "TÉCNICA", text: "hack estável · habilidades -18%", speed: 1, noise: 0.9, alertGain: 0.82, alertRecovery: 1.0, color: "#ff3fd0" },
+};
+function renderRoute() {
+  const r = { ...ROUTES[routeMode], ...routeTune() };
+  $("routeText").textContent = r.label + " · " + r.text;
+  $("routeRead").style.color = r.color;
+  ["fast", "safe", "tech"].forEach((k) => {
+    const b = $("route" + (k === "fast" ? "Fast" : k === "safe" ? "Safe" : "Tech"));
+    b.dataset.route = k;
+    b.dataset.active = String(k === routeMode);
+  });
+  routeVisuals.children.forEach((line) => { line.material.opacity = line.userData.route === routeMode ? 0.7 : 0.12; });
+}
+function setRoute(mode) {
+  if (!ROUTES[mode] || mode === routeMode) return;
+  routeMode = mode;
+  renderRoute();
+  note = "Rota " + ROUTES[mode].label + " selecionada: " + ROUTES[mode].text;
+  noteT = 2.4;
+  flashFeedback(mode === "safe" ? "collect" : mode === "tech" ? "hack" : "danger");
+}
 let lvl = 0,
   emp = 0,
   boost = 0,
@@ -940,20 +1253,54 @@ let lvl = 0,
   note = "",
   noteT = 0;
 const DIRS = ["←", "↑", "→", "↓"];
+const HACK_PROTOCOLS = [
+  { name: "PROTOCOLO // SETAS", rule: "sequencia livre" },
+  { name: "PROTOCOLO // RELE", rule: "sem repetir o ultimo sinal" },
+  { name: "PROTOCOLO // PULSO", rule: "ritmo alternado de invasao" },
+  { name: "PROTOCOLO // NUCLEO", rule: "sequencia curta · alerta alto" },
+  { name: "PROTOCOLO // CHEFAO", rule: "memorize e reaja" },
+];
+function hackSequence(length, mode) {
+  const out = [];
+  for (let i = 0; i < length; i++) {
+    if (mode === 1) {
+      let d = Math.floor(Math.random() * 4);
+      while (d === out[i - 1]) d = Math.floor(Math.random() * 4);
+      out.push(d);
+    } else if (mode === 2) {
+      out.push(i % 2 ? (Math.floor(Math.random() * 2) + 2) : Math.floor(Math.random() * 2));
+    } else if (mode === 3) {
+      out.push([0, 1, 3, 2, 1, 0, 2][i % 7]);
+    } else {
+      out.push(Math.floor(Math.random() * 4));
+    }
+  }
+  return out;
+}
 function drawMini() {
+  const protocol = HACK_PROTOCOLS[mini.mode] || HACK_PROTOCOLS[0];
+  $("miniTitle").textContent = "BREACH — " + protocol.name.split("// ")[1];
+  $("miniRule").textContent = protocol.rule;
+  $("mini").dataset.mode = String(mini.mode);
   $("seq").innerHTML = mini.seq
     .map((d, i) => `<span class="${i < mini.pos ? "ok" : i === mini.pos ? "cur" : ""}">${DIRS[d]}</span>`)
     .join("");
 }
 function startMini(t) {
+  flashFeedback("hack");
+  triggerPlayerFx(0xff3fd0, 1);
+  cameraMoment("hack", t.x, t.z, 0.75);
   mini = {
     t,
-    seq: Array.from({ length: LV[lvl].seq }, () => Math.floor(Math.random() * 4)),
+    mode: LV[lvl].mode ?? lvl,
+    seq: hackSequence(LV[lvl].seq, LV[lvl].mode ?? lvl),
     pos: 0,
     left: LV[lvl].t,
   };
   drawMini();
   $("mini").hidden = false;
+  sfx("hack");
+  buzz(16);
 }
 function miniKey(d) {
   if (!mini || state !== "play") return;
@@ -969,8 +1316,10 @@ function miniKey(d) {
     }
   } else {
     sfx("bad");
+    buzz(18);
+    runStats.failedHacks++;
     mini.pos = 0;
-    alert_ = Math.min(0.98, alert_ + 0.2);
+    alert_ = Math.min(0.98, alert_ + 0.2 * ROUTES[routeMode].alertGain);
     if (!calm) shake = 0.3;
   }
   drawMini();
@@ -984,6 +1333,13 @@ addEventListener("keydown", (e) => {
     miniKey(k);
   }
 });
+[[ $("routeFast"), "fast" ], [ $("routeSafe"), "safe" ], [ $("routeTech"), "tech" ]].forEach(([button, mode]) => {
+  button.addEventListener("click", () => setRoute(mode));
+});
+addEventListener("keydown", (e) => {
+  if (state === "play" && !mini && { "1": "fast", "2": "safe", "3": "tech" }[e.key]) setRoute({ "1": "fast", "2": "safe", "3": "tech" }[e.key]);
+});
+renderRoute();
 DIRS.forEach((g, i) => {
   const b = document.createElement("button");
   b.textContent = g;
@@ -994,6 +1350,7 @@ DIRS.forEach((g, i) => {
   $("mk").appendChild(b);
 });
 const pick = [],
+  sceneProps = [],
   PT = { e: "energy", k: "keycard", u: "usb" },
   tex = {};
 for (const k in ICON) {
@@ -1004,11 +1361,16 @@ function spawnPickups() {
   pick.forEach((p) => S.remove(p.s));
   pick.length = 0;
   ["e", "k", "u"].forEach((t) => {
-    let x, z;
+    let x, z, tentativas = 0;
+    // ÂNCORA: as coberturas/bloqueios das rotas só têm largura (w) e profundidade (d), sem raio (r).
+    // Antes, "s.r + 2" virava NaN, a condição nunca era verdadeira e o laço rodava para sempre (jogo congelava).
+    // Agora o raio é calculado a partir de w/d, e o laço tem limite de tentativas.
+    const raio = (s) => (Number.isFinite(s.r) ? s.r : Math.hypot(s.w || 0, s.d || 0) / 2);
     do {
       x = (Math.random() - 0.5) * 60;
       z = (Math.random() - 0.5) * 60;
-    } while (!solids.every((s) => Math.hypot(x - s.x, z - s.z) > s.r + 2) || Math.hypot(x, z - 22) < 6);
+      tentativas++;
+    } while (tentativas < 400 && (!solids.every((s) => Math.hypot(x - s.x, z - s.z) > raio(s) + 2) || Math.hypot(x, z - 22) < 6));
     const s = new T.Sprite(
       new T.SpriteMaterial({
         map: tex[PT[t]],
@@ -1024,6 +1386,18 @@ function spawnPickups() {
   });
 }
 function getPick(t) {
+  runStats.items++;
+  if (!sideMission.done && t === sideMission.type) {
+    sideMission.done = true;
+    runStats.side++;
+    renderSideMission();
+    note = "OP. SECUNDARIA CONCLUIDA: " + sideMission.reward;
+    noteT = 3;
+    sfx("done");
+    buzz(48);
+    flashFeedback("collect");
+    triggerPlayerFx(0x39ff88, 1.2);
+  }
   if (t === "e") {
     boost = 6;
     alert_ = 0;
@@ -1062,7 +1436,97 @@ function getPick(t) {
   s.scale.set(hh * PR[k].ar, hh, 1);
   s.position.set(x, hh / 2, z);
   S.add(s);
+  sceneProps.push({ node: s, x, z, kind: k, damage: 0, destroyed: false });
 });
+// Kit procedural de destrutíveis: painel, caixa, cabo e porta.
+const propMat = {
+  panel: new T.MeshStandardMaterial({ color: 0x1b2630, emissive: 0x2fe6ff, emissiveIntensity: 0.9, metalness: 0.5 }),
+  crate: new T.MeshStandardMaterial({ color: 0x6b5435, emissive: 0x24160a, emissiveIntensity: 0.2 }),
+  door: new T.MeshStandardMaterial({ color: 0x24202f, emissive: 0xff3fd0, emissiveIntensity: 0.35, metalness: 0.7 }),
+  cable: new T.LineBasicMaterial({ color: 0xff3fd0, transparent: true, opacity: 0.9 }),
+};
+function addDestructible(kind, x, z, rot = 0) {
+  let node;
+  if (kind === "cable") {
+    const geo = new T.BufferGeometry().setFromPoints([new T.Vector3(x - 2.5, 1.2, z), new T.Vector3(x, 0.25, z + 1), new T.Vector3(x + 2.5, 1.2, z)]);
+    node = new T.Line(geo, propMat.cable);
+  } else {
+    const dims = kind === "door" ? [2.8, 4.4, 0.28] : kind === "crate" ? [1.8, 1.8, 1.8] : [2.4, 1.6, 0.18];
+    node = new T.Mesh(new T.BoxGeometry(...dims), propMat[kind]);
+    node.position.y = dims[1] / 2;
+    node.rotation.y = rot;
+    if (kind === "panel") {
+      const led = new T.Mesh(new T.BoxGeometry(1.5, 0.08, 0.04), new T.MeshBasicMaterial({ color: 0x39ff88 }));
+      led.position.set(0, 0.3, 0.12);
+      node.add(led);
+    }
+  }
+  node.position.x = x;
+  node.position.z = z;
+  S.add(node);
+  sceneProps.push({ node, x, z, kind, damage: 0, destroyed: false });
+}
+addDestructible("panel", -24, 8, 0.08);
+addDestructible("panel", 24, 10, -0.08);
+addDestructible("crate", -4, -16, 0.25);
+addDestructible("crate", 14, -8, -0.35);
+addDestructible("door", 0, -32, 0);
+addDestructible("cable", -8, 2, 0);
+addDestructible("cable", 12, 18, 0);
+function resetSceneProps() {
+  sceneProps.forEach((p) => {
+    p.damage = 0;
+    p.destroyed = false;
+    p.node.visible = true;
+    p.node.scale.set(1, 1, 1);
+    p.node.rotation.z = 0;
+    p.node.userData.damaged = false;
+  });
+}
+const PROP_FX = {
+  panel: { color: 0x2fe6ff, force: 10 },
+  crate: { color: 0xffa33a, force: 8 },
+  cable: { color: 0xff3fd0, force: 16 },
+  door: { color: 0xffe14a, force: 12 },
+  rack: { color: 0x39ff88, force: 9 },
+  crt: { color: 0x72cfff, force: 11 },
+  laptop: { color: 0x39ff88, force: 7 },
+  usb: { color: 0x2fe6ff, force: 6 },
+  mask: { color: 0xff3fd0, force: 6 },
+};
+function destroyPropNear(x, z) {
+  let target = null;
+  let distance = 8;
+  sceneProps.forEach((p) => {
+    if (p.destroyed) return;
+    const d = Math.hypot(x - p.x, z - p.z);
+    if (d < distance) { distance = d; target = p; }
+  });
+  if (!target) return null;
+  const fx = PROP_FX[target.kind] || PROP_FX.panel;
+  target.damage = Math.min(2, (target.damage || 0) + 1);
+  if (target.damage === 1) {
+    target.node.scale.set(0.86, 0.9, 0.86);
+    target.node.rotation.z = 0.08;
+    target.node.userData.damaged = true;
+    burst(target.x, target.kind === "door" ? 1.4 : 0.65, target.z, fx.color, 42, fx.force * 0.65);
+    flashFeedback("danger");
+    triggerPlayerFx(0xffe14a, 0.7);
+    note = "Alvo danificado — use BREACH novamente para desmontar.";
+    noteT = 1.8;
+    sfx("bad");
+  } else {
+    target.destroyed = true;
+    target.node.visible = false;
+    burst(target.x, target.kind === "door" ? 2.2 : 1, target.z, fx.color, 130, fx.force);
+    flashFeedback("hack");
+    triggerPlayerFx(0xff3fd0, 0.9);
+    sfx("boss");
+    note = "Estrutura desmontada.";
+    noteT = 1.4;
+  }
+  return target.kind;
+}
 const nc = document.createElement("canvas");
 nc.width = 1024;
 nc.height = 200;
@@ -1108,18 +1572,19 @@ function drawMap() {
     mc.fillRect(X(c.x) - 2, Y(c.z) - 2, 4, 4);
   });
   towers.forEach((t) => {
-    mc.fillStyle = t.done ? "#fff" : "#e0261c";
+    mc.fillStyle = t.done ? "#39ff88" : t.state === "hack" ? "#ff3fd0" : t.state === "target" ? "#ffe14a" : "#e0261c";
     mc.fillRect(X(t.x) - 4, Y(t.z) - 4, 8, 8);
   });
   pick.forEach((p) => {
-    mc.fillStyle = p.t === "e" ? "#2fe6ff" : p.t === "k" ? "#ff3fd0" : "#39ff88";
+    const special = !sideMission.done && p.t === sideMission.type;
+    mc.fillStyle = special ? "#ffe14a" : p.t === "e" ? "#2fe6ff" : p.t === "k" ? "#ff3fd0" : "#39ff88";
     mc.beginPath();
-    mc.arc(X(p.x), Y(p.z), 2.5, 0, 7);
+    mc.arc(X(p.x), Y(p.z), special ? 4 : 2.5, 0, 7);
     mc.fill();
   });
   drones.forEach((d, n) => {
     if (n >= LV[lvl].dr) return;
-    mc.fillStyle = d.chase ? "#ff8a00" : "#ff4d4d";
+    mc.fillStyle = d.state === "virus" ? "#ff3fd0" : d.state === "frozen" ? "#2fe6ff" : d.state === "detected" ? "#ffe14a" : d.chase ? "#ff8a00" : "#ff4d4d";
     mc.beginPath();
     mc.arc(X(d.position.x), Y(d.position.z), 3, 0, 7);
     mc.fill();
@@ -1144,10 +1609,15 @@ function drawMap() {
 let actx = null,
   mute = false,
   aLast = 0,
-  alertAnt = 0;
+  alertAnt = 0,
+  audioLayers = null,
+  audioStateShown = "";
 $("snd").onclick = () => {
   mute = !mute;
   $("snd").textContent = mute ? "🔇" : "🔊";
+  // ÂNCORA: o mudo também desliga a trilha ambiente (antes só os efeitos calavam)
+  if (audioLayers && actx) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.1);
+  audioStateShown = "";
 };
 function sfx(n, i) {
   if (mute || !actx) return;
@@ -1213,6 +1683,7 @@ function sfx(n, i) {
   } else if (n === "record") [784, 988, 1175, 1568].forEach((f, k) => tone(f, 0.22, "triangle", 0.08, 0.7 + k * 0.11));
   else if (n === "ok") tone(440 + i * 90, 0.1);
   else if (n === "bad") tone(110, 0.25, "sawtooth", 0.08);
+  else if (n === "hack") { tone(240, 0.12, "square", 0.08); tone(520, 0.18, "triangle", 0.06, 0.08); }
   else if (n === "done") [523, 659, 784, 1047].forEach((f, k) => tone(f, 0.18, "square", 0.07, k * 0.09));
   else if (n === "pick") {
     tone(880, 0.08, "triangle", 0.08);
@@ -1222,7 +1693,100 @@ function sfx(n, i) {
     tone(140, 0.3, "triangle", 0.1, 0.02);
   } else if (n === "alarm") tone(300, 0.12, "sawtooth", 0.06);
   else if (n === "lose") [400, 300, 200, 120].forEach((f, k) => tone(f, 0.25, "sawtooth", 0.08, k * 0.15));
-  else if (n === "win") [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, 0.2, "square", 0.07, k * 0.1));
+  else if (n === "bossIn") {
+    const r = BOSS_SND[i] ? BOSS_SND[i].root : 60;
+    sweep(r * 4, r, 0.9, "sawtooth", 0.12);
+    tone(r, 1.1, BOSS_SND[i] ? BOSS_SND[i].wave : "square", 0.14, 0.1);
+    noise(0.6, 0.18, 700 + (i || 0) * 500, 0.05);
+  } else if (n === "bossAtk") {
+    const r = BOSS_SND[i] ? BOSS_SND[i].root : 60;
+    sweep(r * 6, r * 2, 0.35, BOSS_SND[i] ? BOSS_SND[i].wave : "square", 0.1);
+    noise(0.3, 0.14, 1500 + (i || 0) * 900);
+  } else if (n === "bossDie") {
+    const r = BOSS_SND[i] ? BOSS_SND[i].root : 60;
+    [4, 3, 2, 1].forEach((m, k) => sweep(r * m * 3, r * m, 0.5, "sawtooth", 0.1, k * 0.16));
+    noise(1.0, 0.2, 1800);
+  } else if (n === "win") [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, 0.2, "square", 0.07, k * 0.1));
+}
+function ensureAudioLayers() {
+  if (!actx || audioLayers) return;
+  const master = actx.createGain();
+  master.gain.value = 0.0001;
+  master.connect(actx.destination);
+  const make = (f, type, gain, detune = 0) => {
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = type;
+    o.frequency.value = f;
+    o.detune.value = detune;
+    g.gain.value = 0.0001;
+    o.connect(g);
+    g.connect(master);
+    o.start();
+    return { o, g, base: gain };
+  };
+  audioLayers = {
+    master,
+    explore: make(62, "sine", 0.055),
+    exploreHi: make(124, "triangle", 0.018, 7),
+    alert: make(92, "sawtooth", 0.045),
+    chase: make(184, "square", 0.035),
+    route: make(330, "triangle", 0.018),
+    // ÂNCORA: trilha de chefão — grave contínuo + pulso (gain modulado por um LFO no ritmo do chefão)
+    bossBass: make(65, "square", 0.05),
+    bossPulse: make(130, "triangle", 0),
+  };
+  const lfo = actx.createOscillator(), lfoG = actx.createGain();
+  lfo.frequency.value = 2;
+  lfoG.gain.value = 0.0001;
+  lfo.connect(lfoG);
+  lfoG.connect(audioLayers.bossPulse.g.gain); // o LFO soma ao ganho do pulso: liga e desliga no tempo
+  lfo.start();
+  audioLayers.bossLfo = { o: lfo, g: lfoG };
+}
+function syncAudioLayers() {
+  if (!actx || mute) return;
+  ensureAudioLayers();
+  if (!audioLayers) return;
+  const now = actx.currentTime;
+  const danger = Math.max(0, Math.min(1, alert_ || 0));
+  const activeDrones = typeof drones !== "undefined" ? drones.slice(0, LV[lvl].dr) : [];
+  const threat = activeDrones.some((d) => d.state === "chase" || d.state === "detected" || d.state === "virus") || !!boss;
+  const route = typeof routeTune === "function" ? routeTune() : { };
+  const routeId = typeof routeMode === "string" ? routeMode : "safe";
+  const key = `${state}|${Math.round(danger * 4)}|${threat}|${routeId}|${boss ? "b" + bi : "-"}`;
+  if (key === audioStateShown) return;
+  audioStateShown = key;
+  const target = (node, value, time = 0.35) => {
+    node.g.gain.cancelScheduledValues(now);
+    node.g.gain.setTargetAtTime(value, now, time);
+  };
+  const playing = state === "play" || state === "brief";
+  const explore = playing ? 0.8 * (1 - danger * 0.75) : state === "menu" ? 0.3 : 0;
+  const alert = playing ? danger * 0.7 : 0;
+  const chase = playing && threat ? Math.max(0.18, danger) : 0;
+  const routeTone = playing ? (routeId === "fast" ? 0.8 : routeId === "tech" ? 0.55 : 0.25) : 0;
+  // ÂNCORA: com chefão vivo, o clima de exploração abaixa e a trilha do chefão sobe
+  const onBoss = state === "play" && !!boss;
+  const snd = BOSS_SND[Math.min(bi, BOSS_SND.length - 1)] || BOSS_SND[0];
+  if (onBoss) {
+    audioLayers.bossBass.o.type = snd.wave;
+    audioLayers.bossBass.o.frequency.setTargetAtTime(snd.root, now, 0.05);
+    audioLayers.bossPulse.o.type = snd.pulse;
+    audioLayers.bossPulse.o.frequency.setTargetAtTime(snd.root * 2, now, 0.05);
+    audioLayers.bossLfo.o.frequency.setTargetAtTime(snd.tempo, now, 0.05);
+  }
+  const bossLevel = onBoss ? 0.05 : 0;
+  target(audioLayers.bossBass, bossLevel);
+  target(audioLayers.bossPulse, bossLevel * 0.5);
+  audioLayers.bossLfo.g.gain.setTargetAtTime(bossLevel * 0.5, now, 0.2);
+  target(audioLayers.explore, audioLayers.explore.base * explore * (onBoss ? 0.3 : 1));
+  target(audioLayers.exploreHi, audioLayers.exploreHi.base * explore);
+  target(audioLayers.alert, audioLayers.alert.base * alert);
+  target(audioLayers.chase, audioLayers.chase.base * chase);
+  target(audioLayers.route, audioLayers.route.base * routeTone);
+  audioLayers.route.o.frequency.setTargetAtTime(routeId === "fast" ? 440 : routeId === "tech" ? 260 : 180, now, 0.4);
+  audioLayers.master.gain.setTargetAtTime(0.9, now, 0.25);
 }
 // ÂNCORA: todo <button> faz "tick"; o 1º clique também liga o áudio (navegadores exigem gesto do usuário)
 document.addEventListener("click", (e) => {
@@ -1233,18 +1797,24 @@ document.addEventListener("click", (e) => {
     } catch (err) {}
   }
   if (actx && actx.state === "suspended") actx.resume();
+  ensureAudioLayers();
   sfx("tick");
 });
 function brief() {
   state = "brief";
   sfx("done");
-  $("bfh").textContent = "ESCONDERIJO — NÍVEL " + (lvl + 2) + "/5";
-  $("bft").textContent = [
-    "Mais um drone na área e sequências maiores. Respire fundo e volte.",
-    "Drones mais rápidos e o alerta não perdoa. Última invasão.",
-    "Tomaram os servidores do seu próprio esconderijo. Retome a sala.",
-    "Último alvo: a sede da MEGACORP e seus três chefões. Use o BREACH quando eles chegarem perto.",
-  ][lvl];
+  const data = [
+    { title: "ZONA INDUSTRIAL — NIVEL 2/6", text: "O dinheiro virou maquina. Use as laterais e nao corra perto dos drones.", objective: "Hackear tres torres", threat: "Drones em patrulha", recommend: "EMP cria uma janela segura" },
+    { title: "CENTRO DE VIGILANCIA — NIVEL 3/6", text: "Cada camera e uma testemunha. Leia o minimapa antes de atravessar.", objective: "Derrubar a rede de vigilancia", threat: "Linha de visao ampliada", recommend: "Use cobertura e rotas longas" },
+    { title: "ESCONDERIJO DATA — NIVEL 4/6", text: "Tomaram os servidores do seu proprio esconderijo. Retome a sala.", objective: "Recuperar os servidores", threat: "Corredores e racks", recommend: "Fique atras das mesas" },
+    { title: "SUBESTACAO ELETRICA — NIVEL 5/6", text: "Sem energia, sem olhos: a rede pisca e os drones cegam por instantes. Use o escuro.", objective: "Hackear as torres da rede eletrica", threat: "Blecaute periodico e drones rapidos", recommend: "Avance quando a tela escurecer" },
+    { title: "NUCLEO MEGACORP — NIVEL 6/6", text: "Ultimo alvo: a sede da MEGACORP e seus tres chefoes.", objective: "Derrubar tres chefoes", threat: "Ataques telegráficos", recommend: "Guarde BREACH para a aproximacao" },
+  ][lvl] || {};
+  $("bfh").textContent = data.title || "PROXIMA OPERACAO";
+  $("bft").textContent = data.text || "A rede abriu. Agora desapareca.";
+  $("bfo").textContent = data.objective || "Avancar";
+  $("bfa").textContent = data.threat || "Alerta";
+  $("bfr").textContent = data.recommend || "Leia o ambiente";
   $("bf").hidden = false;
   setTimeout(() => {
     $("bf").hidden = true;
@@ -1422,7 +1992,23 @@ function applyLevel() {
   sky.forEach((m) => (m.visible = !r));
   sign.visible = !r;
   roomG.visible = r;
-  ground.material.color.set(r ? 0x2b2a33 : 0x111114);
+  applyRouteLayout();
+  // Objetos ocultos de uma fase não podem bloquear o jogador. Primeiro removemos
+  // a geometria de rota do conjunto anterior e depois registramos somente os
+  // elementos sólidos que estão visíveis no layout atual.
+  routeGeometry.forEach((o) => {
+    const oldIndex = solids.indexOf(o);
+    if (oldIndex >= 0) solids.splice(oldIndex, 1);
+    if (o.solid && o.mesh.visible) solids.push(o);
+  });
+  const theme = PHASE_THEME[lvl] || PHASE_THEME[0];
+  S.background.set(theme.sky);
+  S.fog.color.set(theme.fog);
+  ground.material.color.set(r ? 0x2b2a33 : theme.ground);
+  grid.material.color.set(theme.grid);
+  sun.color.set(theme.sun);
+  applyPhaseKit();
+  applyPhaseReadout();
   bz = 0;
   bi = 0;
   if (boss) {
@@ -1466,6 +2052,12 @@ const ringM = new T.Mesh(
 );
 ringM.position.y = 0.15;
 S.add(ringM);
+// ÂNCORA: assinatura sonora de cada chefão — root = nota grave (Hz), tempo = batidas/s do pulso, wave = timbre
+const BOSS_SND = [
+  { root: 65, tempo: 2.0, wave: "square", pulse: "triangle" }, // Banqueiro: marcha seca de escritório
+  { root: 55, tempo: 2.7, wave: "sawtooth", pulse: "square" }, // Barão: grave pesado e sujo
+  { root: 49, tempo: 3.6, wave: "sawtooth", pulse: "sawtooth" }, // CEO: rápido e dissonante
+];
 const BOSS = [
   { n: "DIRETOR-BANQUEIRO", sp: 2.2, r: 5.5, s: 1, c: 0xe0261c, model: "banqueiro", attacks: ["AUDITORIA DE DÍVIDA", "MURALHA DE CONTRATOS", "EXECUÇÃO FISCAL"] },
   { n: "BARÃO DO PETRÓLEO", sp: 3.1, r: 6, s: 1.25, c: 0xff8a00, model: "petroleo", attacks: ["VAZAMENTO TÓXICO", "CHAMINÉ DE FOGO", "MARÉ DE PETRÓLEO"] },
@@ -1488,7 +2080,7 @@ function createBossTelegraph(label, kind, color) {
     bossTelegraph.className = "boss-telegraph";
     document.body.appendChild(bossTelegraph);
   }
-  bossTelegraph.textContent = "ALERTA // " + label;
+  bossTelegraph.textContent = "ALERTA // " + (boss ? boss.cfg.n : "CHEFÃO") + " // " + label;
   bossTelegraph.dataset.kind = kind;
   bossTelegraph.style.color = "#" + color.toString(16).padStart(6, "0");
 }
@@ -1514,13 +2106,51 @@ function createBossHazard(x, z, r, color, delay, life, label) {
   createBossTelegraph(label, delay < 0.9 ? "danger" : "warning", color);
 }
 function startBossAttack(b) {
+  sfx("bossAtk", bi);
   const index = (b.attackIndex || 0) % 3;
   b.attackIndex = index + 1;
   const targetX = index === 1 ? P.position.x : b.g.position.x;
   const targetZ = index === 1 ? P.position.z : b.g.position.z;
   const radius = b.cfg.r * (index === 2 ? 0.9 : 0.62);
   const delay = index === 0 ? 1.15 : index === 1 ? 0.8 : 0.55;
-  createBossHazard(targetX, targetZ, radius, b.cfg.c, delay, 1.3, b.cfg.attacks[index]);
+  const label = b.cfg.attacks[index];
+  createBossHazard(targetX, targetZ, radius, b.cfg.c, delay, 1.3, label);
+  if (b.cfg.model === "banqueiro" && index === 1) {
+    createBossHazard(targetX - 4.2, targetZ, radius * 0.55, b.cfg.c, delay + 0.12, 1.05, "MURALHA LATERAL");
+    createBossHazard(targetX + 4.2, targetZ, radius * 0.55, b.cfg.c, delay + 0.12, 1.05, "MURALHA LATERAL");
+  } else if (b.cfg.model === "petroleo" && index === 2) {
+    createBossHazard(targetX + 3.4, targetZ + 3.4, radius * 0.5, b.cfg.c, delay + 0.18, 1.15, "MARÉ SECUNDÁRIA");
+    createBossHazard(targetX - 3.4, targetZ - 3.4, radius * 0.5, b.cfg.c, delay + 0.18, 1.15, "MARÉ SECUNDÁRIA");
+  } else if (b.cfg.model === "ceo" && index === 0) {
+    createBossHazard(targetX, targetZ, radius * 0.42, b.cfg.c, delay + 0.08, 1.5, "NÚCLEO ZERO");
+  }
+}
+function bossSignature(kind, color) {
+  const g = new T.Group();
+  const mat = new T.MeshStandardMaterial({ color: 0x15151d, emissive: color, emissiveIntensity: 0.65, metalness: 0.55, roughness: 0.35 });
+  const glow = new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, blending: T.AdditiveBlending });
+  if (kind === "banqueiro") {
+    const shoulders = new T.Mesh(new T.BoxGeometry(4.8, 0.55, 1.35), mat);
+    shoulders.position.y = 1.65;
+    g.add(shoulders);
+    [-1, 1].forEach((side) => {
+      const seal = new T.Mesh(new T.CylinderGeometry(0.55, 0.55, 0.12, 6), glow);
+      seal.rotation.x = Math.PI / 2; seal.position.set(side * 2.35, 1.35, 0.35); g.add(seal);
+    });
+  } else if (kind === "petroleo") {
+    [-0.85, 0.85].forEach((side) => {
+      const stack = new T.Mesh(new T.CylinderGeometry(0.3, 0.46, 3.2, 10), mat);
+      stack.position.set(side * 1.05, 2.35, -0.25); g.add(stack);
+      const flame = new T.Mesh(new T.ConeGeometry(0.22, 0.8, 8), glow);
+      flame.position.set(side * 1.05, 4.2, -0.25); g.add(flame);
+    });
+  } else {
+    const crown = new T.Mesh(new T.ConeGeometry(2.05, 1.0, 5), glow);
+    crown.position.y = 3.4; crown.rotation.y = Math.PI / 5; g.add(crown);
+    const cage = new T.Mesh(new T.BoxGeometry(4.8, 5.2, 0.12), glow);
+    cage.position.z = -1.6; cage.position.y = 2.15; g.add(cage);
+  }
+  return g;
 }
 function updateBossHazards(dt) {
   for (let i = bossHazards.length - 1; i >= 0; i--) {
@@ -1543,6 +2173,8 @@ function updateBossHazards(dt) {
         h.hit = true;
         alert_ = Math.min(0.96, alert_ + 0.28);
         note = h.label + " atingiu a área!";
+        flashFeedback("danger");
+        triggerPlayerFx(0xff244d, 1.4);
         noteT = 1.4;
         if (!calm) shake = 0.8;
       }
@@ -1574,11 +2206,23 @@ function spawnBoss(i) {
   for (let k = 0; k < 2; k++) {
     const rg = new T.Mesh(
       new T.TorusGeometry(2.3 + k * 0.5, 0.1, 8, 32),
-      new T.MeshBasicMaterial({ color: 0xffffff }),
+      new T.MeshBasicMaterial({ color: c.c, transparent: true, opacity: 0.8 }),
     );
     rg.rotation.x = Math.PI / 2 + k * 0.5;
     g.add(rg);
   }
+  const aura = new T.Group();
+  for (let k = 0; k < 3; k++) {
+    const ring = new T.Mesh(
+      new T.TorusGeometry(2.8 + k * 0.42, 0.035, 6, 24),
+      new T.MeshBasicMaterial({ color: c.c, transparent: true, opacity: 0.28 - k * 0.05, blending: T.AdditiveBlending }),
+    );
+    ring.rotation.set(Math.PI / 2, k * 0.45, k * 0.2);
+    aura.add(ring);
+  }
+  g.add(aura);
+  const signature = bossSignature(c.model, c.c);
+  g.add(signature);
   g.scale.setScalar(c.s);
   g.position.set(0, 0.22, -26);
   const disc = new T.Mesh(
@@ -1588,7 +2232,9 @@ function spawnBoss(i) {
   disc.scale.set(c.r, 1, c.r);
   disc.position.set(0, 0.08, -26);
   S.add(g, disc);
-  boss = { g, disc, hp: 100, fz: 0, cfg: c, atkT: 2.1, attackIndex: 0 };
+  boss = { g, disc, aura, signature, hp: 100, fz: 0, cfg: c, atkT: 2.1, attackIndex: 0 };
+  cameraMoment("boss", g.position.x, g.position.z, 1.8);
+  sfx("bossIn", bi);
   const modelUrl = BOSS_MODEL_URLS[c.model];
   if (modelUrl && BossGLTFLoader) {
     const loader = new BossGLTFLoader();
@@ -1650,6 +2296,7 @@ function hitBoss(d) {
     noteT = 1.5;
     return;
   }
+  sfx("bossDie", bi);
   sfx("win");
   clearBossHazards();
   S.remove(boss.g, boss.disc);
@@ -1666,9 +2313,18 @@ function hitBoss(d) {
     noteT = 2.5;
   }
 }
+// ÂNCORA: balanceamento das 3 habilidades num só lugar (cada uma com um papel diferente)
+// BREACH = golpe grande e raro · EMP = trava curta e frequente · VÍRUS = sequestro/dano preciso e lento
+const SKILLS = {
+  breach: { cd: 10, bossCd: 7, R: 16, freeze: 4.5, bossDmg: 34, alertCut: 0.2, towerBoost: 0.4 },
+  emp: { cd: 8, R: 12, freeze: 3.5, bossDmg: 20, alertCut: 0.25 },
+  virus: { cd: 10, R: 18, bossR: 20, hijack: 6, bossDmg: 20 },
+};
 function breach() {
   if (state !== "play" || bz > 0 || mini) return;
-  bz = LV[lvl].boss ? 6 : 10;
+  runStats.skills++;
+  buzz(32);
+  bz = LV[lvl].boss ? SKILLS.breach.bossCd : SKILLS.breach.cd;
   rainT = calm ? 0 : 2.2; // sem chuva de código se o sistema pede menos movimento
   ringT = 0;
   castT = 0.6;
@@ -1676,30 +2332,32 @@ function breach() {
   ringM.position.z = P.position.z;
   sfx("freeze");
   if (!calm) shake = 0.3;
-  const R = 16,
+  const R = SKILLS.breach.R,
     near = (x, z) => Math.hypot(P.position.x - x, P.position.z - z) < R;
   // ÂNCORA: conta o que o BREACH atingiu para mostrar ao jogador (antes ele não sabia se valeu a pena)
   let nDr = 0,
     nTo = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && near(d.position.x, d.position.z)) {
-      d.fz = 4;
+      d.fz = SKILLS.breach.freeze;
       nDr++;
     }
   });
   towers.forEach((t) => {
     if (!t.done && near(t.x, t.z)) {
-      t.p = Math.min(0.95, t.p + 0.4);
+      t.p = Math.min(0.95, t.p + SKILLS.breach.towerBoost);
       nTo++;
     }
   });
-  alert_ = Math.max(0, alert_ - 0.3);
+  alert_ = Math.max(0, alert_ - SKILLS.breach.alertCut);
   const partes = [];
+  const wrecked = destroyPropNear(P.position.x, P.position.z);
+  if (wrecked) partes.push(wrecked + " desativado");
   if (nDr) partes.push(nDr + (nDr === 1 ? " drone congelado" : " drones congelados"));
   if (nTo) partes.push(nTo + (nTo === 1 ? " torre +40%" : " torres +40%"));
   note = "BREACH: " + (partes.length ? partes.join(" · ") : "nada ao alcance (raio 16)");
   noteT = 2;
-  if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(34);
+  if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(SKILLS.breach.bossDmg);
   else if (boss) {
     note = "BREACH longe demais! Chegue a menos de 16.";
     noteT = 1.8;
@@ -1707,21 +2365,23 @@ function breach() {
 }
 function empAttack() {
   if (state !== "play" || empCd > 0 || mini) return;
-  empCd = 7;
+  runStats.skills++;
+  buzz(26);
+  empCd = SKILLS.emp.cd * routeTune().cd;
   ringT = 0;
   ringM.material.color.set(0x39ff88);
   ringM.position.x = P.position.x;
   ringM.position.z = P.position.z;
-  const R = 12;
+  const R = SKILLS.emp.R;
   let frozen = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < R) {
-      d.fz = 4.5;
+      d.fz = SKILLS.emp.freeze;
       frozen++;
     }
   });
-  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(18);
-  alert_ = Math.max(0, alert_ - 0.35);
+  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(SKILLS.emp.bossDmg);
+  alert_ = Math.max(0, alert_ - SKILLS.emp.alertCut);
   note = frozen ? "EMP: " + frozen + " drone(s) travado(s)!" : "EMP: firewall inimigo drenado.";
   noteT = 1.8;
   sfx("freeze");
@@ -1729,7 +2389,11 @@ function empAttack() {
 }
 function virusAttack() {
   if (state !== "play" || virusCd > 0 || mini) return;
-  virusCd = 10;
+  runStats.skills++;
+  buzz(26);
+  virusCd = SKILLS.virus.cd * routeTune().cd;
+  flashFeedback("virus");
+  triggerPlayerFx(0xff3fd0, 1.1);
   ringT = 0;
   ringM.material.color.set(0xff3fd0);
   ringM.position.x = P.position.x;
@@ -1740,8 +2404,8 @@ function virusAttack() {
     const d = Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z);
     if (d < distance) { distance = d; target = boss; }
   }
-  if (target && distance < 20) {
-    hitBoss(12);
+  if (target && distance < SKILLS.virus.bossR) {
+    hitBoss(SKILLS.virus.bossDmg);
     note = "VÍRUS: blindagem do chefão corrompida!";
   } else {
     let best = null;
@@ -1750,8 +2414,8 @@ function virusAttack() {
       const d2 = Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z);
       if (d2 < distance) { distance = d2; best = d; }
     });
-    if (best && distance < 18) best.fz = 6;
-    note = best && distance < 18 ? "VÍRUS: drone sequestrado por 6s." : "VÍRUS lançado na rede.";
+    if (best && distance < SKILLS.virus.R) { best.fz = SKILLS.virus.hijack; best.virus = SKILLS.virus.hijack; }
+    note = best && distance < SKILLS.virus.R ? "VÍRUS: drone sequestrado por " + SKILLS.virus.hijack + "s." : "VÍRUS lançado na rede.";
   }
   noteT = 1.8;
   sfx("pulse");
@@ -1889,6 +2553,8 @@ function loop() {
   const dt = slowT > 0 ? rawDt * 0.25 : rawDt; // câmera lenta de 0,2 s após um hack
   slowT = Math.max(0, slowT - rawDt);
   time += dt;
+  updatePlayerFx(dt);
+  syncAudioLayers();
   drones.forEach((d) => {
     d.rg.rotation.z += dt * 6;
     d.position.y = 5 + Math.sin(time * 2 + d.sp) * 0.3;
@@ -1921,6 +2587,7 @@ function loop() {
     // anel por estado: concluída (verde), hackeando (pulso rápido),
     // próximo objetivo (brilho forte), pendente (pulso lento)
     const dP = Math.hypot(P.position.x - t.x, P.position.z - t.z);
+    t.state = t.done ? "done" : dP < 5.1 ? "hack" : t === nextT ? "target" : "pending";
     if (t.done) {
       t.ring.material.color.set(0x39ff88);
       t.ring.material.opacity = 1;
@@ -1974,13 +2641,14 @@ function loop() {
       iz /= l;
     }
     const running = keys.shift && l > 0.1 && !mini;
-    const SP = (boost > 0 ? 13 : 9) * (running ? 1.55 : 1);
+    const SP = (boost > 0 ? 13 : 9) * routeTune().speed * (running ? 1.55 : 1);
     if (running && grace <= 0) {
+      // Corrida: rota rapida, mas deixa uma assinatura de ruido no alerta.
       const near = drones.some(
         (d, n) => n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < 10,
       );
       if (near) {
-        alert_ = Math.min(1, alert_ + dt * 0.35);
+        alert_ = Math.min(1, alert_ + dt * 0.35 * routeTune().noise);
         if (noteT <= 0) {
           note = "Correndo faz barulho — drones ouviram!";
           noteT = 0.4;
@@ -2032,6 +2700,15 @@ function loop() {
       noteT = 0.3;
     }
     grace = Math.max(0, grace - dt);
+    // ÂNCORA: relógio do blecaute — ligado só no último 2,5 s de cada ciclo de 12 s
+    const blackoutWas = blackoutOn;
+    blackoutClock += dt;
+    blackoutOn = !!LV[lvl].blackout && blackoutClock % 12 > 9.5;
+    if (blackoutOn !== blackoutWas) {
+      document.body.classList.toggle("blackout", blackoutOn);
+      if (blackoutOn) { note = "BLECAUTE — drones cegos"; noteT = 1.8; buzz(40); }
+    }
+    const visR = LV[lvl].vis * (blackoutOn ? 0.6 : 1); // raio de visão efetivo neste quadro
     drones.forEach((d, n) => {
       const on = n < LV[lvl].dr;
       d.visible = on;
@@ -2041,7 +2718,9 @@ function loop() {
         pz = P.position.z - d.position.z,
         pd = Math.hypot(px, pz);
       d.fz = Math.max(0, (d.fz || 0) - dt);
+      d.virus = Math.max(0, (d.virus || 0) - dt);
       const frz = emp > 0 || d.fz > 0;
+      const virus = d.virus > 0;
       d.chase = alert_ > 0.35 && pd < 12 ? 1 : alert_ < 0.1 ? 0 : d.chase;
       let gx,
         gz,
@@ -2066,18 +2745,38 @@ function loop() {
         }
       }
       d.disc.position.set(d.position.x, 0.08, d.position.z);
-      const k = LV[lvl].vis / VIS_BASE; // o disco (e o cone/anel, filhos dele) cresce com o raio de visão da fase
+      const k = visR / VIS_BASE; // o disco (e o cone/anel, filhos dele) cresce com o raio de visão da fase
       d.disc.scale.set(k, 1, k);
-      const sees = !frz && pd < LV[lvl].vis && !covered;
+      const sees = !frz && pd < visR && !covered;
       if (sees) inside = true;
       // vermelho patrulha · amarelo te viu · laranja perseguindo · ciano congelado
-      const col = frz ? 0x2fe6ff : sees ? 0xffe14a : d.chase ? 0xff8a00 : 0xe0261c;
+      d.state = virus ? "virus" : frz ? "frozen" : sees ? "detected" : d.chase ? "chase" : "patrol";
+      d.virusFx.visible = virus;
+      if (virus) {
+        d.virusFx.rotation.y += dt * 4.5;
+        d.virusFx.rotation.z -= dt * 2.2;
+        d.virusFx.scale.setScalar(1 + Math.sin(time * 10) * 0.12);
+        d.virusFx.children.forEach((tendril, k) => {
+          tendril.material.opacity = 0.35 + Math.abs(Math.sin(time * (8 + k * 2))) * 0.55;
+        });
+      }
+      const col = virus ? 0xff3fd0 : frz ? 0x2fe6ff : sees ? 0xffe14a : d.chase ? 0xff8a00 : 0xe0261c;
       d.disc.material.color.set(col);
       d.edge.material.color.set(col);
       d.beam.material.color.set(col);
       d.beam.material.opacity = sees ? 0.22 + (calm ? 0 : Math.sin(time * 20) * 0.06) : 0.1; // piscar do feixe: fixo em modo reduzido
       d.children[0].material.emissive.set(col);
+      d.eye.material.color.set(col);
+      d.eye.material.emissive.set(col);
+      d.rg.children.forEach((rotor) => rotor.material.color.set(virus ? 0xff3fd0 : frz ? 0x2fe6ff : 0x39e6ff));
     });
+    const activeDrones = drones.slice(0, LV[lvl].dr);
+    const priority = ["detected", "chase", "virus", "frozen", "patrol"];
+    const drState = priority.find((kind) => activeDrones.some((d) => d.state === kind)) || "patrol";
+    const drLabels = { detected: "DETECCAO", chase: "PERSEGUICAO", virus: "VIRUS", frozen: "CONGELADOS", patrol: "PATRULHA" };
+    $("drstate").textContent = drLabels[drState];
+    $("sideRead").title = sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase();
+    $("drread").style.color = drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00";
     bossIn = false;
     if (boss) {
       const b = boss,
@@ -2097,6 +2796,11 @@ function loop() {
       if (b.g.userData.mixer) b.g.userData.mixer.update(dt);
       b.g.position.y = 0.22 + Math.sin(time * 2.4) * 0.08;
       b.g.rotation.y += dt * (b.fz > 0 ? 0.15 : 0.35);
+      b.aura.rotation.y -= dt * (b.fz > 0 ? 0.25 : 0.7);
+      b.aura.rotation.z += dt * 0.18;
+      b.aura.children.forEach((ring, k) => {
+        ring.material.opacity = (b.fz > 0 ? 0.08 : 0.18) + Math.abs(Math.sin(time * (3 + k))) * 0.12;
+      });
       b.disc.position.set(b.g.position.x, 0.08, b.g.position.z);
       b.disc.material.color.set(b.fz > 0 ? 0x2fe6ff : b.cfg.c);
       if (b.fz <= 0 && dd < b.cfg.r) {
@@ -2105,9 +2809,17 @@ function loop() {
       }
     }
     updateBossHazards(dt);
-    alert_ = Math.max(0, Math.min(1, alert_ + (inside && !grace ? 1.5 * (bossIn ? 1.5 : 1) : -0.6) * dt));
+    const tune = routeTune();
+    const routeAlert = inside && !grace ? 1.5 * (bossIn ? 1.5 : 1) * tune.alertGain : -0.6 * tune.alertRecovery;
+    alert_ = Math.max(0, Math.min(1, alert_ + routeAlert * dt));
     $("al").style.width = alert_ * 100 + "%";
-    if (alert_ > 0.5 && alertAnt <= 0.5) sfx("spot"); // cruzou o limite: sirene de aviso
+    if (alert_ > 0.5 && alertAnt <= 0.5) {
+      runStats.alerts++;
+      buzz(34);
+      flashFeedback("danger");
+      triggerPlayerFx(0xff3b3b, 1.3);
+      sfx("spot");
+    } // cruzou o limite: sirene de aviso
     alertAnt = alert_;
     if (alert_ > 0.5 && Math.floor(time * 4) !== aLast) {
       aLast = Math.floor(time * 4);
@@ -2139,6 +2851,7 @@ function loop() {
         mini = null;
         $("mini").hidden = true;
         t.p = 0.4;
+        runStats.failedHacks++;
         alert_ = Math.min(0.98, alert_ + 0.3);
         note = "Falhou! Tente de novo.";
         noteT = 2;
@@ -2192,15 +2905,34 @@ function loop() {
   rig.position.set(P.position.x, 0, P.position.z);
   const tx = P.position.x,
     tz = P.position.z;
-  C.position.x += (tx - C.position.x) * 0.08;
-  C.position.y += (14 - C.position.y) * 0.08;
-  C.position.z += (tz + 14 - C.position.z) * 0.08;
+  let camX = tx,
+    camY = 14,
+    camZ = tz + 14,
+    lookX = tx,
+    lookZ = tz - 2,
+    lookY = 1;
+  if (camFx) {
+    camFx.t -= rawDt;
+    const shot = cameraShot(camFx.kind, camFx.x, camFx.z);
+    const k = Math.max(0, Math.min(1, camFx.t / camFx.duration));
+    const ease = k * k * (3 - 2 * k);
+    camX = shot.x * (1 - ease) + tx * ease;
+    camY = shot.y * (1 - ease) + 14 * ease;
+    camZ = shot.z * (1 - ease) + (tz + 14) * ease;
+    lookX = camFx.x * (1 - ease) + tx * ease;
+    lookZ = camFx.z * (1 - ease) + (tz - 2) * ease;
+    lookY = shot.lookY * (1 - ease) + ease;
+    if (camFx.t <= 0) camFx = null;
+  }
+  C.position.x += (camX - C.position.x) * 0.1;
+  C.position.y += (camY - C.position.y) * 0.1;
+  C.position.z += (camZ - C.position.z) * 0.1;
   if (shake > 0) {
     shake = Math.max(0, shake - dt * 1.5);
     C.position.x += (Math.random() - 0.5) * shake;
     C.position.y += (Math.random() - 0.5) * shake;
   }
-  C.lookAt(tx, 1, tz - 2);
+  C.lookAt(lookX, lookY, lookZ);
   fxTick(dt);
   drawMap();
   R.render(S, C);
@@ -2390,12 +3122,14 @@ function updObjective() {
   }
   if (!tg) {
     arrow.visible = false;
+    $("obj").dataset.state = "done";
     $("obj").textContent = cnt >= 3 ? "OBJETIVO ▸ fuga em andamento…" : "";
     return;
   }
   const dx = tg.x - P.position.x,
     dz = tg.z - P.position.z,
     d = Math.hypot(dx, dz);
+  $("obj").dataset.state = boss ? "danger" : d < 5.5 ? "hack" : "target";
   $("obj").textContent = "OBJETIVO ▸ " + label + " · " + Math.round(d) + " m";
   const a = Math.atan2(dx, dz);
   arrow.position.set(P.position.x + Math.sin(a) * 2.2, 0.4, P.position.z + Math.cos(a) * 2.2);
@@ -2466,3 +3200,41 @@ $("pzm").onclick = () => {
     }
   };
 })();
+
+// Diagnóstico local: não é carregado em produção pública. Permite validar layouts
+// e colisões sem alterar o fluxo normal do jogador ou depender de estado global.
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.hostname.endsWith(".manus.computer")) {
+  window.__ANARCO_PLAYTEST__ = {
+    setLevel(index) {
+      lvl = Math.max(0, Math.min(LV.length - 1, index | 0));
+      // Apenas troca o layout para auditoria; não reinicia a partida. No núcleo,
+      // aplicamos só o layout de rota para não iniciar carregamento de GLB.
+      if (lvl < LV.length - 1) applyLevel();
+      else {
+        applyRouteLayout();
+        routeGeometry.forEach((o) => {
+          const oldIndex = solids.indexOf(o);
+          if (oldIndex >= 0) solids.splice(oldIndex, 1);
+          if (o.solid && o.mesh.visible) solids.push(o);
+        });
+      }
+      return this.inspect();
+    },
+    inspect() {
+      return {
+        level: lvl + 1,
+        phase: LV[lvl].name,
+        routeObjects: routeGeometry.map((o) => ({ kind: o.kind, shape: o.shape, x: o.x, z: o.z, visible: o.mesh.visible, solid: o.solid })),
+        routeSolids: solids.filter((s) => routeGeometry.includes(s)).map((s) => ({ kind: s.kind, shape: s.shape, visible: s.mesh.visible })),
+      };
+    },
+    collisionProbe(kind, distance = 0) {
+      const target = routeGeometry.find((o) => o.kind === kind && o.mesh.visible && o.solid);
+      if (!target) return { kind, blocked: false, reason: "sem objeto sólido visível" };
+      P.position.set(target.x + distance, 0, target.z);
+      const before = P.position.clone();
+      collideBox(target);
+      return { kind, blocked: P.position.distanceTo(before) > 0.001, x: P.position.x, z: P.position.z };
+    },
+  };
+}

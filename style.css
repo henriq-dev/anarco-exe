@@ -477,3 +477,103 @@ canvas {
 /* Botão de instalar o app (PWA) */
 #inst { border-color: #39ff88; color: #39ff88; }
 #inst[hidden] { display: none; }
+
+/* Pacote 1 — leitura tática e identidade por fase */
+.phase-readout { min-width: 210px; color: #ffe14a; border-left: 3px solid #ffe14a; padding-left: 8px; }
+.phase-readout span, .phase-readout small { display: block; }
+.phase-readout small { margin-top: 3px; color: #d8d3ff; font-size: .68rem; letter-spacing: .05em; }
+#drread { color: #ff8a00; }
+#drstate { color: inherit; font-weight: 700; }
+.side-readout { min-width: 190px; color: #ffe14a; border-left: 3px solid currentColor; padding-left: 8px; }
+.side-readout span, .side-readout small { display: block; }
+.side-readout span { font-size: .68rem; letter-spacing: .08em; }
+.side-readout small { margin-top: 3px; color: #ece9e1; font-size: .68rem; line-height: 1.2; }
+#sideRead[title] { cursor: help; }
+#obj { transition: color .2s, border-color .2s, box-shadow .2s; }
+#obj[data-state="hack"] { color: #ff3fd0; border-color: #ff3fd0; box-shadow: 0 0 18px #ff3fd055; }
+#obj[data-state="done"] { color: #39ff88; border-color: #39ff88; }
+#obj[data-state="danger"] { color: #ff4d4d; border-color: #ff4d4d; box-shadow: 0 0 18px #ff4d4d55; }
+#map-wrap { position: fixed; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 136px; z-index: 2; }
+#map-wrap #map { position: static; display: block; width: 130px; height: 130px; }
+#mapLegend { display: flex; justify-content: space-between; gap: 3px; margin-top: 4px; color: #d8d3ff; font: 10px/1.1 "Special Elite", monospace; text-transform: uppercase; }
+#mapLegend span { display: inline-flex; align-items: center; gap: 3px; }
+.legend-dot { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: #fff; }
+.legend-dot.tower { background: #e0261c; }
+.legend-dot.drone { background: #ff8a00; }
+.legend-dot.item { background: #39ff88; }
+#bf .eyebrow { margin: 0 0 5px; color: #ff3fd0; font-size: .75rem; letter-spacing: .16em; }
+.brief-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.brief-grid span { display: block; padding: 8px; background: #11101a; color: #ece9e1; border-left: 3px solid #ff3fd0; }
+.brief-grid b, .brief-grid strong { display: block; }
+.brief-grid b { color: #ffe14a; font-size: .68rem; letter-spacing: .08em; }
+.brief-grid strong { margin-top: 4px; font-size: .78rem; line-height: 1.25; font-weight: 400; }
+#stats { margin: 12px 0; padding: 10px; border: 3px solid var(--ink); background: #11101a; color: #ece9e1; text-align: left; }
+.stats-title { display: block; color: #39ff88; font: 1.1rem Anton, Impact, sans-serif; letter-spacing: .04em; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.stats-grid span { padding: 6px; border: 1px solid #423a55; }
+.stats-grid small, .stats-grid strong { display: block; }
+.stats-grid small { color: #a8a1c2; font-size: .62rem; }
+.stats-grid strong { color: #ffe14a; font-size: 1rem; }
+#stProfile { margin: 8px 0 0; color: #ff3fd0; font-weight: 700; }
+body[data-phase="hideout"] #hud { border-top: 3px solid #39ff88; }
+body[data-phase="industrial"] #hud { border-top: 3px solid #ff8a00; }
+body[data-phase="surveillance"] #hud { border-top: 3px solid #2fe6ff; }
+body[data-phase="megacorp"] #hud { border-top: 3px solid #ff3fd0; }
+@media (max-width: 760px) {
+  #hud { gap: 8px; padding-right: 58px; }
+  .phase-readout { min-width: 180px; }
+  .b { width: auto; min-width: 92px; }
+  .brief-grid { grid-template-columns: 1fr; }
+  #bf { padding: 18px; }
+  #bf > div { max-height: 80vh; overflow: auto; }
+  #mapLegend { font-size: 9px; }
+  .side-readout { min-width: 150px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #obj { transition: none; }
+}
+
+/* Pacote 2 — protocolos de hack por fase */
+#mini small { display: block; margin: 4px 0 10px; color: #ffe14a; font: .72rem "Special Elite", monospace; letter-spacing: .08em; }
+#mini[data-mode="1"] { border-color: #ffe14a; }
+#mini[data-mode="2"] { border-color: #2fe6ff; }
+#mini[data-mode="3"] { border-color: #ff3fd0; box-shadow: 0 0 30px #ff3fd044; }
+#mini[data-mode="4"] { border-color: #ff8a00; }
+#mini[data-mode="3"] #seq span.cur { color: #ff3fd0; }
+
+/* Pacote 5 — feedback audiovisual de ações */
+#fxFlash { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; mix-blend-mode: screen; }
+#fxFlash.pulse { animation: fxPulse .34s ease-out; }
+#fxFlash[data-kind="hack"] { background: radial-gradient(circle at 50% 55%, #ff3fd055, transparent 48%); }
+#fxFlash[data-kind="collect"] { background: radial-gradient(circle at 50% 55%, #39ff8855, transparent 48%); }
+#fxFlash[data-kind="danger"] { background: radial-gradient(circle at 50% 55%, #ff3b3b66, transparent 48%); }
+@keyframes fxPulse { 0% { opacity: .9; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #fxFlash.pulse { animation: none; opacity: 0; } }
+
+/* Pacote 8 — infecção do VÍRUS */
+#fxFlash[data-kind="virus"] { background: radial-gradient(circle at 50% 55%, #ff3fd066, transparent 48%); }
+
+/* Pacote 10 — rotas alternativas */
+.route-readout { min-width: 220px; color: #2fe6ff; border-left: 3px solid currentColor; padding-left: 8px; }
+.route-readout span, .route-readout small { display: block; }
+.route-readout span { font-size: .68rem; letter-spacing: .08em; }
+.route-readout small { margin-top: 3px; color: #ece9e1; font-size: .68rem; line-height: 1.2; }
+#routePicker { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 5; display: flex; gap: 6px; }
+#routePicker button { border: 2px solid #2fe6ff; background: #080610dd; color: #ece9e1; padding: 7px 9px; font: .68rem "Special Elite", monospace; cursor: pointer; }
+#routePicker button[data-active="true"] { color: #0b1012; background: #2fe6ff; box-shadow: 0 0 18px #2fe6ff99; }
+#routePicker button[data-route="safe"] { border-color: #39ff88; }
+#routePicker button[data-route="safe"][data-active="true"] { background: #39ff88; box-shadow: 0 0 18px #39ff8899; }
+#routePicker button[data-route="tech"] { border-color: #ff3fd0; }
+#routePicker button[data-route="tech"][data-active="true"] { background: #ff3fd0; box-shadow: 0 0 18px #ff3fd099; }
+@media (max-width: 760px) { #routePicker { width: min(96vw, 430px); } #routePicker button { flex: 1; padding-inline: 3px; font-size: .58rem; } .route-readout { min-width: 160px; } }
+
+/* Recompensas cosméticas persistentes: alteram apenas o HUD, nunca a jogabilidade. */
+body[data-reward="neon"] .b { border-color: #39ff88; }
+body[data-reward="neon"] #phaseTag { box-shadow: 0 0 18px rgba(57, 255, 136, .22); }
+body[data-reward="glitch"] .b { border-color: #ff3fd0; text-shadow: 1px 0 #2fe6ff, -1px 0 #ff3fd0; }
+body[data-reward="glitch"] #phaseTag { box-shadow: 0 0 20px rgba(255, 63, 208, .28); }
+
+/* ÂNCORA: fase 5 (subestação) — borda azul no HUD e escurecimento durante o blecaute */
+body[data-phase="grid"] #hud { border-top: 3px solid #6ea8ff; }
+body.blackout canvas { filter: brightness(0.55); }
+@media (prefers-reduced-motion: reduce) { body.blackout canvas { filter: none; } }

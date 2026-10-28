@@ -1,8 +1,11 @@
 /* ÂNCORA: service worker = "porteiro" que guarda os arquivos no aparelho. Depois da 1ª visita o jogo abre até sem internet. */
-const VERSAO = "anarco-v2.2";
+const VERSAO = "anarco-v3.3-fase6";
 const BASICO = ["./", "index.html", "style.css", "script.js", "manifest.webmanifest", "assets/dados/manifesto.js",
   "assets/lib/three.min.js", "assets/lib/three.module.js", "assets/lib/three.core.js", "assets/lib/GLTFLoader.js",
-  "assets/utils/BufferGeometryUtils.js", "assets/fonts/fonts.css", "assets/img/icone-192.png", "assets/img/icone-512.png"];
+  "assets/utils/BufferGeometryUtils.js", "assets/fonts/fonts.css", "assets/img/icone-192.png", "assets/img/icone-512.png",
+  "assets/img/fundo-menu.jpg", "assets/img/fundo-briefing.jpg", "assets/img/skins/capuz.png",
+  "assets/models/anarco.bin", "assets/models/laptop.bin", "assets/models/boss-banqueiro-animated.glb",
+  "assets/models/boss-petroleo-rigged.glb", "assets/models/boss-ceo-rigged.glb"];
 
 self.addEventListener("install", (e) => {
   // guarda o básico; se algum arquivo falhar, a instalação do SW continua mesmo assim

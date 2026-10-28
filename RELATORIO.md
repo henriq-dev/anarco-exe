@@ -124,3 +124,25 @@ As cores da skin Cachos no seu celular (a luz neon da cena muda o tom: a pele fi
 **Conceitos:** projeção planar de UV, atlas de textura, `flipY` do Three.js (o visualizador de teste estava com `flipY` desligado e parecia que a textura estava de cabeça para baixo), classificação de faces por distância a um plano, vértices duplicados por região.
 
 **Limite:** o notebook continua sendo uma peça só (aberto); para a tampa abrir de verdade seria preciso o modelo com tampa e base separadas. As manchas escuras nas dobradiças são pequenas e quase invisíveis no tamanho do jogo.
+
+## Item M — Notebook virado para o boneco (Fácil)
+
+**O que mudou:** no item L o notebook ficava com a tela para a câmera, parecendo que o personagem estava apresentando o computador. Agora `lapG.rotation.y = Math.PI` gira a peça meia-volta: a tela fica virada para o boneco, o teclado fica perto das mãos e a câmera enxerga as costas da tampa. Posição `(0, 1.08, 0.72)` e braços/antebraços dobrados no teclado (`animChar`, ramo `hk`) com cabeça baixa olhando a tela.
+
+**Conceito:** rotação de um `Group` em torno do eixo Y; o modelo é pensado de frente para +z, e a cena do hack pede a tampa de costas para quem olha de fora.
+
+**Teste:** capturas das duas skins por três câmeras (a do jogo, lateral e frontal) mostram o personagem digitando, sem erros no console.
+
+## Item N — 6ª fase: Subestação Elétrica (Difícil)
+
+**O que mudou:** nova fase entre o Esconderijo e o Núcleo MegaCorp (agora o jogo tem 6 fases, o chefão fica na 6ª). Tema azul-elétrico, kit visual (transformadores e cabos), layout de rotas próprio, balanceamento de rotas, missão secundária (USB: religue o gerador reserva), briefing "NÍVEL 5/6" e HUD "x/6". Mecânica nova: **BLECAUTE** — a cada 12 s, por 2,5 s, a tela escurece e o raio de visão dos drones cai para 60%. O hack da fase usa o protocolo PULSO e o chefão passou a usar o protocolo CHEFÃO (`mode: 4`).
+
+**Ordem (Fácil → Difícil):** (1) Fácil: textos "x/5" → "x/6" e HUD com `LV.length`; borda azul do HUD e cache do service worker (`anarco-v3.3-fase6`); (2) Médio: entradas novas nas tabelas indexadas por fase (`PHASE_THEME`, `ROUTE_LAYOUTS`, `ROUTE_BALANCE`, `SIDE_MISSIONS`, briefing) e o kit visual; (3) Difícil: a entrada `LV` com `mode` próprio e o relógio do BLECAUTE dentro do loop dos drones.
+
+**Conceitos:** tabelas de dados indexadas (o jogo é guiado por dados, não por `if`), `??` (nullish coalescing) para `mode` opcional, relógio acumulado com `%` (resto da divisão) para ciclos, `classList.toggle`, `prefers-reduced-motion`.
+
+**Lógica do blecaute:** `blackoutClock += dt` a cada quadro; `blackoutClock % 12 > 9.5` vale verdadeiro só no último 2,5 s do ciclo. O raio efetivo `visR = vis × (blecaute ? 0.6 : 1)` é usado tanto no teste de detecção (`sees`) quanto no tamanho do disco vermelho, então o que o jogador vê é o que vale.
+
+**Justificativa:** reaproveitei as torres e rotas de patrulha da cidade (já validadas), então a nova fase não cria risco de torre inalcançável; a dificuldade vem do blecaute (janela de oportunidade) e não de mais drones inalcançáveis.
+
+**Teste (navegador real, 0 erros no console):** as 6 fases carregam com nome, HUD x/6, 3 torres, 3 itens; chefão só na 6ª; blecaute liga em 9,5 s (nota na tela, disco 0,74×), desliga em 12 s e nunca liga nas outras fases; hack da fase 5 = modo PULSO (6 setas), da 6 = CHEFÃO; `spawnPickups` ×20 em cada fase sem travar. `scripts/smoke.mjs` ajustado para exigir 6 fases (não executei `pnpm build`/smoke aqui).
