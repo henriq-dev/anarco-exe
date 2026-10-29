@@ -1,1 +1,27 @@
-{"schemaVersion":2,"title":"ANARCO.EXE 3D — Breach Protocol","description":"Jogo 3D cyberpunk de infiltração, hacking e combate contra drones e chefões. A v3.7 adiciona efeitos neon, partículas de combate e qualidade gráfica adaptativa.","assets":{"og":"assets/share/og.png","favicon":"assets/share/favicon.png"}}
+{
+  "schemaVersion": 2,
+  "publicationOrigin": "https://anarco37-kh3ylkgr.manus.game",
+  "title": "ANARCO.EXE 3D — Breach Protocol",
+  "description": "Jogo 3D cyberpunk de infiltração, hacking e combate contra drones e chefões. A v3.7 adiciona efeitos neon, partículas de combate e qualidade gráfica adaptativa.",
+  "defaultCaptions": {},
+  "assets": {
+    "og": {
+      "digest": "sha256:e53733f551ad66486033919a5011d0d6b18936a2476872488f1862edd4b25c27",
+      "path": "share/e53733f551ad66486033919a5011d0d6b18936a2476872488f1862edd4b25c27.png",
+      "mime": "image/png",
+      "width": 1200,
+      "height": 630,
+      "sizeBytes": 1253263,
+      "sourcePath": "assets/share/og.png"
+    },
+    "favicon": {
+      "digest": "sha256:c077ccd81ae0dc47d120c17d85620acc3241d2728e88e3dcbb3004b83887254b",
+      "path": "share/c077ccd81ae0dc47d120c17d85620acc3241d2728e88e3dcbb3004b83887254b.png",
+      "mime": "image/png",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 12164,
+      "sourcePath": "assets/share/favicon.png"
+    }
+  }
+}
