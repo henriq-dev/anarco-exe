@@ -106,6 +106,8 @@ canvas {
   justify-content: center;
   background: rgba(5, 5, 6, 0.78);
   padding: 20px;
+  z-index: 20; /* ÂNCORA: o menu fica acima do HUD (z-index 8), senão o painel de cima cobre o título do menu */
+  overflow-y: auto; /* em tela baixa o painel rola em vez de cortar */
 }
 #ov div {
   background: var(--paper);

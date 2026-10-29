@@ -188,3 +188,10 @@ Dano por segundo no chefão agora: BREACH 4,9 · EMP 2,5 · VÍRUS 2,0. Cada uma
 **Justificativa:** o `.gitignore` original ignorava as skins e os `.glb` (eram restaurados do armazenamento da Manus), e o `build` tentava baixá-los em `/manus-storage` — isso quebraria na Vercel. Colocar os ~18 MB dentro do repositório é simples e seguro (limite do GitHub: 100 MB por arquivo).
 
 **Teste (pasta limpa, sem Manus):** `pnpm install --frozen-lockfile`, `pnpm typecheck` e `pnpm test` (79 testes) passaram; `pnpm build` gerou `dist/` de 18 MB. No Chromium (WebGL por software), servindo a `dist/`: clique em Invadir + terminal de introdução → jogo em `play` com 3 itens; as 6 fases carregam com HUD "x/6" e 3 torres; chefão só na 6ª; habilidades com os valores balanceados (EMP 8 s/3,5 s · VÍRUS 10 s/6 s · BREACH 10 s/4,5 s); esquiva desloca o personagem (2 m); service worker ativo e a página abre **offline**; 0 erros no console. `pnpm smoke` também passou (34 arquivos, 17,5 MiB), rodando a partir do zip extraído numa pasta nova. **Limites:** não testei toque/GPU/áudio audível, e o Barão ainda não foi vencido em luta completa.
+
+## Item R — Menu cobrido pelo HUD (Fácil)
+
+**Problema (visto no site publicado):** o painel do HUD (`z-index: 8`) ficava por cima do menu inicial (`#ov`, sem `z-index`), cobrindo o título "ANARCO.EXE" e o início do texto.
+**Correção:** `#ov { z-index: 20; overflow-y: auto; }` em `style.css` — o menu passa a ficar acima do HUD e, em tela baixa, rola em vez de cortar.
+**Conceito:** `z-index` só vale em elementos posicionados; sem valor, o elemento cai atrás de quem tem número maior.
+**Teste:** capturas em 1366×720, 1366×640 e 1280×720: menu inteiro visível, HUD escondido atrás dele.
