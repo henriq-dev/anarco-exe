@@ -2174,7 +2174,7 @@ const BOSS_SND = [
 ];
 const BOSS = [
   { n: "DIRETOR-BANQUEIRO", sp: 2.2, r: 5.5, s: 1, c: 0xe0261c, model: "banqueiro", attacks: ["AUDITORIA DE DÍVIDA", "MURALHA DE CONTRATOS", "EXECUÇÃO FISCAL"] },
-  { n: "BARÃO DO PETRÓLEO", sp: 3.1, r: 6, s: 1.25, c: 0xff8a00, model: "petroleo", attacks: ["VAZAMENTO TÓXICO", "CHAMINÉ DE FOGO", "MARÉ DE PETRÓLEO"] },
+  { n: "BARÃO DO PETRÓLEO", sp: 2.7, r: 6, s: 1.25, c: 0xff8a00, model: "petroleo", attacks: ["VAZAMENTO TÓXICO", "CHAMINÉ DE FOGO", "MARÉ DE PETRÓLEO"] },
   { n: "CEO MEGACORP", sp: 3.8, r: 7, s: 1.6, c: 0xff3fd0, model: "ceo", attacks: ["PROTOCOLO ZERO", "CAGE DE DADOS", "COLAPSO DE REDE"] },
 ];
 const BOSS_MODEL_URLS = globalThis.BOSS_MODEL_URLS || {};
@@ -2226,7 +2226,7 @@ function startBossAttack(b) {
   const targetX = index === 1 ? P.position.x : b.g.position.x;
   const targetZ = index === 1 ? P.position.z : b.g.position.z;
   const radius = b.cfg.r * (index === 2 ? 0.9 : 0.62);
-  const delay = index === 0 ? 1.15 : index === 1 ? 0.8 : 0.55;
+  const delay = b.cfg.model === "petroleo" ? [1.45, 1.2, 0.95][index] : index === 0 ? 1.15 : index === 1 ? 0.8 : 0.55;
   const label = b.cfg.attacks[index];
   const at = new T.Vector3(targetX, 1, targetZ);
   fxSystem.emit(b.cfg.model === "banqueiro" ? "paper" : b.cfg.model === "petroleo" ? "oil" : "data", at, 0.8);
@@ -3050,7 +3050,9 @@ function loop() {
     }
     updateBossHazards(dt);
     const tune = routeTune();
-    const routeAlert = inside && !grace ? 1.5 * (bossIn ? 1.5 : 1) * tune.alertGain : -0.6 * tune.alertRecovery;
+    // A proximidade do Barão continua perigosa, mas não deve preencher o alerta quase instantaneamente.
+    const bossAlertScale = bossIn ? boss?.cfg.model === "petroleo" ? 0.65 : 1.5 : 1;
+    const routeAlert = inside && !grace ? 1.5 * bossAlertScale * tune.alertGain : -0.6 * tune.alertRecovery;
     alert_ = Math.max(0, Math.min(1, alert_ + routeAlert * dt));
     $("al").style.width = alert_ * 100 + "%";
     if (alert_ > 0.5 && alertAnt <= 0.5) {
