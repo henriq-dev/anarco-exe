@@ -2475,11 +2475,18 @@ function hitBoss(d) {
     noteT = 2.5;
   }
 }
+// ÂNCORA: balanceamento das 3 habilidades num só lugar (cada uma com um papel diferente)
+// BREACH = golpe grande e raro · EMP = trava curta e frequente · VÍRUS = sequestro/dano preciso e lento
+const SKILLS = {
+  breach: { cd: 10, bossCd: 7, R: 16, freeze: 4.5, bossDmg: 34, alertCut: 0.2, towerBoost: 0.4 },
+  emp: { cd: 8, R: 12, freeze: 3.5, bossDmg: 20, alertCut: 0.25 },
+  virus: { cd: 10, R: 18, bossR: 20, hijack: 6, bossDmg: 20 },
+};
 function breach() {
   if (state !== "play" || bz > 0 || mini) return;
   runStats.skills++;
   buzz(32);
-  bz = LV[lvl].boss ? 6 : 10;
+  bz = LV[lvl].boss ? SKILLS.breach.bossCd : SKILLS.breach.cd;
   rainT = calm ? 0 : 2.2; // sem chuva de código se o sistema pede menos movimento
   ringT = 0;
   castT = 0.6;
@@ -2490,25 +2497,25 @@ function breach() {
   fxSystem.flash("breach", 460);
   sfx("freeze");
   if (!calm) shake = 0.3;
-  const R = 16,
+  const R = SKILLS.breach.R,
     near = (x, z) => Math.hypot(P.position.x - x, P.position.z - z) < R;
   // ÂNCORA: conta o que o BREACH atingiu para mostrar ao jogador (antes ele não sabia se valeu a pena)
   let nDr = 0,
     nTo = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && near(d.position.x, d.position.z)) {
-      d.fz = 4;
+      d.fz = SKILLS.breach.freeze;
       fxSystem.emit("code", d.position.clone().add(new T.Vector3(0, 1, 0)), 0.34);
       nDr++;
     }
   });
   towers.forEach((t) => {
     if (!t.done && near(t.x, t.z)) {
-      t.p = Math.min(0.95, t.p + 0.4);
+      t.p = Math.min(0.95, t.p + SKILLS.breach.towerBoost);
       nTo++;
     }
   });
-  alert_ = Math.max(0, alert_ - 0.3);
+  alert_ = Math.max(0, alert_ - SKILLS.breach.alertCut);
   const partes = [];
   const wrecked = destroyPropNear(P.position.x, P.position.z);
   if (wrecked) partes.push(wrecked + " desativado");
@@ -2516,7 +2523,7 @@ function breach() {
   if (nTo) partes.push(nTo + (nTo === 1 ? " torre +40%" : " torres +40%"));
   note = "BREACH: " + (partes.length ? partes.join(" · ") : "nada ao alcance (raio 16)");
   noteT = 2;
-  if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(34);
+  if (boss && near(boss.g.position.x, boss.g.position.z)) hitBoss(SKILLS.breach.bossDmg);
   else if (boss) {
     note = "BREACH longe demais! Chegue a menos de 16.";
     noteT = 1.8;
@@ -2526,7 +2533,7 @@ function empAttack() {
   if (state !== "play" || empCd > 0 || mini) return;
   runStats.skills++;
   buzz(26);
-  empCd = 7 * routeTune().cd;
+  empCd = SKILLS.emp.cd * routeTune().cd;
   ringT = 0;
   ringM.material.color.set(0x39ff88);
   ringM.position.x = P.position.x;
@@ -2534,17 +2541,17 @@ function empAttack() {
   fxSystem.emit("emp", new T.Vector3(P.position.x, 0.7, P.position.z), 1.15);
   fxSystem.lightAt(new T.Vector3(P.position.x, 1.5, P.position.z), "#39ff88", 3.2, 0.4, 15);
   fxSystem.flash("emp", 330);
-  const R = 12;
+  const R = SKILLS.emp.R;
   let frozen = 0;
   drones.forEach((d, n) => {
     if (n < LV[lvl].dr && Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z) < R) {
-      d.fz = 4.5;
+      d.fz = SKILLS.emp.freeze;
       fxSystem.emit("drone", d.position.clone().add(new T.Vector3(0, 1, 0)), 0.38);
       frozen++;
     }
   });
-  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(18);
-  alert_ = Math.max(0, alert_ - 0.35);
+  if (boss && Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z) < R) hitBoss(SKILLS.emp.bossDmg);
+  alert_ = Math.max(0, alert_ - SKILLS.emp.alertCut);
   note = frozen ? "EMP: " + frozen + " drone(s) travado(s)!" : "EMP: firewall inimigo drenado.";
   noteT = 1.8;
   sfx("freeze");
@@ -2554,7 +2561,7 @@ function virusAttack() {
   if (state !== "play" || virusCd > 0 || mini) return;
   runStats.skills++;
   buzz(26);
-  virusCd = 10 * routeTune().cd;
+  virusCd = SKILLS.virus.cd * routeTune().cd;
   flashFeedback("virus");
   fxSystem.emit("virus", new T.Vector3(P.position.x, 1, P.position.z), 1.1);
   fxSystem.lightAt(new T.Vector3(P.position.x, 1.5, P.position.z), "#ff3fd0", 2.7, 0.34, 13);
@@ -2570,8 +2577,8 @@ function virusAttack() {
     const d = Math.hypot(P.position.x - boss.g.position.x, P.position.z - boss.g.position.z);
     if (d < distance) { distance = d; target = boss; }
   }
-  if (target && distance < 20) {
-    hitBoss(12);
+  if (target && distance < SKILLS.virus.bossR) {
+    hitBoss(SKILLS.virus.bossDmg);
     note = "VÍRUS: blindagem do chefão corrompida!";
   } else {
     let best = null;
@@ -2580,8 +2587,8 @@ function virusAttack() {
       const d2 = Math.hypot(P.position.x - d.position.x, P.position.z - d.position.z);
       if (d2 < distance) { distance = d2; best = d; }
     });
-    if (best && distance < 18) { best.fz = 6; best.virus = 6; }
-    note = best && distance < 18 ? "VÍRUS: drone sequestrado por 6s." : "VÍRUS lançado na rede.";
+    if (best && distance < SKILLS.virus.R) { best.fz = SKILLS.virus.hijack; best.virus = SKILLS.virus.hijack; }
+    note = best && distance < SKILLS.virus.R ? "VÍRUS: drone sequestrado por " + SKILLS.virus.hijack + "s." : "VÍRUS lançado na rede.";
   }
   noteT = 1.8;
   sfx("pulse");
@@ -3426,6 +3433,9 @@ $("pzm").onclick = () => {
   $("ov").style.display = "flex";
 };
 
+
+/* ÂNCORA: registra o service worker (app instalável e offline). Só em http/https; falha em silêncio. */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
 
 /* ÂNCORA: instalar como app (PWA) — botão "Instalar" no menu */
 (function () {
