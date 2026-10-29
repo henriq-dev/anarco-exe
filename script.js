@@ -273,16 +273,22 @@ function winTex(h) {
   t.magFilter = T.NearestFilter;
   return t;
 }
+const bldGeometry = new T.BoxGeometry(1, 1, 1);
+const bldMaterials = new Map();
 function bld(w, h, d, tex) {
-  return new T.Mesh(
-    new T.BoxGeometry(w, h, d),
-    new T.MeshStandardMaterial({
+  let material = bldMaterials.get(tex);
+  if (!material) {
+    material = new T.MeshStandardMaterial({
       color: 0x151518,
       emissive: 0xffffff,
       emissiveMap: tex,
       emissiveIntensity: 0.9,
-    }),
-  );
+    });
+    bldMaterials.set(tex, material);
+  }
+  const mesh = new T.Mesh(bldGeometry, material);
+  mesh.scale.set(w, h, d);
+  return mesh;
 }
 
 // skyline
@@ -1652,6 +1658,8 @@ gr.position.set(0, 0.03, 20);
 S.add(gr);
 const mc = $("map").getContext("2d"),
   MK = 130 / 74;
+let mapRefreshT = 0;
+let hudRefreshT = 0;
 function drawMap() {
   sign.material.opacity = 0.85 + Math.sin(time * 3) * 0.1;
   mc.clearRect(0, 0, 130, 130);
@@ -2075,7 +2083,7 @@ function applyLevel() {
     t.h = r ? 10 : b[2];
     t.n = r ? NAMES[i] : b[3];
     t.mesh.visible = t.ring.visible = t.wave.visible = !bs;
-    t.mesh.scale.y = t.h / b[2];
+    t.mesh.scale.set(6, t.h, 6);
     t.mesh.position.set(t.x, t.h / 2, t.z);
     t.ring.position.set(t.x, 0.06, t.z);
     t.wave.position.set(t.x, 0.1, t.z);
@@ -2348,10 +2356,28 @@ function updateBossHazards(dt) {
     bossTelegraph = null;
   }
 }
+function disposeSceneObject(root) {
+  if (!root) return;
+  root.traverse((object) => {
+    if (object.geometry) object.geometry.dispose();
+    if (!object.material) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => {
+      ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "alphaMap"].forEach((key) => {
+        if (material[key] && material[key].dispose) material[key].dispose();
+      });
+      material.dispose();
+    });
+  });
+}
 function spawnBoss(i) {
   const c = BOSS[i];
   clearBossHazards();
-  if (boss) S.remove(boss.g, boss.disc);
+  if (boss) {
+    S.remove(boss.g, boss.disc);
+    disposeSceneObject(boss.g);
+    disposeSceneObject(boss.disc);
+  }
   const g = new T.Group();
   g.add(
     new T.Mesh(
@@ -2462,6 +2488,8 @@ function hitBoss(d) {
   sfx("win");
   clearBossHazards();
   S.remove(boss.g, boss.disc);
+  disposeSceneObject(boss.g);
+  disposeSceneObject(boss.disc);
   boss = null;
   bi++;
   if (bi >= BOSS.length) {
@@ -2772,6 +2800,9 @@ function loop() {
     dtReal = Math.min((agora - ultimoQuadro) / 1000, 1);
   ultimoQuadro = agora;
   ajustarResolucao(dtReal);
+  hudRefreshT -= dtReal;
+  const refreshHud = hudRefreshT <= 0;
+  if (refreshHud) hudRefreshT = 1 / 12;
   if (state === "pause") {
     fxSystem.render();
     return;
@@ -3011,9 +3042,11 @@ function loop() {
     const priority = ["detected", "chase", "virus", "frozen", "patrol"];
     const drState = priority.find((kind) => activeDrones.some((d) => d.state === kind)) || "patrol";
     const drLabels = { detected: "DETECCAO", chase: "PERSEGUICAO", virus: "VIRUS", frozen: "CONGELADOS", patrol: "PATRULHA" };
-    $("drstate").textContent = drLabels[drState];
-    $("sideRead").title = sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase();
-    $("drread").style.color = drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00";
+    if (refreshHud) {
+      $("drstate").textContent = drLabels[drState];
+      $("sideRead").title = sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase();
+      $("drread").style.color = drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00";
+    }
     bossIn = false;
     if (boss) {
       const b = boss,
@@ -3061,7 +3094,7 @@ function loop() {
     const bossAlertScale = bossIn ? boss?.cfg.model === "petroleo" ? 0.65 : 1.5 : 1;
     const routeAlert = inside && !grace ? 1.5 * bossAlertScale * tune.alertGain : -0.6 * tune.alertRecovery;
     alert_ = Math.max(0, Math.min(1, alert_ + routeAlert * dt));
-    $("al").style.width = alert_ * 100 + "%";
+    if (refreshHud) $("al").style.width = alert_ * 100 + "%";
     if (alert_ > 0.5 && alertAnt <= 0.5) {
       runStats.alerts++;
       buzz(34);
@@ -3090,11 +3123,11 @@ function loop() {
         t.glitch = Math.max(t.glitch, 0.15);
       } else if (!t.done) t.p = Math.max(0, t.p - dt * 0.5);
     });
-    $("hk").style.width = (near ? near.p * 100 : 0) + "%";
+    if (refreshHud) $("hk").style.width = (near ? near.p * 100 : 0) + "%";
     hacking = !!near;
     if (mini) {
       mini.left -= dt;
-      $("mt").style.width = Math.max(0, (mini.left / LV[lvl].t) * 100) + "%";
+      if (refreshHud) $("mt").style.width = Math.max(0, (mini.left / LV[lvl].t) * 100) + "%";
       if (mini.left <= 0) {
         const t = mini.t;
         mini = null;
@@ -3125,9 +3158,9 @@ function loop() {
     lapG.rotation.y = LAP_ROT;
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
-      $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
+      if (refreshHud) $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
       if (near.p >= 1 && !mini) startMini(near);
-    } else if (cnt < 3 && !shake)
+    } else if (cnt < 3 && !shake && refreshHud)
       $("msg").textContent = inside ? "Drone te viu! Saia da luz." : noteT > 0 ? note : "";
     updObjective();
     if (endT > 0) {
@@ -3194,7 +3227,11 @@ function loop() {
     phase: (PHASE_THEME[lvl] || PHASE_THEME[0]).key,
   });
   fxTick(dt);
-  drawMap();
+  mapRefreshT -= rawDt;
+  if (mapRefreshT <= 0) {
+    mapRefreshT = state === "play" ? 1 / 12 : 1 / 8;
+    drawMap();
+  }
   fxSystem.render();
 }
 C.position.set(0, 14, 36);
