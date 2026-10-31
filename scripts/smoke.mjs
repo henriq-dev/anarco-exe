@@ -37,12 +37,20 @@ const required = [
   'assets/img/skins/capuz.png',
   'assets/img/skins/vanta.png',
   'assets/img/skins/cachos.png',
+  'assets/audio/anarco-cyberpunk-ost.mp3',
+  'assets/audio/hack-connect.mp3',
+  'assets/audio/data-stream-loop.mp3',
+  'assets/audio/hack-fail.mp3',
+  'assets/audio/root-access.mp3',
 ]
 for (const path of required) assert.ok(existsSync(join(root, path)), `required local game asset is missing: ${path}`)
 const runtime = readFileSync(join(root, 'script.js'), 'utf8')
 assert.ok(runtime.includes('new window.ANARCO_FX.AnarcoFxSystem'), 'dist/script.js is stale or is not the current ANARCO.EXE runtime')
 assert.ok(runtime.includes('fxSystem.emit("breach"') && runtime.includes('fxSystem.dodge('), 'dist/script.js is missing v3.7 combat effects')
 assert.ok(!runtime.includes('navigator.serviceWorker.register("sw.js")'), 'dist/script.js must not register a missing service worker')
+assert.ok(runtime.includes('function updateHackPanel(') && runtime.includes('function updateHackFlow('), 'contextual hack HUD or animated data flow is missing')
+assert.ok(runtime.includes('VIGILÂNCIA TOTAL // COMPROMETIDA') && runtime.includes('assets/audio/anarco-cyberpunk-ost.mp3'), 'surveillance takeover state or custom cyberpunk audio is missing')
+assert.ok(html.includes('id="hackPanel"') && html.includes('id="hackProgressBar"'), 'contextual hack panel markup is missing')
 
 const routes = JSON.parse(readFileSync(join(root, 'manus-routes.json'), 'utf8'))
 assert.deepEqual(routes.routes.map(route => route.path), ['/'], 'the route manifest must match the single-page game')

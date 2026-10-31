@@ -235,7 +235,8 @@ const routeObjects = [];
 function makeRouteObject(kind, shape) {
   const color = kind === "fast" ? 0x2fe6ff : kind === "safe" ? 0x39ff88 : 0xff3fd0;
   const geo = shape === "cover" ? new T.BoxGeometry(3.4, 1.6, 2.2) : shape === "block" ? new T.BoxGeometry(7.5, 1.1, 1.1) : new T.TorusGeometry(1.25, 0.08, 8, 24);
-  const mat = new T.MeshStandardMaterial({ color: shape === "block" ? 0xff244d : color, emissive: color, emissiveIntensity: 0.7, transparent: true, opacity: 0.72 });
+  const isBarrier = shape !== "shortcut";
+  const mat = new T.MeshStandardMaterial({ color: shape === "block" ? 0xff244d : color, emissive: color, emissiveIntensity: isBarrier ? 0.42 : 0.7, transparent: !isBarrier, opacity: isBarrier ? 1 : 0.5, depthWrite: isBarrier });
   const mesh = new T.Mesh(geo, mat);
   mesh.visible = false;
   routeVisuals.add(mesh);
@@ -302,12 +303,29 @@ function bld(w, h, d, tex) {
 
 // skyline
 const sk = [winTex(), winTex(), winTex()];
+const cityEdgeMats = [
+  new T.MeshBasicMaterial({ color: 0x2fe6ff }),
+  new T.MeshBasicMaterial({ color: 0xff3fd0 }),
+  new T.MeshBasicMaterial({ color: 0x39ff88 }),
+];
+const cityRoofMat = new T.MeshStandardMaterial({ color: 0x0b0e18, metalness: 0.8, roughness: 0.32, emissive: 0x101c36, emissiveIntensity: 0.55 });
 const sky = [];
 for (let i = 0; i < 46; i++) {
   const a = rnd() * Math.PI * 2,
     r = 50 + rnd() * 25,
     h = 10 + rnd() * 34;
-  const b = bld(5 + rnd() * 6, h, 5 + rnd() * 6, sk[i % 3]);
+  const w = 5 + rnd() * 6, d = 5 + rnd() * 6;
+  const b = bld(w, h, d, sk[i % 3]);
+  const edgeMat = cityEdgeMats[i % cityEdgeMats.length];
+  const edge = new T.Mesh(new T.BoxGeometry(0.12, h * 0.82, 0.12), edgeMat);
+  edge.position.set(-w * 0.34, h * 0.02, d * 0.5 + 0.05);
+  const edge2 = edge.clone();
+  edge2.position.x = w * 0.34;
+  const crown = new T.Mesh(new T.BoxGeometry(w * 0.86, 0.16, d * 0.86), cityRoofMat);
+  crown.position.y = h * 0.5 + 0.08;
+  const antenna = new T.Mesh(new T.CylinderGeometry(0.035, 0.055, 1.4 + (i % 3) * 0.45, 6), edgeMat);
+  antenna.position.set((i % 2 ? 1 : -1) * w * 0.18, h * 0.5 + 0.82, 0);
+  b.add(edge, edge2, crown, antenna);
   b.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r);
   S.add(b);
   sky.push(b);
@@ -335,16 +353,68 @@ ac.width = ac.height = 128;
 }
 const aTex = new T.CanvasTexture(ac);
 
-// towers
+// torres corporativas: blindagem modular, conduítes luminosos e ferragens de infraestrutura crítica.
+const towerArmor = new T.MeshStandardMaterial({ color: 0x111824, metalness: 0.82, roughness: 0.34, emissive: 0x081722, emissiveIntensity: 0.35 });
+const towerTrimCyan = new T.MeshBasicMaterial({ color: 0x2fe6ff });
+const towerTrimGreen = new T.MeshBasicMaterial({ color: 0x39ff88 });
+function makeSurveillancePlate() {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#071017"; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = "#2fe6ff"; g.lineWidth = 4; g.strokeRect(3, 3, c.width - 6, c.height - 6);
+  g.fillStyle = "#53f6ff"; g.font = "bold 35px monospace"; g.textAlign = "center";
+  g.fillText("VIGILÂNCIA TOTAL", 256, 54);
+  g.fillStyle = "#94a8b6"; g.font = "19px monospace"; g.fillText("DATACENTER // CAM-NET 07", 256, 93);
+  const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; return tex;
+}
+const surveillancePlate = makeSurveillancePlate();
 const TD = [
   { x: -20, z: -16, h: 22, n: "BancoUsura S.A." },
   { x: 22, z: -6, h: 28, n: "PetroNegra Ltda." },
   { x: 3, z: -30, h: 34, n: "Vigilância Total Corp." },
 ];
-const towers = TD.map((d) => {
+const towers = TD.map((d, towerIndex) => {
   d.lit = winTex(false);
   d.hot = winTex(true);
   d.mesh = bld(6, d.h, 6, d.lit);
+  const towerEdge = cityEdgeMats[towerIndex % cityEdgeMats.length];
+  const finL = new T.Mesh(new T.BoxGeometry(0.18, d.h * 0.92, 0.18), towerEdge);
+  finL.position.set(-2.35, 0, 2.88);
+  const finR = finL.clone();
+  finR.position.x = 2.35;
+  const crown = new T.Mesh(new T.BoxGeometry(5.4, 0.2, 5.4), cityRoofMat);
+  crown.position.y = d.h / 2 + 0.12;
+  d.mesh.add(finL, finR, crown);
+  // placas blindadas laterais e reforços verticais: detalhes visuais, sem colisões extras.
+  [-1, 1].forEach((side) => {
+    const guard = new T.Mesh(new T.BoxGeometry(0.28, d.h * 0.88, 0.2), towerArmor);
+    guard.position.set(side * 2.72, 0, 3.03);
+    d.mesh.add(guard);
+    const conduit = new T.Mesh(new T.BoxGeometry(0.07, d.h * 0.78, 0.045), towerTrimCyan);
+    conduit.position.set(side * 2.48, 0, 3.15);
+    d.mesh.add(conduit);
+  });
+  [-1, 1].forEach((side) => [-0.27, 0.27].forEach((height) => {
+    const plate = new T.Mesh(new T.BoxGeometry(1.05, 0.62, 0.18), towerArmor);
+    plate.position.set(side * 1.82, d.h * height, 3.03);
+    const edge = new T.LineSegments(new T.EdgesGeometry(plate.geometry), towerTrimCyan);
+    plate.add(edge); d.mesh.add(plate);
+  }));
+  const band = new T.Mesh(new T.BoxGeometry(5.55, 0.22, 0.16), towerArmor);
+  band.position.set(0, -d.h * 0.04, 3.06); d.mesh.add(band);
+  if (towerIndex === 2) {
+    // A antena elevada e a placa da Vigilância Total tornam o alvo reconhecível à distância.
+    const mast = new T.Mesh(new T.CylinderGeometry(0.055, 0.09, 3.2, 8), towerArmor);
+    mast.position.set(0, d.h / 2 + 1.75, 0); d.mesh.add(mast);
+    const crossbar = new T.Mesh(new T.BoxGeometry(2.25, 0.09, 0.09), towerTrimCyan);
+    crossbar.position.set(0, d.h / 2 + 2.7, 0); d.mesh.add(crossbar);
+    const beacon = new T.Mesh(new T.SphereGeometry(0.2, 12, 8), towerTrimGreen);
+    beacon.position.set(0, d.h / 2 + 3.35, 0); d.mesh.add(beacon);
+    const dish = new T.Mesh(new T.TorusGeometry(0.55, 0.055, 7, 24), towerTrimCyan);
+    dish.position.set(0, d.h / 2 + 2.1, 0.28); dish.rotation.x = Math.PI / 2; d.mesh.add(dish);
+    const plate = new T.Mesh(new T.PlaneGeometry(3.6, 0.9), new T.MeshBasicMaterial({ map: surveillancePlate, transparent: false, side: T.DoubleSide }));
+    plate.position.set(0, d.h * 0.29, 3.13); d.mesh.add(plate);
+  }
   d.mesh.position.set(d.x, d.h / 2, d.z);
   S.add(d.mesh);
   d.ring = new T.Mesh(
@@ -372,6 +442,29 @@ const towers = TD.map((d) => {
   d.virus = 0;
   return d;
 });
+// O núcleo de interação substitui o círculo vazio por um uplink ciano pulsante ligado ao alvo.
+for (const t of towers) {
+  const root = new T.Group();
+  const pedestal = new T.Mesh(new T.CylinderGeometry(0.58, 0.72, 0.22, 8), towerArmor);
+  pedestal.position.y = -0.44; root.add(pedestal);
+  const coreMaterial = new T.MeshStandardMaterial({ color: 0x53f6ff, emissive: 0x2fe6ff, emissiveIntensity: 1.8, metalness: 0.28, roughness: 0.22 });
+  const core = new T.Mesh(new T.IcosahedronGeometry(0.34, 1), coreMaterial); root.add(core);
+  const haloMat = new T.MeshBasicMaterial({ color: 0x53f6ff, transparent: true, opacity: 0.78, blending: T.AdditiveBlending, depthWrite: false });
+  const halo = new T.Mesh(new T.TorusGeometry(0.58, 0.035, 8, 36), haloMat); halo.rotation.x = Math.PI / 2; halo.position.y = -0.18; root.add(halo);
+  const upright = new T.Mesh(new T.TorusGeometry(0.47, 0.022, 7, 32), haloMat.clone()); upright.position.z = 0.05; root.add(upright);
+  const beam = new T.Mesh(new T.CylinderGeometry(0.025, 0.11, 1.8, 8), new T.MeshBasicMaterial({ color: 0x2fe6ff, transparent: true, opacity: 0.16, depthWrite: false, blending: T.AdditiveBlending }));
+  beam.position.y = 0.89; root.add(beam);
+  S.add(root);
+  t.node = { root, core, halo, upright, beam };
+}
+const hackFlowCount = 28;
+const hackFlowPositions = new Float32Array(hackFlowCount * 3);
+const hackFlowGeometry = new T.BufferGeometry();
+hackFlowGeometry.setAttribute("position", new T.BufferAttribute(hackFlowPositions, 3).setUsage(T.DynamicDrawUsage));
+hackFlowGeometry.setDrawRange(0, 0);
+const hackFlowMaterial = new T.PointsMaterial({ color: 0x53f6ff, size: 0.19, transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true });
+const hackFlow = new T.Points(hackFlowGeometry, hackFlowMaterial); hackFlow.frustumCulled = false; hackFlow.renderOrder = 8; hackFlow.visible = false; S.add(hackFlow);
+const hackFlowStart = new T.Vector3(), hackFlowEnd = new T.Vector3();
 
 // crates
 const crates = [
@@ -424,7 +517,109 @@ let model = null,
   bone = null,
   won = false,
   hacking = false,
-  wob = 0;
+  wob = 0,
+  hackUiTarget = null,
+  hackHoldTarget = null,
+  hackHoldUntil = 0,
+  hackFailureTarget = null,
+  hackFailureUntil = 0,
+  lastHackTarget = null;
+function playHackFeedback(kind) {
+  const sound = { connect: "hack-connect", error: "hack-fail", root: "root-access" }[kind];
+  if (!playCustomSound(sound, kind === "connect" ? 0.48 : 0.56)) {
+    sfx(kind === "connect" ? "hack" : kind === "error" ? "bad" : "done");
+  }
+}
+function updateHackFlow(target, progress, error) {
+  if (!target || !target.node || state !== "play") { hackFlow.visible = false; hackFlowGeometry.setDrawRange(0, 0); setHackStream(false); return; }
+  hackFlow.visible = true;
+  setHackStream(true);
+  const node = target.node.root.position;
+  hackFlowStart.set(node.x, node.y + 0.15, node.z);
+  hackFlowEnd.set(P.position.x, P.position.y + 1.25, P.position.z);
+  const count = Math.min(hackFlowCount, 5 + Math.round(Math.max(0, Math.min(1, progress)) * (hackFlowCount - 5)));
+  hackFlowMaterial.color.set(error ? 0xff3fd0 : 0x53f6ff);
+  hackFlowMaterial.opacity = error ? 1 : 0.48 + Math.max(0, Math.min(1, progress)) * 0.45;
+  for (let i = 0; i < count; i++) {
+    const along = (time * (error ? 1.8 : 0.82) + i / count) % 1;
+    const jitter = error ? Math.sin(time * 64 + i * 7.1) * 0.42 : Math.sin(time * 6 + i * 2.3) * 0.12;
+    const k = i * 3;
+    hackFlowPositions[k] = hackFlowStart.x + (hackFlowEnd.x - hackFlowStart.x) * along + jitter;
+    hackFlowPositions[k + 1] = hackFlowStart.y + (hackFlowEnd.y - hackFlowStart.y) * along + Math.sin(time * 8 + i * 1.9) * (error ? 0.25 : 0.09);
+    hackFlowPositions[k + 2] = hackFlowStart.z + (hackFlowEnd.z - hackFlowStart.z) * along + Math.cos(time * 7 + i * 2.1) * (error ? 0.25 : 0.09);
+  }
+  hackFlowGeometry.attributes.position.needsUpdate = true;
+  hackFlowGeometry.setDrawRange(0, count);
+}
+function updateHackPanel(target, error = false, committed = false) {
+  const panel = $("hackPanel");
+  if (!panel || !target || state !== "play") {
+    if (panel) panel.hidden = true;
+    hackUiTarget = null;
+    updateHackFlow(null, 0, false);
+    return;
+  }
+  hackUiTarget = target;
+  panel.hidden = false;
+  const miniProgress = mini && mini.t === target ? Math.round((mini.pos / mini.seq.length) * 100) : 0;
+  const progress = committed ? 100 : Math.round(Math.max(0, Math.min(1, target.p)) * 100);
+  let stateKey = committed ? "committed" : error ? "error" : progress >= 70 ? "root" : progress < 7 ? "connect" : "extract";
+  if (error) stateKey = "error";
+  panel.dataset.state = stateKey;
+  const status = committed
+    ? (target.n === "Vigilância Total Corp." ? "VIGILÂNCIA TOTAL // COMPROMETIDA" : target.n.toUpperCase() + " // COMPROMETIDA")
+    : error ? "SEQUÊNCIA INCORRETA // LINK INSTÁVEL"
+    : progress < 7 ? "CONEXÃO ESTABELECIDA"
+    : progress >= 70 ? "ACESSO ROOT"
+    : "EXTRAINDO DADOS";
+  setTxt($("hackBuilding"), target.n.toUpperCase());
+  setTxt($("hackState"), status);
+  setTxt($("hackPercent"), progress + "%");
+  setSty($("hackProgressBar"), "width", progress + "%");
+  const bar = $("hackProgress");
+  if (bar && bar.getAttribute("aria-valuenow") !== String(progress)) bar.setAttribute("aria-valuenow", String(progress));
+  const root = $("hackRoot");
+  if (root) {
+    const rootText = committed ? "ROOT // CONCEDIDO" : error ? "ROOT // NEGADO" : progress >= 70 ? "ROOT // VALIDANDO" : "ROOT // BLOQUEADO";
+    setTxt(root.querySelector("b"), rootText);
+    setTxt(root.querySelector("small"), committed ? "CONTROLE DE CÂMERAS OBTIDO" : error ? "REFAÇA A SEQUÊNCIA" : mini && mini.t === target ? `CHAVE ${miniProgress}% // AUTENTICAÇÃO` : "SEQUÊNCIA NECESSÁRIA");
+  }
+  const trace = committed ? "CAM-NET // ROOT TOKEN // UPLINK OWNED" : error ? "PACKET REJECTED // RETRY AUTH" : mini && mini.t === target ? `AUTH TOKEN // ${mini.pos}/${mini.seq.length} // CAM-07` : progress >= 70 ? "ROOT SHELL // VALIDANDO CREDENCIAIS" : `CAM-07 // DATA STREAM // ${Math.max(1, Math.round(progress * 3))}KB/s`;
+  setTxt($("hackTrace"), trace);
+  updateHackFlow(target, committed ? 1 : target.p, error);
+}
+function positionHackPanel() {
+  const panel = $("hackPanel"), target = hackUiTarget;
+  if (!panel || panel.hidden || !target) return;
+  const touchLayout = innerWidth <= 980 || matchMedia("(pointer: coarse)").matches;
+  const miniEl = $("mini");
+  if (touchLayout) {
+    panel.style.left = "50%";
+    panel.style.transform = "translateX(-50%)";
+    const hud = $("hud"), routes = $("routePicker");
+    let top = Math.max(8, Math.ceil(Math.max(hud?.getBoundingClientRect().bottom || 0, routes?.getBoundingClientRect().bottom || 0)) + 7);
+    const panelHeight = panel.getBoundingClientRect().height;
+    if (!miniEl.hidden) {
+      const miniHeight = miniEl.getBoundingClientRect().height;
+      const controls = $("touchActions");
+      const safeBottom = controls && getComputedStyle(controls).display !== "none" ? controls.getBoundingClientRect().top - 8 : innerHeight - 10;
+      const desiredCenter = top + panelHeight + 7 + miniHeight / 2;
+      const miniCenter = Math.min(desiredCenter, safeBottom - miniHeight / 2);
+      top = Math.max(6, miniCenter - miniHeight / 2 - 7 - panelHeight);
+      miniEl.style.top = `${miniCenter}px`;
+    } else miniEl.style.removeProperty("top");
+    panel.style.top = `${top}px`;
+    return;
+  }
+  panel.style.transform = "none";
+  hackProjectPoint.set(target.x + 5.25, Math.min(target.h - 1, Math.max(3, target.h * 0.54)), target.z).project(C);
+  const x = (hackProjectPoint.x * 0.5 + 0.5) * innerWidth + 16;
+  const y = (-hackProjectPoint.y * 0.5 + 0.5) * innerHeight - 36;
+  panel.style.left = `${Math.max(10, Math.min(innerWidth - panel.offsetWidth - 10, x))}px`;
+  panel.style.top = `${Math.max(88, Math.min(innerHeight - panel.offsetHeight - 18, y))}px`;
+  miniEl.style.removeProperty("top");
+}
+const hackProjectPoint = new T.Vector3();
 // ÂNCORA: formato do arquivo assets/models/anarco.mdl (tudo em sequência, sem separadores):
 //   [posições Int16 x3 por vértice] [índices Uint16 x3 por triângulo] [cores Uint8 x3 por vértice]
 const RIM_FORCA = 0.75; // intensidade do contorno neon (0 desliga)
@@ -1085,6 +1280,28 @@ const vel = new T.Vector3();
 const reduzMov = matchMedia("(prefers-reduced-motion:reduce)");
 let calm = reduzMov.matches;
 reduzMov.addEventListener("change", (e) => (calm = e.matches));
+const codeRainSelect = $("codeRainMode");
+const codeRainStatus = $("codeRainStatus");
+let codeRainMode = matchMedia("(pointer: coarse)").matches ? "auto" : "on";
+try {
+  const savedCodeRainMode = localStorage.getItem("anarco_code_rain_mode");
+  if (["on", "auto", "off"].includes(savedCodeRainMode)) codeRainMode = savedCodeRainMode;
+} catch { /* preferência apenas desta sessão */ }
+if (codeRainSelect) {
+  codeRainSelect.value = codeRainMode;
+  const syncCodeRainSetting = () => {
+    codeRainMode = codeRainSelect.value;
+    if (codeRainStatus) codeRainStatus.textContent = codeRainMode === "on"
+      ? "ATIVA · chuva de códigos no BREACH"
+      : codeRainMode === "auto" ? "AUTOMÁTICA · segue Reduzir Movimento do sistema" : "DESATIVADA";
+    try { localStorage.setItem("anarco_code_rain_mode", codeRainMode); } catch { /* preferência apenas desta sessão */ }
+  };
+  codeRainSelect.addEventListener("change", syncCodeRainSetting);
+  syncCodeRainSetting();
+}
+function breachCodeRainEnabled() {
+  return codeRainMode === "on" || (codeRainMode === "auto" && !calm);
+}
 function cameraMoment(kind, x, z, duration) {
   if (calm) { camFx = null; return; }
   camFx = { kind, x, z, t: duration, duration };
@@ -1103,6 +1320,12 @@ function reset(keep) {
     resetStats();
   }
   mini = null;
+  hackUiTarget = hackHoldTarget = hackFailureTarget = lastHackTarget = null;
+  hackHoldUntil = hackFailureUntil = 0;
+  $("hackPanel").hidden = true;
+  setHackStream(false);
+  document.body.dataset.hackMini = "0";
+  $("mini").style.removeProperty("top");
   blackoutClock = 0;
   blackoutOn = false;
   document.body.classList.remove("blackout");
@@ -1147,6 +1370,7 @@ function reset(keep) {
   applyPhaseReadout();
   $("stats").hidden = true;
   $("ov").style.display = "none";
+  $("ov").dataset.mode = "menu";
 }
 function chooseEnd(k) {
   $("ch").hidden = true;
@@ -1182,6 +1406,9 @@ function end(win) {
   buzz(win ? [60, 40, 60, 40, 140] : [160, 70, 220]); // vitória: vibração em "ta-ta-TÁ"; derrota: longa e grave
   mini = null;
   $("mini").hidden = true;
+  $("hackPanel").hidden = true;
+  setHackStream(false);
+  document.body.dataset.hackMini = "0";
   $("msg").textContent = "";
   $("ot").innerHTML = win ? "A REDE É <span>LIVRE</span>" : "RASTRE<span>ADO</span>";
   $("od").textContent = win
@@ -1210,13 +1437,21 @@ function end(win) {
     $("st").hidden = true;
   }
   $("ov").style.display = "flex";
+  $("ov").dataset.mode = "results";
+  // O mesmo cartão é reutilizado entre menu, vitória e derrota: sempre reabre no topo.
+  $("ov").scrollTop = 0;
+  const overlayCard = $("ov").querySelector(".ov-card");
+  if (overlayCard) overlayCard.scrollTop = 0;
 }
 function hackDone(t) {
-  sfx("done");
   buzz(42);
   cameraMoment("tower", t.x, t.z, 0.9);
   runStats.hacks++;
   t.done = true;
+  hackHoldTarget = t;
+  hackHoldUntil = performance.now() + 2200;
+  hackFailureUntil = 0;
+  playHackFeedback("root");
   cnt++;
   $("cnt").textContent = cnt + "/3";
   t.mesh.material.emissiveMap = t.hot;
@@ -1354,6 +1589,7 @@ function setRoute(mode) {
   if (!ROUTES[mode] || mode === routeMode) return;
   routeMode = mode;
   renderRoute();
+  sfx("route", mode === "fast" ? 0 : mode === "safe" ? 1 : 2);
   note = "Rota " + ROUTES[mode].label + " selecionada: " + ROUTES[mode].text;
   noteT = 2.4;
   flashFeedback(mode === "safe" ? "collect" : mode === "tech" ? "hack" : "danger");
@@ -1411,7 +1647,7 @@ function startMini(t) {
   };
   drawMini();
   $("mini").hidden = false;
-  sfx("hack");
+  document.body.dataset.hackMini = "1";
   buzz(16);
 }
 function miniKey(d) {
@@ -1423,11 +1659,14 @@ function miniKey(d) {
       const t = mini.t;
       mini = null;
       $("mini").hidden = true;
+      document.body.dataset.hackMini = "0";
       hackDone(t);
       return;
     }
   } else {
-    sfx("bad");
+    hackFailureTarget = mini.t;
+    hackFailureUntil = performance.now() + 1150;
+    playHackFeedback("error");
     buzz(18);
     runStats.failedHacks++;
     mini.pos = 0;
@@ -1724,16 +1963,78 @@ let actx = null,
   aLast = 0,
   alertAnt = 0,
   audioLayers = null,
-  audioStateShown = "";
+  audioStateShown = "",
+  customAudioBuffers = Object.create(null),
+  customAudioLoad = null,
+  customMusicSource = null,
+  hackStreamSource = null,
+  hackStreamGain = null,
+  hackStreamWanted = false;
+const CUSTOM_AUDIO = {
+  music: "assets/audio/anarco-cyberpunk-ost.mp3",
+  connect: "assets/audio/hack-connect.mp3",
+  stream: "assets/audio/data-stream-loop.mp3",
+  error: "assets/audio/hack-fail.mp3",
+  root: "assets/audio/root-access.mp3",
+};
+function startCustomMusic() {
+  const buffer = customAudioBuffers.music;
+  if (!actx || !audioLayers || !buffer || customMusicSource) return;
+  const source = actx.createBufferSource(), gain = actx.createGain();
+  source.buffer = buffer; source.loop = true; gain.gain.value = 0.34;
+  source.connect(gain).connect(audioLayers.master); source.start(); customMusicSource = source;
+}
+function playCustomSound(name, volume = 0.5) {
+  const buffer = customAudioBuffers[name];
+  if (!actx || !audioLayers || !buffer || mute) return false;
+  const source = actx.createBufferSource(), gain = actx.createGain();
+  source.buffer = buffer; gain.gain.value = volume;
+  source.connect(gain).connect(audioLayers.master); source.start();
+  return true;
+}
+function setHackStream(active) {
+  hackStreamWanted = active;
+  if (!actx || !audioLayers) return;
+  if (active && !hackStreamSource && customAudioBuffers.stream) {
+    hackStreamSource = actx.createBufferSource();
+    hackStreamGain = actx.createGain();
+    hackStreamSource.buffer = customAudioBuffers.stream;
+    hackStreamSource.loop = true;
+    hackStreamGain.gain.setValueAtTime(0.0001, actx.currentTime);
+    hackStreamGain.gain.setTargetAtTime(mute ? 0.0001 : 0.13, actx.currentTime, 0.12);
+    hackStreamSource.connect(hackStreamGain).connect(audioLayers.master);
+    hackStreamSource.start();
+  } else if (!active && hackStreamSource) {
+    const source = hackStreamSource;
+    if (hackStreamGain) hackStreamGain.gain.setTargetAtTime(0.0001, actx.currentTime, 0.045);
+    hackStreamSource = null; hackStreamGain = null;
+    window.setTimeout(() => { try { source.stop(); } catch (e) {} }, 260);
+  }
+}
+async function loadCustomAudio() {
+  if (customAudioLoad || !actx) return customAudioLoad;
+  customAudioLoad = Promise.all(Object.entries(CUSTOM_AUDIO).map(async ([key, path]) => {
+    try {
+      const response = await fetch(new URL(path, document.baseURI).toString());
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      customAudioBuffers[key] = await actx.decodeAudioData(await response.arrayBuffer());
+      if (key === "music") startCustomMusic();
+      if (key === "stream" && hackStreamWanted) setHackStream(true);
+    } catch (error) { console.warn(`Áudio local indisponível (${key}); usando síntese de reserva.`, error); }
+  }));
+  return customAudioLoad;
+}
 $("snd").onclick = () => {
   mute = !mute;
   $("snd").textContent = mute ? "🔇" : "🔊";
   if (audioLayers && actx) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.1);
+  if (hackStreamGain && actx) hackStreamGain.gain.setTargetAtTime(mute ? 0.0001 : hackStreamWanted ? 0.13 : 0.0001, actx.currentTime, 0.08);
   audioStateShown = "";
 };
 function sfx(n, i) {
   if (mute || !actx) return;
   const t = actx.currentTime;
+  const output = audioLayers?.master || actx.destination;
   const tone = (f, d, ty = "square", v = 0.06, at = 0) => {
     const o = actx.createOscillator(),
       g = actx.createGain();
@@ -1742,7 +2043,7 @@ function sfx(n, i) {
     g.gain.setValueAtTime(v, t + at);
     g.gain.exponentialRampToValueAtTime(0.0001, t + at + d);
     o.connect(g);
-    g.connect(actx.destination);
+    g.connect(output);
     o.start(t + at);
     o.stop(t + at + d);
   };
@@ -1756,7 +2057,7 @@ function sfx(n, i) {
     g.gain.setValueAtTime(v, t + at);
     g.gain.exponentialRampToValueAtTime(0.0001, t + at + d);
     o.connect(g);
-    g.connect(actx.destination);
+    g.connect(output);
     o.start(t + at);
     o.stop(t + at + d);
   };
@@ -1775,7 +2076,7 @@ function sfx(n, i) {
     g.gain.value = v;
     src.connect(f);
     f.connect(g);
-    g.connect(actx.destination);
+    g.connect(output);
     src.start(t + at);
   };
   if (n === "tick") tone(1200, 0.04, "square", 0.03);
@@ -1820,6 +2121,12 @@ function sfx(n, i) {
     noise(1.0, 0.2, 1800);
   }
   else if (n === "win") [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, 0.2, "square", 0.07, k * 0.1));
+  else if (n === "route") {
+    const root = [330, 392, 262][i || 0];
+    tone(root, 0.12, "triangle", 0.07);
+    tone(root * 1.5, 0.18, "sine", 0.045, 0.08);
+    tone(root * 2, 0.22, "triangle", 0.035, 0.15);
+  }
 }
 function ensureAudioLayers() {
   if (!actx || audioLayers) return;
@@ -1855,6 +2162,47 @@ function ensureAudioLayers() {
   lfoG.connect(audioLayers.bossPulse.g.gain);
   lfo.start();
   audioLayers.bossLfo = { o: lfo, g: lfoG };
+  audioLayers.musicStep = 0;
+  audioLayers.musicTimer = window.setInterval(playMusicTick, 520);
+  void loadCustomAudio();
+}
+// Música procedural leve: motivos diferentes para menu, infiltração, tensão e encerramento.
+// Tudo passa pelo master existente, portanto mute e o volume geral continuam funcionando.
+function playMusicTick() {
+  if (!actx || !audioLayers || mute || customAudioBuffers.music) return;
+  const now = actx.currentTime;
+  const over = state === "over";
+  const playing = state === "play" || state === "brief";
+  const menu = !playing && !over;
+  const step = audioLayers.musicStep++ % 8;
+  const menuNotes = [196, 233, 293.7, 349.2, 293.7, 233, 174.6, 233];
+  const briefNotes = [261.6, 293.7, 349.2, 392, 349.2, 293.7, 233, 261.6];
+  const runNotes = [110, 130.8, 146.8, 164.8, 146.8, 130.8, 98, 130.8];
+  const endNotes = won ? [261.6, 329.6, 392, 523.2, 392, 329.6, 261.6, 196] : [196, 174.6, 164.8, 146.8, 130.8, 123.5, 110, 98];
+  const notes = over ? endNotes : state === "brief" ? briefNotes : state === "play" ? runNotes : menuNotes;
+  const freq = notes[step];
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.type = over ? "triangle" : menu ? "sine" : "triangle";
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(over ? 0.045 : state === "brief" ? 0.032 : playing ? 0.028 : 0.022, now + 0.035);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+  osc.connect(gain).connect(audioLayers.master);
+  osc.start(now);
+  osc.stop(now + 0.46);
+  if (step % 4 === 0) {
+    const pad = actx.createOscillator();
+    const padGain = actx.createGain();
+    pad.type = "sine";
+    pad.frequency.setValueAtTime(freq / 2, now);
+    padGain.gain.setValueAtTime(0.0001, now);
+    padGain.gain.linearRampToValueAtTime(over ? 0.024 : 0.014, now + 0.12);
+    padGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.65);
+    pad.connect(padGain).connect(audioLayers.master);
+    pad.start(now);
+    pad.stop(now + 1.7);
+  }
 }
 function syncAudioLayers() {
   if (!actx || mute) return;
@@ -1866,7 +2214,7 @@ function syncAudioLayers() {
   const threat = activeDrones.some((d) => d.state === "chase" || d.state === "detected" || d.state === "virus") || !!boss;
   const route = typeof routeTune === "function" ? routeTune() : { };
   const routeId = typeof routeMode === "string" ? routeMode : "safe";
-  const key = `${state}|${Math.round(danger * 4)}|${threat}|${routeId}|${boss ? "b" + bi : "-"}`;
+  const key = `${state}|${Math.round(danger * 4)}|${threat}|${routeId}|${boss ? "b" + bi : "-"}|${customAudioBuffers.music ? "score" : "synth"}`;
   if (key === audioStateShown) return;
   audioStateShown = key;
   const target = (node, value, time = 0.35) => {
@@ -1874,10 +2222,11 @@ function syncAudioLayers() {
     node.g.gain.setTargetAtTime(value, now, time);
   };
   const playing = state === "play" || state === "brief";
-  const explore = playing ? 0.8 * (1 - danger * 0.75) : state === "menu" ? 0.3 : 0;
+  const hasCustomScore = !!customAudioBuffers.music;
+  const explore = hasCustomScore ? 0 : playing ? 0.8 * (1 - danger * 0.75) : state === "menu" ? 0.3 : 0;
   const alert = playing ? danger * 0.7 : 0;
   const chase = playing && threat ? Math.max(0.18, danger) : 0;
-  const routeTone = playing ? (routeId === "fast" ? 0.8 : routeId === "tech" ? 0.55 : 0.25) : 0;
+  const routeTone = hasCustomScore ? 0 : playing ? (routeId === "fast" ? 0.8 : routeId === "tech" ? 0.55 : 0.25) : 0;
   const onBoss = state === "play" && !!boss;
   const snd = BOSS_SND[Math.min(bi, BOSS_SND.length - 1)] || BOSS_SND[0];
   if (onBoss) {
@@ -1987,6 +2336,41 @@ function addRoomRail(w, h, d, x, y, z, material) {
   addRoomRail(0.14, 0.04, 57, side * 31, 8.98, 0, roomCyan);
 });
 [-23, -11, 11, 23].forEach((z) => addRoomRail(12, 0.025, 0.07, 0, 0.07, z, roomCyan));
+// Linguagem de hacker datacenter: corredores legíveis, teto técnico, painéis de controle
+// e um núcleo central visual. São elementos decorativos e não entram em `solids`.
+const roomPanel = new T.MeshStandardMaterial({ color: 0x0b111b, metalness: 0.82, roughness: 0.3, emissive: 0x10243b, emissiveIntensity: 0.5 });
+const roomScreen = new T.MeshBasicMaterial({ color: 0x53f6ff });
+const roomPink = new T.MeshBasicMaterial({ color: 0xff3fd0 });
+[-27, -14, 0, 14, 27].forEach((z, i) => {
+  addRoomRail(64, 0.16, 0.24, 0, 11.5, z, roomPanel);
+  addRoomRail(54, 0.035, 0.06, 0, 11.38, z, i % 2 ? roomCyan : roomGlow);
+});
+[-30, -15, 0, 15, 30].forEach((x) => {
+  addRoomRail(0.18, 0.16, 62, x, 11.35, 0, roomPanel);
+});
+[-31, 31].forEach((x, i) => {
+  const panel = new T.Mesh(new T.BoxGeometry(0.12, 2.4, 4.6), roomPanel);
+  panel.position.set(x, 5.2, -8 + i * 16);
+  roomG.add(panel);
+  for (let k = 0; k < 5; k++) {
+    const led = new T.Mesh(new T.BoxGeometry(0.025, 0.08, 0.5), k % 2 ? roomPink : roomScreen);
+    led.position.set(x + (x > 0 ? -0.08 : 0.08), 4.4 + k * 0.32, -8 + i * 16);
+    roomG.add(led);
+  }
+});
+const coreBase = new T.Mesh(new T.CylinderGeometry(2.3, 2.7, 0.32, 8), roomPanel);
+coreBase.position.set(0, 0.18, -10);
+roomG.add(coreBase);
+const coreRing = new T.Mesh(new T.TorusGeometry(2.1, 0.06, 8, 40), roomCyan);
+coreRing.rotation.x = -Math.PI / 2;
+coreRing.position.set(0, 0.38, -10);
+roomG.add(coreRing);
+const corePillar = new T.Mesh(new T.BoxGeometry(1.1, 1.5, 1.1), roomPanel);
+corePillar.position.set(0, 0.95, -10);
+roomG.add(corePillar);
+const coreScreen = new T.Mesh(new T.BoxGeometry(0.78, 0.58, 0.035), roomScreen);
+coreScreen.position.set(0, 1.05, -10.56);
+roomG.add(coreScreen);
 // ESCONDERIJO: mesas, racks e caixas (obstáculo + cobertura)
 const HIDE = [];
 {
@@ -2103,6 +2487,7 @@ function applyLevel() {
     t.ring.position.set(t.x, 0.06, t.z);
     t.wave.position.set(t.x, 0.1, t.z);
     t.spr.position.set(t.x, t.h + 5, t.z + 3.5);
+    if (t.node) { t.node.root.position.set(t.x + 4.75, 1.48, t.z + 0.2); t.node.root.visible = !bs; }
     solids[i].x = t.x;
     solids[i].z = t.z;
   });
@@ -2522,7 +2907,7 @@ function breach() {
   runStats.skills++;
   buzz(32);
   bz = LV[lvl].boss ? SKILLS.breach.bossCd : SKILLS.breach.cd;
-  rainT = calm ? 0 : 2.2; // sem chuva de código se o sistema pede menos movimento
+  rainT = breachCodeRainEnabled() ? 2.2 : 0; // modo explícito pode ativar a chuva mesmo com movimento reduzido
   ringT = 0;
   castT = 0.6;
   ringM.position.x = P.position.x;
@@ -2863,8 +3248,8 @@ function loop() {
       t.ring.material.opacity = 1;
       t.ring.scale.setScalar(1);
     } else if (dP < 5.1) {
-      t.ring.material.color.set(0xe0261c);
-      t.ring.material.opacity = calm ? 0.85 : 0.6 + Math.abs(Math.sin(time * 10)) * 0.4;
+      t.ring.material.color.set(0x53f6ff);
+      t.ring.material.opacity = calm ? 0.9 : 0.62 + Math.abs(Math.sin(time * 10)) * 0.38;
       t.ring.scale.setScalar(calm ? 1 : 1 + Math.sin(time * 10) * 0.06);
     } else if (t === nextT) {
       t.ring.material.color.set(0xffe14a);
@@ -2874,6 +3259,22 @@ function loop() {
       t.ring.material.color.set(0xe0261c);
       t.ring.material.opacity = 0.55 + Math.sin(time * 2) * 0.15;
       t.ring.scale.setScalar(1);
+    }
+    if (t.node) {
+      const activeNode = !t.done && dP < 5.1;
+      const failedNode = hackFailureTarget === t && performance.now() < hackFailureUntil;
+      const nodeColor = t.done ? 0x39ff88 : failedNode ? 0xff3fd0 : 0x53f6ff;
+      t.node.core.material.color.set(nodeColor);
+      t.node.core.material.emissive.set(nodeColor);
+      t.node.core.material.emissiveIntensity = activeNode ? 2.2 + Math.sin(time * 16) * 0.55 : t.done ? 1.1 : 0.85;
+      t.node.halo.material.color.set(nodeColor);
+      t.node.upright.material.color.set(nodeColor);
+      t.node.beam.material.color.set(nodeColor);
+      t.node.beam.material.opacity = activeNode ? 0.27 : 0.12;
+      t.node.halo.rotation.z += dt * (activeNode ? 1.8 : 0.55);
+      t.node.upright.rotation.y += dt * (activeNode ? -1.6 : -0.45);
+      const pulse = activeNode && !calm ? 1 + Math.sin(time * 12) * 0.09 : 1;
+      t.node.root.scale.setScalar(pulse);
     }
     if (t.pulse > 0) {
       t.pulse = Math.max(0, t.pulse - dt * 2.5);
@@ -3137,6 +3538,15 @@ function loop() {
     });
     $("hk").style.width = (near ? near.p * 100 : 0) + "%";
     hacking = !!near;
+    if (near && lastHackTarget !== near) {
+      playHackFeedback("connect");
+      lastHackTarget = near;
+      hackHoldTarget = null;
+    } else if (!near) lastHackTarget = null;
+    const errorActive = !!near && hackFailureTarget === near && performance.now() < hackFailureUntil;
+    const heldCommit = !near && hackHoldTarget && performance.now() < hackHoldUntil ? hackHoldTarget : null;
+    const displayTarget = near || heldCommit;
+    updateHackPanel(displayTarget, errorActive, !!heldCommit);
     if (mini) {
       mini.left -= dt;
       $("mt").style.width = Math.max(0, (mini.left / LV[lvl].t) * 100) + "%";
@@ -3144,6 +3554,11 @@ function loop() {
         const t = mini.t;
         mini = null;
         $("mini").hidden = true;
+        document.body.dataset.hackMini = "0";
+        $("mini").style.removeProperty("top");
+        hackFailureTarget = t;
+        hackFailureUntil = performance.now() + 1150;
+        playHackFeedback("error");
         t.p = 0.4;
         runStats.failedHacks++;
         alert_ = Math.min(0.98, alert_ + 0.3);
@@ -3227,6 +3642,8 @@ function loop() {
     C.position.y += (Math.random() - 0.5) * shake;
   }
   C.lookAt(lookX, lookY, lookZ);
+  C.updateMatrixWorld();
+  positionHackPanel();
   fxSystem.update(rawDt, {
     player: P,
     boss: boss ? boss.g : null,
@@ -3447,6 +3864,8 @@ function updObjective() {
 function togglePause() {
   if (state === "play") {
     state = "pause";
+    $("hackPanel").hidden = true;
+    setHackStream(false);
     $("pz").hidden = false;
     $("pb").textContent = "▶";
   } else if (state === "pause") {
@@ -3471,6 +3890,8 @@ $("pzc").onclick = togglePause;
 $("pzm").onclick = () => {
   $("pz").hidden = true;
   $("pb").textContent = "⏸";
+  $("hackPanel").hidden = true;
+  setHackStream(false);
   state = "menu";
   arrow.visible = false;
   $("obj").textContent = "";

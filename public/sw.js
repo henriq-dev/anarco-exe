@@ -1,9 +1,11 @@
 /* ÂNCORA: service worker = "porteiro" que guarda os arquivos no aparelho. Depois da 1ª visita o jogo abre até sem internet. */
-const VERSAO = "anarco-v3.9.9";
+const VERSAO = "anarco-v4.0.0-breach-rain";
 // Só nomes estáveis; os arquivos com hash (assets/index-XXXX.js) entram no cache na 1ª visita, pela regra de fetch abaixo.
 const BASICO = ["./", "index.html", "style.css", "script.js", "manifest.webmanifest", "assets/dados/manifesto.js",
   "assets/share/favicon-192.png", "assets/share/favicon-512.png", "assets/img/skins/vanta.png",
-  "assets/models/anarco.mdl", "assets/models/laptop.mdl"];
+  "assets/models/anarco.mdl", "assets/models/laptop.mdl",
+  "assets/audio/anarco-cyberpunk-ost.mp3", "assets/audio/hack-connect.mp3",
+  "assets/audio/data-stream-loop.mp3", "assets/audio/hack-fail.mp3", "assets/audio/root-access.mp3"];
 
 self.addEventListener("install", (e) => {
   // se algum arquivo falhar, a instalação do SW continua mesmo assim

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ANARCO.EXE 3D — Breach Protocol</title>
-<meta name="description" content="Jogo 3D cyberpunk: invada torres corporativas, fuja dos drones e enfrente chefões aprimorados.">
+<meta name="description" content="Jogo 3D cyberpunk de infiltração: invada torres, extraia dados e comprometa a Vigilância Total Corp.">
 <meta name="theme-color" content="#09090b">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -60,6 +60,14 @@
 <div id="fxFlash" aria-hidden="true"></div>
 <div id="leakcard" hidden><b>VAZAMENTO CAPTURADO</b><span id="lcc"></span><small id="lcd"></small></div>
 <div id="obj" role="status" aria-live="polite"></div>
+<div id="hackPanel" class="hack-panel" hidden role="region" aria-live="off" aria-label="Progresso contextual do hack">
+  <div class="hack-panel-head"><span class="hack-panel-corp">VIGILÂNCIA TOTAL CORP.</span><span class="hack-live"><i></i> LINK ATIVO</span></div>
+  <strong class="hack-building" id="hackBuilding">ALVO // TORRE</strong>
+  <div class="hack-state-line"><span id="hackState" aria-live="polite">CONEXÃO ESTABELECIDA</span><b id="hackPercent">0%</b></div>
+  <div id="hackProgress" class="hack-progress" role="progressbar" aria-label="Progresso de extração" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="hackProgressBar"></i></div>
+  <div class="hack-trace" aria-hidden="true"><span id="hackTrace">CAM-07 // UPLINK AGUARDANDO</span><span class="hack-trace-cursor">▌</span></div>
+  <div id="hackRoot" class="hack-root"><span>◈</span><b>ROOT // BLOQUEADO</b><small>SEQUÊNCIA NECESSÁRIA</small></div>
+</div>
 <div id="pz" hidden><div><h2>PAUS<span>A</span></h2><p>P ou Esc para voltar.</p><button id="pzc">Continuar</button> <button id="pzm">Menu</button></div></div>
 <div id="bf" hidden><div><p class="eyebrow">BRIEFING // REDE ANARQUISTA</p><h2 id="bfh"></h2><p id="bft"></p><div class="brief-grid"><span><b>OBJETIVO</b><strong id="bfo"></strong></span><span><b>AMEAÇA</b><strong id="bfa"></strong></span><span><b>RECOMENDAÇÃO</b><strong id="bfr"></strong></span></div></div></div>
 <div id="mini" hidden><b id="miniTitle">BREACH — digite a sequência</b><small id="miniRule">PROTOCOLO // SETAS</small><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
@@ -77,12 +85,14 @@
 </div>
 <div id="routePicker" aria-label="Escolher rota"><button id="routeFast" type="button" aria-label="Escolher rota rápida">1 RÁPIDA</button><button id="routeSafe" type="button" aria-label="Escolher rota protegida">2 PROTEGIDA</button><button id="routeTech" type="button" aria-label="Escolher rota técnica">3 TÉCNICA</button></div>
 <div id="joy"><b id="nub"></b></div>
-<div id="ov"><div>
+<div id="ov"><div class="ov-card">
+  <div class="ov-kicker">OPERAÇÃO // REDE ANARQUISTA</div>
   <h2 id="ot">ANARCO<span>.EXE</span></h2>
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
-  <p>Mova com WASD ou setas, segure Shift para correr. Use BREACH, EMP e VÍRUS para controlar a rede e sobreviver aos chefões. Tudo é ficção.</p>
+  <p class="ov-copy">Mova com WASD ou setas, segure Shift para correr. Use BREACH, EMP e VÍRUS para controlar a rede e sobreviver aos chefões. Tudo é ficção.</p>
   <p id="rkres" hidden></p>
   <label class="fx-settings" for="fxQuality"><span>QUALIDADE DOS EFEITOS</span><select id="fxQuality"><option value="low">Baixa · máximo desempenho</option><option value="medium">Média · bloom seletivo</option><option value="high">Alta · bloom completo opcional</option></select><small id="fxQualityStatus" aria-live="polite">FX · MÉDIA</small><small>Se o desempenho cair, o jogo reduz efeitos e resolução automaticamente.</small></label>
+  <label class="fx-settings" for="codeRainMode"><span>CHUVA DE CÓDIGO // BREACH</span><select id="codeRainMode"><option value="on">Ativa no BREACH · padrão PC</option><option value="auto">Automática · respeita reduzir movimento</option><option value="off">Desativada</option></select><small id="codeRainStatus" aria-live="polite">Chuva de códigos ao ativar BREACH.</small></label>
   <label class="fx-settings" for="hudMode"><span>PAINEL NA TELA (HUD)</span><select id="hudMode"><option value="slim">Trilho fino · lateral, sem caixas (padrão)</option><option value="lateral">Lateral · painel em caixas</option><option value="compacto">Compacto · faixa no topo</option><option value="minimo">Mínimo · só tempo, torres, hack e alerta</option><option value="discreto">Discreto · compacto e transparente</option></select><small>Muda na hora; fica salvo neste aparelho.</small></label>
   <div id="stats" hidden><b class="stats-title">RELATÓRIO DA OPERAÇÃO</b><div class="stats-grid"><span><small>TORRES</small><strong id="stTowers">0/3</strong></span><span><small>HACKS</small><strong id="stHacks">0</strong></span><span><small>FALHAS</small><strong id="stFails">0</strong></span><span><small>ALERTAS</small><strong id="stAlerts">0</strong></span><span><small>ITENS</small><strong id="stItems">0</strong></span><span><small>HABILIDADES</small><strong id="stSkills">0</strong></span></div><p id="stProfile"></p></div>
   <div id="ch" class="mb2" hidden><button id="cCaos">VAZAR TUDO</button><button id="cSomb">CHANTAGEAR</button></div>
