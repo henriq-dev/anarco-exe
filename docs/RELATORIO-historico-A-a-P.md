@@ -195,3 +195,65 @@ Dano por segundo no chefão agora: BREACH 4,9 · EMP 2,5 · VÍRUS 2,0. Cada uma
 **Correção:** `#ov { z-index: 20; overflow-y: auto; }` em `style.css` — o menu passa a ficar acima do HUD e, em tela baixa, rola em vez de cortar.
 **Conceito:** `z-index` só vale em elementos posicionados; sem valor, o elemento cai atrás de quem tem número maior.
 **Teste:** capturas em 1366×720, 1366×640 e 1280×720: menu inteiro visível, HUD escondido atrás dele.
+
+## Item S — Ajustes da lista restante (v3.9.2)
+
+**Ordem (Fácil → Difícil):**
+1. **Fácil — teclas presas:** já estava resolvido na v3.8 (`soltarTeclas` em `blur` e `visibilitychange`); confirmado e coberto pelo teste novo.
+2. **Fácil — vibração:** vitória e derrota já vibram em `end()` (padrões "ta-ta-TÁ" e longa/grave); hack, BREACH, EMP, VÍRUS, esquiva, detecção e blecaute também. Cobertura confirmada no código.
+3. **Fácil — teste do "Invadir":** novo `scripts/e2e-invadir.mjs` (`pnpm build && pnpm e2e`): abre o jogo, clica em Invadir, confere o estado `play`, 3 itens, 3 torres, as 6 fases (chefão só na 6ª), teclas soltas no blur e zero erros. Passou 11/11. Se o Chromium do Playwright não estiver instalado: `pnpm exec playwright install chromium` ou `CHROMIUM_PATH=...`.
+4. **Médio — peso dos GLB:** `scripts/reduzir-glb.py` recomprime só as texturas embutidas (PNG 2048→1536, JPEG 2048→1024, qualidade 80); malha e ossos intactos. Os 3 chefões foram de **12,4 MB para 6,1 MB**; o `dist/` foi de 17,5 para 11,5 MiB.
+5. **Médio — chefões escuros:** o material PBR ficava quase preto na cena escura. Agora `emissiveMap = map` com `emissive = 0.55`: a própria textura emite um pouco de luz. Antes/depois conferidos por captura.
+6. **Difícil — animação de caminhada:** o Diretor-Banqueiro já trazia o clipe `walk` gravado, mas o jogo só usava o `idle`. Agora cada chefão tem `idle` + `walk` e troca com `crossFadeTo` (0,35 s) conforme anda ou está parado/congelado. Petróleo e CEO emprestam as duas (só rotações dos ossos).
+
+**Conceitos:** `AnimationMixer`/`AnimationAction`, pesos e crossfade, `emissiveMap`, recompressão de textura dentro de um `.glb` (cabeçalho + bloco JSON + bloco binário alinhado a 4 bytes), teste de ponta a ponta.
+
+**Teste:** 3 chefões com `mix`, `walk` ativo (peso 1) enquanto andam e volta ao `idle` (peso 1) ao congelar; 0 erros no console; `pnpm smoke` OK com os GLB menores. **Limite:** o balanço do brilho (0,55) e a leitura do `walk` só dá para julgar jogando.
+
+## Item T — HUD compacto (Médio)
+
+**Pedido (do teste local):** o painel de cima era grande demais e atrapalhava a visão.
+**O que mudou (`style.css`, bloco "HUD COMPACTO" no fim):** a faixa do HUD caiu de ~130 px para ~84 px (74 px sem a barra de chefão) em desktop; linha principal de 32 px, a "ameaça" saiu do painel (já aparece no briefing), "OP. SECUNDÁRIA" e "ROTA ATIVA" viraram texto sem caixa, fundo em degradê transparente e `pointer-events: none` no espaço vazio (o clique passa para o jogo). Celular mantém as regras próprias.
+**Conceitos:** CSS Grid com áreas nomeadas, especificidade (`#hud #sideRead` vence `#hud .b`), `pointer-events`, `@media (min-width: 981px)`.
+**Teste:** capturas em 1366×640 e 1100×600 (HUD 84/74 px), sem sobreposição com objetivo e rotas. **Também:** README ganhou o aviso sobre Live Server e o passo a passo do Node/pnpm no Windows.
+
+## Item U — Skin Cachos liberada desde o início (Fácil)
+
+**Pedido:** a skin Cachos aparecia bloqueada (só destravava após a 1ª vitória).
+**Correção (`script.js`, logo após a lista de skins):** se `cachos` não estiver em `progression.skins`, ela é adicionada na carga. Funciona também para quem já tinha progresso salvo no navegador. O destravamento por vitória em `end()` continua no código; para voltar a ser prêmio, basta apagar essas 3 linhas.
+**Conceito:** estado salvo no `localStorage` precisa de migração ao mudar a regra (por isso a checagem roda a cada carga, não só na primeira).
+**Teste:** skins `["capuz","vanta","cachos"]`, contador "3/3", o botão alterna Capuz → Cachos → VANTA → Capuz e a partida inicia sem erros.
+
+## Item V — Revisão da v3.9.5 "otimizada" + 2 acertos visuais (v3.9.6)
+
+**Revisado (o que veio na v3.9.5):** cache do `$()`/`getElementById` e funções `setTxt/setCls/setSty` (só mexem no DOM quando o valor muda); minimapa redesenhado a 20 quadros/s em vez de todo quadro; modelos `.bin` renomeados para `.mdl` (código, `sw.js`, smoke e arquivos consistentes); acabamento visual em CSS (vinheta + scanlines sutis, hover/active nos botões, brilho do título, fade da tela de carregamento). Validado: `pnpm install/typecheck/test` (79), `build`, `smoke` e `e2e` (11/11) passaram; as skins carregam com os `.mdl`; 0 erros.
+**Acertos:** (1) a animação de entrada do menu terminava em `transform: none` e tirava a inclinação de -1° do cartão — agora termina em `rotate(-1deg)`; (2) o painel TORRES quebrava a palavra ("TORRE/S") em ~1200 px — coluna alargada e `white-space: nowrap`.
+**Conceitos:** memoização de DOM (evitar escrita repetida e recálculo de estilo), limitação de taxa (throttle) do minimapa, `@keyframes` e o estado final com `animation-fill-mode: both`.
+**Limite:** o ganho de desempenho não foi medido aqui (WebGL por software); só dá para comparar FPS no seu aparelho.
+
+## Item W — Modos do HUD: Compacto, Mínimo e Discreto (Médio, v3.9.7)
+
+**Pedido:** as informações na tela durante o jogo ocupavam boa parte da visão do cenário.
+**O que mudou:** novo seletor "PAINEL NA TELA (HUD)" no menu (abaixo da qualidade dos efeitos). A escolha vale na hora e fica salva no `localStorage` (`anarco_hud`).
+| Modo | Altura (desktop) | O que mostra |
+|---|---|---|
+| Compacto (padrão) | 74 px | tudo, em 2 linhas (a 2ª é só texto) |
+| Mínimo | 48 px | nível, tempo, torres, hack, alerta e barra do chefão |
+| Discreto | 74 px a 50% de opacidade | igual ao compacto; fica sólido ao passar o mouse |
+**Conceitos:** atributo `data-hud` no `<body>` como "chave" de estilo (o CSS troca o layout sem tocar na lógica), CSS Grid com `grid-template-areas`, `localStorage` com valor validado, `syncHudClearance()` para reposicionar objetivo e rotas.
+**Teste:** capturas dos 3 modos em 1200×680; seletor grava e aplica; 0 erros. Os modos mudam só o desktop (≥ 981 px) quanto ao layout; no celular o painel mantém as regras próprias.
+
+## Item X — HUD lateral (Médio, v3.9.8)
+
+**Pedido:** deixar as informações de lado, e não no alto da tela, como em outros jogos.
+**O que mudou:** novo modo **Lateral**, agora o **padrão** (quem já escolheu outro modo mantém a escolha). Painel estreito (210 px) no canto esquerdo com fase, nível, tempo, torres, hack, alerta, operação secundária e barra do chefão; som/pausa vão para o canto superior direito; drones e rota ativa saem do painel. O topo e o centro ficam livres: o objetivo sobe para o topo (`syncHudClearance` zera a altura do painel nesse modo). Os modos Compacto, Mínimo e Discreto continuam no menu.
+**Conceitos:** `position: fixed` e retirada de um filho do fluxo do pai (`#hudActions`), grid de 2 colunas com áreas nomeadas, `matchMedia` no JS para o layout só de desktop, valor padrão com escolha salva por cima.
+**Teste:** captura 1200×680 (painel à esquerda, 253 px de altura, sem sobrepor botões nem minimapa), seletor grava e aplica, 79 testes e e2e passam, 0 erros. Celular continua com as regras próprias.
+
+## Item Y — HUD "Trilho fino" (Médio, v3.9.9)
+
+**Pedido:** outro design para o painel lateral, e menor.
+**O que mudou:** novo modo **Trilho fino**, agora o **padrão** (quem já escolheu outro modo mantém a escolha). Sem caixas nem fundo: só texto pequeno, números e barras de 4 px com brilho, presos a uma linha-guia ciano à esquerda. Ocupa cerca de 158 × 99 px (o lateral anterior tinha 210 × 253 px). Mostra fase, nível, tempo (só o número), torres, hack, alerta e barra do chefão (só quando há chefão). Os demais modos continuam no menu.
+**Conceitos:** especificidade de CSS (`body[data-hud] #hud #id` vence `#hud .b`), `grid-template-areas` com `grid-area` em cada filho, `font-size: 0` para esconder um rótulo sem mexer no HTML, `border-left` + `box-shadow` como linha-guia, valor salvo em `localStorage`.
+**Teste:** captura 1200 × 680 sem corte nem sobreposição, objetivo no topo livre, 0 erros no console.
+**Lição:** regra escrita depois e com mais IDs ganha. Foi isso que deixou o primeiro rascunho quebrado (textos empilhados e barras sumidas).

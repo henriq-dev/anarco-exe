@@ -1016,8 +1016,8 @@ body.blackout canvas { filter: brightness(0.55); }
   #phaseTag span, #phaseTag small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   #phaseTag small { margin-top: 2px; font-size: .57rem; }
   #sideRead span, #sideRead small, #routeRead span, #routeRead small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  #sideRead span, #routeRead span { font-size: .58rem; }
-  #sideRead small, #routeRead small { margin-top: 2px; font-size: .58rem; }
+  #hud #sideRead span, #hud #routeRead span { font-size: .58rem; }
+  #hud #sideRead small, #hud #routeRead small { margin-top: 2px; font-size: .58rem; }
 }
 @media (max-width: 360px) {
   #hud .b { font-size: .57rem; }
@@ -1028,8 +1028,8 @@ body.blackout canvas { filter: brightness(0.55); }
   #tmv { font-size: .55rem; }
   #towerRead { display: block; }
   #cnt { font-size: .67rem; }
-  #sideRead span, #routeRead span { font-size: .53rem; }
-  #sideRead small, #routeRead small { font-size: .53rem; }
+  #hud #sideRead span, #hud #routeRead span { font-size: .53rem; }
+  #hud #sideRead small, #hud #routeRead small { font-size: .53rem; }
   #obj { font-size: .64rem; }
   #routePicker button { font-size: .58rem; }
 }
@@ -1092,4 +1092,148 @@ body[data-phase="finance"] #hud { border-top: 3px solid #ff3fd0; }
   #routeRead span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   #sideRead small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #hud .b { padding-top: 4px; padding-bottom: 4px; }
+}
+
+/* ÂNCORA: HUD COMPACTO — o painel ocupava ~130 px e tapava a visão. Agora: 1 linha principal de ~34 px,
+   linha secundária só com texto (sem caixas) e fundo bem mais transparente. Celular mantém as regras próprias acima. */
+#hud {
+  background: linear-gradient(180deg, rgba(5, 7, 14, .55), rgba(5, 7, 14, 0));
+  border-bottom: 0;
+  pointer-events: none; /* o vazio entre os painéis não bloqueia o clique no jogo */
+}
+#hud .b, #hud h1, #hudActions button { pointer-events: auto; }
+#hud .b { background: rgba(5, 7, 14, .62); box-shadow: none; }
+#hud h1 { background: rgba(5, 7, 14, .62); box-shadow: none; }
+@media (min-width: 981px) {
+  #hud {
+    grid-template-columns: minmax(130px, 1fr) 76px minmax(140px, 1.2fr) 128px 118px 112px 112px 150px 84px;
+    grid-template-areas:
+      "brand level phase timer towers hack alert drone controls"
+      "side side side route route route boss boss controls";
+    gap: 4px 5px;
+    padding: calc(5px + env(safe-area-inset-top, 0px)) 10px 2px;
+  }
+  #hud h1 { min-height: 32px; padding: 2px 8px; font-size: clamp(.95rem, 1.3vw, 1.2rem); }
+  #hud .b { min-height: 32px; padding: 3px 7px; font-size: clamp(.62rem, .68vw, .74rem); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  #phaseTag { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; }
+  #phaseTag small { display: none; } /* a ameaça aparece no briefing; aqui só o nome da fase */
+  #hud .b i { flex: 1; width: auto; height: 7px; margin: 0; }
+  #hud .b img { width: 13px; height: 13px; margin-right: 2px; }
+  /* linha 2: só texto, sem caixa */
+  #hud #sideRead, #hud #routeRead { min-height: 20px; padding: 0 4px; background: none; border: 0; box-shadow: none; font-size: .68rem; gap: 6px; text-shadow: 0 1px 4px #000, 0 0 8px #000; }
+  #hud #sideRead span, #hud #routeRead span { font-size: .62rem; opacity: .85; white-space: nowrap; }
+  #hud #sideRead small, #hud #routeRead small { margin: 0; font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #hud #bb { min-height: 24px; padding: 2px 7px; }
+  #hudActions button { width: 32px; height: 32px; flex-basis: 32px; }
+}
+
+/* ===== v3.9.5 — acabamento visual ===== */
+/* vinheta neon + linhas de varredura bem sutis (não bloqueiam cliques, custo quase zero) */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(10, 4, 24, .55) 100%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px);
+  mix-blend-mode: normal;
+}
+/* botões respondem ao toque/clique */
+#touchActions button, #routePicker button, #ov button {
+  transition: transform .12s ease, filter .2s ease, box-shadow .2s ease;
+  will-change: transform;
+}
+#touchActions button:active, #routePicker button:active, #ov button:active { transform: scale(.94); }
+#ov button:hover { filter: brightness(1.15); box-shadow: 0 0 18px rgba(255, 63, 208, .45); }
+/* menu entra suavemente */
+#ov > div { animation: anarcoIn .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes anarcoIn { from { opacity: 0; transform: translateY(14px) scale(.98) rotate(-1deg); filter: blur(4px); } to { opacity: 1; transform: rotate(-1deg); filter: none; } } /* ÂNCORA: termina em rotate(-1deg) para manter a inclinação do cartão */
+/* título com brilho pulsante */
+#ot span, #hud h1 span { animation: anarcoGlow 2.4s ease-in-out infinite alternate; }
+@keyframes anarcoGlow { from { text-shadow: 0 0 6px rgba(255,63,208,.5); } to { text-shadow: 0 0 18px rgba(255,63,208,.95), 0 0 32px rgba(47,230,255,.35); } }
+/* tela de carregamento some com fade */
+#bootScreen[hidden] { display: block !important; opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s .5s; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  #ov > div, #ot span, #hud h1 span { animation: none; }
+}
+
+/* ÂNCORA: modos do HUD (body[data-hud]). "compacto" é o padrão acima; os outros só sobrescrevem o necessário. */
+@media (min-width: 981px) {
+  body[data-hud="minimo"] #hud {
+    grid-template-columns: minmax(70px, .6fr) minmax(110px, 1fr) minmax(100px, .9fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(0, 3fr) 84px;
+    grid-template-areas: "level timer towers hack alert boss controls";
+    width: auto; padding-bottom: 0;
+  }
+  body[data-hud="minimo"] #hud h1,
+  body[data-hud="minimo"] #phaseTag,
+  body[data-hud="minimo"] #drread,
+  body[data-hud="minimo"] #sideRead,
+  body[data-hud="minimo"] #routeRead { display: none; }
+}
+body[data-hud="discreto"] #hud { opacity: .5; transition: opacity .2s; }
+body[data-hud="discreto"] #hud:hover { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { body[data-hud="discreto"] #hud { transition: none; } }
+
+/* ÂNCORA: HUD LATERAL — painel estreito no canto esquerdo (desktop). Libera o topo e o centro da tela. */
+@media (min-width: 981px) {
+  body[data-hud="lateral"] #hud {
+    position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); left: 8px; right: auto; width: 210px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 0;
+    grid-template-areas: "phase phase" "level timer" "towers towers" "hack hack" "alert alert" "side side" "boss boss";
+    background: none; border: 0;
+  }
+  body[data-hud="lateral"] #hud h1,
+  body[data-hud="lateral"] #drread,
+  body[data-hud="lateral"] #routeRead { display: none; }
+  body[data-hud="lateral"] #hud .b { background: rgba(5, 7, 14, .6); }
+  body[data-hud="lateral"] #phaseTag { justify-content: flex-start; }
+  body[data-hud="lateral"] #hud #sideRead { display: block; min-height: 0; padding: 2px 4px; background: none; border: 0; }
+  body[data-hud="lateral"] #hud #sideRead span { display: block; }
+  body[data-hud="lateral"] #hud #sideRead small { display: block; white-space: normal; font-size: .64rem; }
+  body[data-hud="lateral"] #hud #bb { min-height: 28px; }
+  /* os botões de som/pausa saem do painel e vão para o canto superior direito */
+  body[data-hud="lateral"] #hudActions { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: 10px; }
+}
+
+/* ÂNCORA: HUD "TRILHO FINO" (slim) — sem caixas: só números e barras finas com brilho, numa linha guia vertical.
+   Ocupa ~150 px de largura e ~120 px de altura no canto esquerdo. */
+@media (min-width: 981px) {
+  body[data-hud="slim"] #hud {
+    position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; right: auto; width: 158px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 5px 6px; padding: 0 0 0 9px;
+    grid-template-areas: "phase phase" "level timer" "towers towers" "hack hack" "alert alert" "boss boss";
+    background: none; border: 0; border-left: 2px solid rgba(83, 246, 255, .55);
+    box-shadow: -6px 0 14px -10px rgba(83, 246, 255, .8);
+  }
+  /* ÂNCORA: 2 ids (#hud #x) para vencer a regra "#hud .b { display: flex }" que vem depois */
+  body[data-hud="slim"] #hud h1,
+  body[data-hud="slim"] #hud #drread,
+  body[data-hud="slim"] #hud #sideRead,
+  body[data-hud="slim"] #hud #routeRead { display: none; }
+  body[data-hud="slim"] #hud #bb[hidden] { display: none; }
+  body[data-hud="slim"] #hud .b {
+    min-height: 0; padding: 0; background: none; border: 0; box-shadow: none; border-radius: 0;
+    font-size: .64rem; letter-spacing: .09em; color: #cfd8ea; text-shadow: 0 1px 4px #000, 0 0 8px #000;
+    display: flex; align-items: center; gap: 6px;
+  }
+  body[data-hud="slim"] #hud #lv { grid-area: level; }
+  body[data-hud="slim"] #hud #phaseTag { grid-area: phase; }
+  body[data-hud="slim"] #hud #tm { grid-area: timer; }
+  body[data-hud="slim"] #hud #towerRead { grid-area: towers; }
+  body[data-hud="slim"] #hud #hackRead { grid-area: hack; }
+  body[data-hud="slim"] #hud #alertRead { grid-area: alert; }
+  body[data-hud="slim"] #hud #bb { grid-area: boss; }
+  body[data-hud="slim"] #hud #phaseTag span { font-size: .66rem; color: #ffe14a; letter-spacing: .12em; }
+  body[data-hud="slim"] #hud #phaseTag small { display: none; }
+  body[data-hud="slim"] #hud #lv { color: #9fb0c9; }
+  body[data-hud="slim"] #hud #tmv { font-size: .95rem; color: #fff; }
+  body[data-hud="slim"] #hud #tm { justify-content: flex-end; font-size: 0; }   /* esconde a palavra TEMPO, deixa só o número */
+  body[data-hud="slim"] #hud #tm span { font-size: .95rem; }
+  body[data-hud="slim"] #hud #towerRead { color: #ffe14a; justify-content: flex-start; }
+  body[data-hud="slim"] #hud #cnt { font-size: 1rem; }
+  body[data-hud="slim"] #hud .b i { flex: 1; height: 4px; margin: 0; border: 0; background: rgba(255, 255, 255, .14); border-radius: 2px; }
+  body[data-hud="slim"] #hud #hackRead i { box-shadow: 0 0 8px rgba(83, 246, 255, .45); }
+  body[data-hud="slim"] #hud #alertRead i { box-shadow: 0 0 8px rgba(255, 90, 80, .45); }
+  body[data-hud="slim"] #hud img { width: 12px; height: 12px; margin: 0; }
+  body[data-hud="slim"] #hud #bb { color: #ff3fd0; }
+  body[data-hud="slim"] #hudActions { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: 10px; }
+  body[data-hud="slim"] #hudActions button { width: 28px; height: 28px; flex-basis: 28px; opacity: .8; }
 }

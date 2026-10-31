@@ -12,7 +12,9 @@ pnpm build        # gera a pasta dist/ (typecheck + vite + cópia dos assets + l
 pnpm smoke        # depois do build: confere os arquivos da dist/
 ```
 Para ver o build pronto: `python3 -m http.server 4173 --directory dist` e abrir `http://localhost:4173`.
-Não abra o `index.html` com duplo clique (precisa de servidor).
+Não abra o `index.html` da raiz com duplo clique nem com o Live Server: ele é o código-fonte (chama `src/anarco-entry.ts`, TypeScript) e só funciona via `pnpm dev` ou depois do `pnpm build` (use a pasta `dist/`).
+
+No Windows (PowerShell), se o `npm` reclamar de scripts desabilitados: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. É preciso ter o Node.js LTS (nodejs.org) e depois `npm install -g pnpm`.
 
 ## Subir no GitHub e publicar na Vercel
 1. Crie a branch de backup do repositório atual (ex.: `backup-v3.4`).

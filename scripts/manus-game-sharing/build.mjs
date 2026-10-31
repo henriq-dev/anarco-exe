@@ -4,9 +4,9 @@ import { basename } from 'node:path'
 import { assembleThreejsShareSite, GameSharingValidationError } from './metadata.mjs'
 
 // Publication metadata is public project content; no runtime credentials are embedded here.
-const publicationOrigin = "https://anarcoexe-pnjqsomb.manus.game"
+const publicationOrigin = "https://anarco37-kh3ylkgr.manus.game"
 const outputDirectory = "dist"
-const projectTitle = "ANARCO.EXE 3D — Breach Protocol"
+const projectTitle = "ANARCO.EXE — v3.7 Neon Effects & Advanced Combat FX"
 // Run the original script through the invoking package manager, preserving argument quoting.
 const packageManager = process.env.npm_execpath
 if (!packageManager) throw new Error('Run sharing through the package.json build script')

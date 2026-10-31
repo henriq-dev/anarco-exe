@@ -1,16 +1,16 @@
 {
   "name": "anarco-exe-3d",
   "private": true,
-  "version": "3.9.0",
+  "version": "3.9.9",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/manus-game-assets/restore.mjs && vite",
-    "build": "node scripts/manus-game-assets/restore.mjs && node scripts/manus-game-sharing/build.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/copy-game-assets.mjs && node scripts/check-size.mjs",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "manus:build-source": "tsc --noEmit && vite build && node scripts/copy-game-assets.mjs && node scripts/check-size.mjs"
+    "e2e": "node scripts/e2e-invadir.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

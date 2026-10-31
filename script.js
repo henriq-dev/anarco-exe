@@ -38,11 +38,26 @@ if (location.protocol === "file:") {
   document.body.append(av);
 }
 const T = THREE,
-  $ = (id) => document.getElementById(id);
+  $cache = new Map(),
+  $ = (id) => {
+    // OTIMIZAÇÃO: guarda o elemento e só procura de novo se ele saiu da página
+    let el = $cache.get(id);
+    if (!el || !el.isConnected) {
+      el = document.getElementById(id);
+      if (el) $cache.set(id, el);
+    }
+    return el;
+  };
+// OTIMIZAÇÃO: só mexe na página quando o valor muda (evita recalcular estilos a cada quadro)
+const setTxt = (el, v) => { if (el && el.__t !== v) { el.__t = v; el.textContent = v; } };
+const setCls = (el, c, on) => { if (!el) return; const k = "__c_" + c; if (el[k] !== on) { el[k] = on; el.classList.toggle(c, on); } };
+const setSty = (el, prop, v) => { if (el) { const k = "__s_" + prop; if (el[k] !== v) { el[k] = v; el.style[prop] = v; } } };
 function syncHudClearance() {
   const hud = $("hud"), obj = $("obj"), routes = $("routePicker");
   if (!hud || !obj || !routes) return;
-  const hudBottom = Math.ceil(hud.getBoundingClientRect().bottom);
+  // ÂNCORA: no modo lateral o painel fica na esquerda (desktop) e o topo da tela fica livre para o objetivo
+  const lateral = ["lateral", "slim"].includes(document.body.dataset.hud) && matchMedia("(min-width: 981px)").matches;
+  const hudBottom = lateral ? 0 : Math.ceil(hud.getBoundingClientRect().bottom);
   const objHeight = Math.max(30, Math.ceil(obj.getBoundingClientRect().height));
   const objTop = hudBottom + 8;
   const routeTop = objTop + objHeight + 8;
@@ -273,22 +288,16 @@ function winTex(h) {
   t.magFilter = T.NearestFilter;
   return t;
 }
-const bldGeometry = new T.BoxGeometry(1, 1, 1);
-const bldMaterials = new Map();
 function bld(w, h, d, tex) {
-  let material = bldMaterials.get(tex);
-  if (!material) {
-    material = new T.MeshStandardMaterial({
+  return new T.Mesh(
+    new T.BoxGeometry(w, h, d),
+    new T.MeshStandardMaterial({
       color: 0x151518,
       emissive: 0xffffff,
       emissiveMap: tex,
       emissiveIntensity: 0.9,
-    });
-    bldMaterials.set(tex, material);
-  }
-  const mesh = new T.Mesh(bldGeometry, material);
-  mesh.scale.set(w, h, d);
-  return mesh;
+    }),
+  );
 }
 
 // skyline
@@ -416,7 +425,7 @@ let model = null,
   won = false,
   hacking = false,
   wob = 0;
-// ÂNCORA: formato do arquivo assets/models/anarco.bin (tudo em sequência, sem separadores):
+// ÂNCORA: formato do arquivo assets/models/anarco.mdl (tudo em sequência, sem separadores):
 //   [posições Int16 x3 por vértice] [índices Uint16 x3 por triângulo] [cores Uint8 x3 por vértice]
 const RIM_FORCA = 0.75; // intensidade do contorno neon (0 desliga)
 // ===== SKINS DO PERSONAGEM =====
@@ -427,7 +436,7 @@ const SKINS = {
   capuz: {
     nome: "Capuz",
     escala: 1.15, // tamanho (1 = original)
-    arq: "assets/models/anarco.bin",
+    arq: "assets/models/anarco.mdl",
     n: 24953,
     f: 50000,
     ossos: [
@@ -461,7 +470,7 @@ const SKINS = {
   cachos: {
     nome: "Cachos",
     escala: 1.05, // a cabeça grande já ocupa muito espaço na tela
-    arq: "assets/models/cachos.bin",
+    arq: "assets/models/cachos.mdl",
     n: 22351,
     f: 45000,
     ossos: [
@@ -505,6 +514,9 @@ progression.wins = Number.isFinite(progression.wins) ? progression.wins : 0;
 progression.skins = Array.isArray(progression.skins) ? progression.skins.filter((id) => SKINS[id]) : ["capuz", "vanta"];
 if (!progression.skins.includes("capuz")) progression.skins.unshift("capuz");
 if (!progression.skins.includes("vanta")) progression.skins.push("vanta");
+// ÂNCORA: CACHOS agora já vem liberada desde a 1ª partida (antes só destravava após a 1ª vitória).
+// Para voltar a ser prêmio de vitória: apague esta linha (o destravamento em end() continua lá).
+if (SKINS.cachos && !progression.skins.includes("cachos")) progression.skins.push("cachos");
 const saveProgress = () => guardar(PROGRESS_KEY, JSON.stringify(progression));
 function applyRewardCosmetic() {
   document.body.dataset.reward = progression.wins >= 3 ? "glitch" : progression.wins >= 2 ? "neon" : "base";
@@ -708,7 +720,7 @@ P.add(lapG);
 const HACK_ANG = Math.PI / 2, LAP_POS = [0, 0.02, 1.05], LAP_ROT = 3.84, LAP_TAM = 1.3;
 const LAP_N = 10764, LAP_F = 20000, LAP_ESCALA = 1.0;
 let lapEsc = 0; // escala atual do "pop" ao abrir (0 -> 1)
-fetch("assets/models/laptop.bin")
+fetch("assets/models/laptop.mdl")
   .then((r) => r.arrayBuffer())
   .then((buf) => {
     if (buf.byteLength !== LAP_N * 10 + LAP_F * 6) throw new Error("laptop.bin com tamanho inesperado");
@@ -972,6 +984,10 @@ function updatePlayerFx(dt) {
 
 // input
 const keys = {};
+// ÂNCORA: se a janela perde o foco (ou a aba some), o "soltar tecla" nunca chega — então zeramos tudo, senão o personagem anda sozinho
+const soltarTeclas = () => Object.keys(keys).forEach((k) => (keys[k] = 0));
+addEventListener("blur", soltarTeclas);
+document.addEventListener("visibilitychange", () => document.hidden && soltarTeclas());
 addEventListener("keydown", (e) => (keys[e.key.toLowerCase()] = 1));
 addEventListener("keyup", (e) => (keys[e.key.toLowerCase()] = 0));
 let jx = 0,
@@ -1163,6 +1179,7 @@ function end(win) {
   state = "over";
   won = win;
   sfx(win ? "win" : "lose");
+  buzz(win ? [60, 40, 60, 40, 140] : [160, 70, 220]); // vitória: vibração em "ta-ta-TÁ"; derrota: longa e grave
   mini = null;
   $("mini").hidden = true;
   $("msg").textContent = "";
@@ -1658,8 +1675,6 @@ gr.position.set(0, 0.03, 20);
 S.add(gr);
 const mc = $("map").getContext("2d"),
   MK = 130 / 74;
-let mapRefreshT = 0;
-let hudRefreshT = 0;
 function drawMap() {
   sign.material.opacity = 0.85 + Math.sin(time * 3) * 0.1;
   mc.clearRect(0, 0, 130, 130);
@@ -2083,7 +2098,7 @@ function applyLevel() {
     t.h = r ? 10 : b[2];
     t.n = r ? NAMES[i] : b[3];
     t.mesh.visible = t.ring.visible = t.wave.visible = !bs;
-    t.mesh.scale.set(6, t.h, 6);
+    t.mesh.scale.y = t.h / b[2];
     t.mesh.position.set(t.x, t.h / 2, t.z);
     t.ring.position.set(t.x, 0.06, t.z);
     t.wave.position.set(t.x, 0.1, t.z);
@@ -2187,7 +2202,7 @@ const BOSS = [
 ];
 const BOSS_MODEL_URLS = globalThis.BOSS_MODEL_URLS || {};
 const BossGLTFLoader = globalThis.GLTFLoader;
-let bossIdleCache = null; // animação "idle" compartilhada entre chefões
+let bossClips = null; // clipes idle/walk do banqueiro, compartilhados entre chefões
 function clearBossHazards() {
   bossHazards.forEach((h) => S.remove(h.g));
   bossHazards = [];
@@ -2356,28 +2371,10 @@ function updateBossHazards(dt) {
     bossTelegraph = null;
   }
 }
-function disposeSceneObject(root) {
-  if (!root) return;
-  root.traverse((object) => {
-    if (object.geometry) object.geometry.dispose();
-    if (!object.material) return;
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach((material) => {
-      ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "alphaMap"].forEach((key) => {
-        if (material[key] && material[key].dispose) material[key].dispose();
-      });
-      material.dispose();
-    });
-  });
-}
 function spawnBoss(i) {
   const c = BOSS[i];
   clearBossHazards();
-  if (boss) {
-    S.remove(boss.g, boss.disc);
-    disposeSceneObject(boss.g);
-    disposeSceneObject(boss.disc);
-  }
+  if (boss) S.remove(boss.g, boss.disc);
   const g = new T.Group();
   g.add(
     new T.Mesh(
@@ -2436,32 +2433,44 @@ function spawnBoss(i) {
         if (o.isMesh) {
           o.castShadow = fxSystem.effectiveQuality === "high";
           o.receiveShadow = fxSystem.effectiveQuality === "high";
+          // ÂNCORA: os chefões ficavam quase pretos na cena escura. Fazemos a própria textura emitir um pouco de luz
+          // (emissiveMap = a cor do material), assim o rosto e as roupas aparecem sem "estourar" o brilho.
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+            if (m && m.map) {
+              m.emissiveMap = m.map;
+              m.emissive.setScalar(0.55);
+              m.needsUpdate = true;
+            }
+          });
         }
       });
       g.add(art);
-      if (res.animations && res.animations.length) {
+      // ÂNCORA: cada chefão tem 2 ações, "idle" (parado) e "walk" (andando), trocadas com crossFade conforme ele se move.
+      // O banqueiro traz as duas gravadas; petróleo e CEO têm o mesmo esqueleto e EMPRESTAM só as tracks de ROTAÇÃO
+      // (posição/escala deformariam o corpo diferente).
+      const achar = (anims, nome) => anims.find((c) => c.name.toLowerCase().includes(nome));
+      const montar = (idle, walk, soRotacao) => {
+        if (!boss || boss.g !== g || !idle) return;
+        const prep = (clip, nome) => (soRotacao ? new T.AnimationClip(nome, clip.duration, clip.tracks.filter((t) => t.name.endsWith(".quaternion"))) : clip);
         const mixer = new T.AnimationMixer(art);
-        const idle = res.animations.find((clip) => clip.name.toLowerCase().includes("idle")) || res.animations[0];
-        mixer.clipAction(idle).play();
+        const aIdle = mixer.clipAction(prep(idle, "idle-emprestado"));
+        const aWalk = walk ? mixer.clipAction(prep(walk, "walk-emprestado")) : null;
+        aIdle.play();
+        if (aWalk) { aWalk.play(); aWalk.setEffectiveWeight(0); }
         g.userData.mixer = mixer;
-        bossIdleCache = bossIdleCache || idle; // ÂNCORA: guarda o "idle" do banqueiro para os outros chefões
-      } else {
-        // ÂNCORA: petróleo e CEO têm o mesmo esqueleto, mas nenhuma animação gravada.
-        // Emprestamos o "idle" do banqueiro: só as tracks de ROTAÇÃO dos ossos (posição/escala deformariam o corpo diferente).
-        const emprestar = (clip) => {
-          if (!boss || boss.g !== g || !clip) return;
-          const rot = new T.AnimationClip("idle-emprestado", clip.duration, clip.tracks.filter((t) => t.name.endsWith(".quaternion")));
-          const mixer = new T.AnimationMixer(art);
-          mixer.clipAction(rot).play();
-          g.userData.mixer = mixer;
-        };
-        if (bossIdleCache) emprestar(bossIdleCache);
-        else
-          new BossGLTFLoader().load(BOSS_MODEL_URLS.banqueiro, (r2) => {
-            bossIdleCache = r2.animations.find((c2) => c2.name.toLowerCase().includes("idle")) || r2.animations[0];
-            emprestar(bossIdleCache);
-          });
-      }
+        g.userData.acoes = { idle: aIdle, walk: aWalk, andando: false };
+      };
+      if (res.animations && res.animations.length) {
+        const idle = achar(res.animations, "idle") || res.animations[0];
+        const walk = achar(res.animations, "walk");
+        bossClips = bossClips || { idle, walk }; // guarda para os outros chefões
+        montar(idle, walk, false);
+      } else if (bossClips) montar(bossClips.idle, bossClips.walk, true);
+      else
+        new BossGLTFLoader().load(BOSS_MODEL_URLS.banqueiro, (r2) => {
+          bossClips = bossClips || { idle: achar(r2.animations, "idle") || r2.animations[0], walk: achar(r2.animations, "walk") };
+          montar(bossClips.idle, bossClips.walk, true);
+        });
       g.children.slice(0, 3).forEach((o) => (o.visible = false));
       g.userData.art = art;
     }, undefined, () => undefined);
@@ -2488,8 +2497,6 @@ function hitBoss(d) {
   sfx("win");
   clearBossHazards();
   S.remove(boss.g, boss.disc);
-  disposeSceneObject(boss.g);
-  disposeSceneObject(boss.disc);
   boss = null;
   bi++;
   if (bi >= BOSS.length) {
@@ -2724,18 +2731,18 @@ function fxTick(dt) {
     dodgeT = Math.max(0, dodgeT - dt);
   }
   const hx = $("hx"), vx = $("vx"), gx = $("gx"), dg = $("dg");
-  hx.textContent = empCd > 0 ? "EMP · " + Math.ceil(empCd) + "s" : "EMP · E";
-  vx.textContent = virusCd > 0 ? "VÍRUS · " + Math.ceil(virusCd) + "s" : "VÍRUS · Q";
-  hx.classList.toggle("cooldown", empCd > 0);
-  vx.classList.toggle("cooldown", virusCd > 0);
-  hx.classList.toggle("ready", empCd <= 0 && state === "play");
-  vx.classList.toggle("ready", virusCd <= 0 && state === "play");
-  gx.textContent = skinAtual === "vanta" ? (ghostCd > 0 ? "NÓ · " + Math.ceil(ghostCd) + "s" : "NÓ FANTASMA · R") : "NÓ · VANTA";
-  gx.classList.toggle("cooldown", ghostCd > 0 || skinAtual !== "vanta");
-  gx.classList.toggle("ready", ghostCd <= 0 && skinAtual === "vanta" && state === "play");
-  dg.textContent = dodgeCd > 0 ? "ESQUIVA · " + Math.ceil(dodgeCd) + "s" : "ESQUIVA · C";
-  dg.classList.toggle("cooldown", dodgeCd > 0);
-  dg.classList.toggle("ready", dodgeCd <= 0 && state === "play");
+  setTxt(hx, empCd > 0 ? "EMP · " + Math.ceil(empCd) + "s" : "EMP · E");
+  setTxt(vx, virusCd > 0 ? "VÍRUS · " + Math.ceil(virusCd) + "s" : "VÍRUS · Q");
+  setCls(hx, "cooldown", empCd > 0);
+  setCls(vx, "cooldown", virusCd > 0);
+  setCls(hx, "ready", empCd <= 0 && state === "play");
+  setCls(vx, "ready", virusCd <= 0 && state === "play");
+  setTxt(gx, skinAtual === "vanta" ? (ghostCd > 0 ? "NÓ · " + Math.ceil(ghostCd) + "s" : "NÓ FANTASMA · R") : "NÓ · VANTA");
+  setCls(gx, "cooldown", ghostCd > 0 || skinAtual !== "vanta");
+  setCls(gx, "ready", ghostCd <= 0 && skinAtual === "vanta" && state === "play");
+  setTxt(dg, dodgeCd > 0 ? "ESQUIVA · " + Math.ceil(dodgeCd) + "s" : "ESQUIVA · C");
+  setCls(dg, "cooldown", dodgeCd > 0);
+  setCls(dg, "ready", dodgeCd <= 0 && state === "play");
   // ÂNCORA: botão mostra os segundos restantes; ao zerar, avisa que está pronto (som + brilho)
   const txt = bz > 0 ? "BREACH · " + Math.ceil(bz) + "s" : "BREACH · Espaço";
   if (txt !== bzShown) {
@@ -2751,9 +2758,8 @@ function fxTick(dt) {
   bzAntes = bz;
   if (castT > 0) castT -= dt;
   const cd = LV[lvl].boss ? 6 : 10;
-  $("bz").style.background =
-    bz > 0 ? `linear-gradient(90deg,#7a2b8e ${(1 - bz / cd) * 100}%,#141414 0)` : "#ff3fd0";
-  $("bz").style.color = bz > 0 ? "#bbb" : "#141414";
+  setSty($("bz"), "background", bz > 0 ? `linear-gradient(90deg,#7a2b8e ${Math.round((1 - bz / cd) * 100)}%,#141414 0)` : "#ff3fd0");
+  setSty($("bz"), "color", bz > 0 ? "#bbb" : "#141414");
   // ÂNCORA: o canvas da chuva só trabalha enquanto há chuva ou rastro; depois limpa uma vez e fica parado
   if (rainT > 0) chuvaFade = 1.5;
   if (chuvaFade > 0) {
@@ -2792,6 +2798,7 @@ function ajustarResolucao(dtReal) {
   // Janela móvel de 90 quadros: reduz primeiro o preset de FX e depois a resolução.
   if (fxSystem) fxSystem.samplePerformance(dtReal, state === "play");
 }
+let mapAcc = 1;
 function loop() {
   requestAnimationFrame(loop);
   const rawDt = Math.min(clock.getDelta(), 0.05);
@@ -2800,9 +2807,6 @@ function loop() {
     dtReal = Math.min((agora - ultimoQuadro) / 1000, 1);
   ultimoQuadro = agora;
   ajustarResolucao(dtReal);
-  hudRefreshT -= dtReal;
-  const refreshHud = hudRefreshT <= 0;
-  if (refreshHud) hudRefreshT = 1 / 12;
   if (state === "pause") {
     fxSystem.render();
     return;
@@ -3042,11 +3046,9 @@ function loop() {
     const priority = ["detected", "chase", "virus", "frozen", "patrol"];
     const drState = priority.find((kind) => activeDrones.some((d) => d.state === kind)) || "patrol";
     const drLabels = { detected: "DETECCAO", chase: "PERSEGUICAO", virus: "VIRUS", frozen: "CONGELADOS", patrol: "PATRULHA" };
-    if (refreshHud) {
-      $("drstate").textContent = drLabels[drState];
-      $("sideRead").title = sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase();
-      $("drread").style.color = drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00";
-    }
+    $("drstate").textContent = drLabels[drState];
+    $("sideRead").title = sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase();
+    $("drread").style.color = drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00";
     bossIn = false;
     if (boss) {
       const b = boss,
@@ -3062,6 +3064,16 @@ function loop() {
       if (b.fz <= 0 && b.atkT <= 0) {
         startBossAttack(b);
         b.atkT = Math.max(2.8, 4.8 - bi * 0.45);
+      }
+      const ac = b.g.userData.acoes;
+      if (ac && ac.walk) {
+        const andando = b.fz <= 0 && dd > 1.5; // mesma condição do movimento acima
+        if (andando !== ac.andando) {
+          ac.andando = andando;
+          const [de, para] = andando ? [ac.idle, ac.walk] : [ac.walk, ac.idle];
+          para.reset().setEffectiveWeight(1).play();
+          de.crossFadeTo(para, 0.35, false);
+        }
       }
       if (b.g.userData.mixer) b.g.userData.mixer.update(dt);
       b.g.position.y = 0.22 + Math.sin(time * 2.4) * 0.08;
@@ -3094,7 +3106,7 @@ function loop() {
     const bossAlertScale = bossIn ? boss?.cfg.model === "petroleo" ? 0.65 : 1.5 : 1;
     const routeAlert = inside && !grace ? 1.5 * bossAlertScale * tune.alertGain : -0.6 * tune.alertRecovery;
     alert_ = Math.max(0, Math.min(1, alert_ + routeAlert * dt));
-    if (refreshHud) $("al").style.width = alert_ * 100 + "%";
+    $("al").style.width = alert_ * 100 + "%";
     if (alert_ > 0.5 && alertAnt <= 0.5) {
       runStats.alerts++;
       buzz(34);
@@ -3123,11 +3135,11 @@ function loop() {
         t.glitch = Math.max(t.glitch, 0.15);
       } else if (!t.done) t.p = Math.max(0, t.p - dt * 0.5);
     });
-    if (refreshHud) $("hk").style.width = (near ? near.p * 100 : 0) + "%";
+    $("hk").style.width = (near ? near.p * 100 : 0) + "%";
     hacking = !!near;
     if (mini) {
       mini.left -= dt;
-      if (refreshHud) $("mt").style.width = Math.max(0, (mini.left / LV[lvl].t) * 100) + "%";
+      $("mt").style.width = Math.max(0, (mini.left / LV[lvl].t) * 100) + "%";
       if (mini.left <= 0) {
         const t = mini.t;
         mini = null;
@@ -3158,9 +3170,9 @@ function loop() {
     lapG.rotation.y = LAP_ROT;
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
-      if (refreshHud) $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
+      $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
       if (near.p >= 1 && !mini) startMini(near);
-    } else if (cnt < 3 && !shake && refreshHud)
+    } else if (cnt < 3 && !shake)
       $("msg").textContent = inside ? "Drone te viu! Saia da luz." : noteT > 0 ? note : "";
     updObjective();
     if (endT > 0) {
@@ -3227,11 +3239,8 @@ function loop() {
     phase: (PHASE_THEME[lvl] || PHASE_THEME[0]).key,
   });
   fxTick(dt);
-  mapRefreshT -= rawDt;
-  if (mapRefreshT <= 0) {
-    mapRefreshT = state === "play" ? 1 / 12 : 1 / 8;
-    drawMap();
-  }
+  mapAcc += rawDt;
+  if (mapAcc >= 0.05) { mapAcc = 0; drawMap(); }
   fxSystem.render();
 }
 C.position.set(0, 14, 36);
@@ -3470,6 +3479,20 @@ $("pzm").onclick = () => {
   $("ov").style.display = "flex";
 };
 
+
+/* ÂNCORA: modo do HUD (lateral / compacto / mínimo / discreto) — o CSS lê body[data-hud]; a escolha fica no localStorage */
+(function () {
+  const sel = document.getElementById("hudMode");
+  const validos = ["slim", "lateral", "compacto", "minimo", "discreto"];
+  const salvo = ler("anarco_hud");
+  const aplicar = (m) => {
+    document.body.dataset.hud = m;
+    if (sel) sel.value = m;
+    syncHudClearance(); // reposiciona objetivo/rotas conforme a nova altura do painel
+  };
+  aplicar(validos.includes(salvo) ? salvo : "slim"); // padrão novo: trilho fino lateral
+  if (sel) sel.onchange = () => { aplicar(sel.value); guardar("anarco_hud", sel.value); };
+})();
 
 /* ÂNCORA: registra o service worker (app instalável e offline). Só em http/https; falha em silêncio. */
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
