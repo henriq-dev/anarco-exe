@@ -35,6 +35,8 @@ WASD/setas movem · Shift corre · Espaço = BREACH · E = EMP · Q = VÍRUS · 
 ## Upgrade v4.0.0 — Vigilância Total
 A torre Vigilância Total Corp. agora tem blindagem modular, antena de datacenter e placa identificadora. Ao entrar no raio de hack, um uplink ciano contextual mostra conexão, extração, autenticação root e comprometimento; o fluxo de partículas acompanha o progresso e glitcha em magenta quando a sequência falha. Em telas touch, a interface compacta fica acima do minigame sem bloquear os controles. A chuva de códigos do BREACH fica ativa por padrão no desktop, inclusive com movimento reduzido; no menu, escolha Ativa, Automática ou Desativada. O pacote inclui uma trilha cyberpunk instrumental e quatro efeitos originais (conexão, fluxo de dados, erro e acesso root), armazenados localmente e compatíveis com o mute e o funcionamento offline.
 
+A abertura do terminal apresenta CAPUZ e a operação BREACH em uma sequência cinematográfica, com emblema ASCII original ANARCO.EXE // CAPUZ, digitação acelerada, bip de inicialização e cliques retro de teclado. Os sons são discretos e respeitam o botão Mudo.
+
 ## Documentação
 - `docs/RELATORIO-historico-A-a-P.md` — nossos relatórios (itens A a P, mais o item Q da mescla v3.9).
 - `docs/relatorios-v3.6-a-v3.8/` — relatórios e evidências da linha v3.6 → v3.8.

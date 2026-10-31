@@ -9,6 +9,9 @@
 - Trilha instrumental cyberpunk original (aprox. 118 s) em loop e quatro efeitos locais: conexão, fluxo de dados, erro de sequência e acesso root. Os sons usam o barramento/master existente e respeitam o mute; a síntese original permanece como fallback.
 - Os cinco MP3 entram no pré-cache do service worker para uso offline após a primeira visita.
 - A chuva de códigos do especial BREACH fica ativada por padrão no desktop. O menu oferece `Ativa`, `Automática` (respeita a preferência do sistema) e `Desativada`, com escolha persistente; o modo explícito permite ver os códigos mesmo quando o sistema solicita movimento reduzido.
+- A introdução em terminal foi reescrita como uma abertura cinematográfica sobre CAPUZ, as três torres e a operação BREACH, mantendo a estética verde e a digitação progressiva.
+- O terminal ganhou um emblema ASCII original `ANARCO.EXE // CAPUZ`, responsivo, e a velocidade de digitação passou de 15 ms para 5 ms por caractere.
+- A introdução toca um bip curto de inicialização e cliques digitais espaçados enquanto o texto aparece; os efeitos são sintetizados pelo Web Audio e passam pelo master existente, respeitando o botão Mudo.
 
 ## Capturas do fluxo
 
@@ -24,6 +27,14 @@ Chuva de códigos visível após ativar BREACH no desktop:
 
 ![Efeito de chuva de código no desktop](capturas/v4.0.0-breach-desktop.png)
 
+Nova abertura hacker com emblema ASCII no desktop:
+
+![Terminal ANARCO.EXE CAPUZ desktop](capturas/v4.0.0-intro-desktop.png)
+
+Emblema ASCII e narração ajustados à largura do celular:
+
+![Terminal ANARCO.EXE CAPUZ mobile](capturas/v4.0.0-intro-mobile.png)
+
 ## Arquivos centrais alterados
 
 `index.html`, `style.css`, `script.js`, `public/sw.js`, `scripts/smoke.mjs`, `scripts/e2e-invadir.mjs`, `README.md`, `package.json`, documentação e `assets/audio/*.mp3`. As regras centrais de movimento, progressão, controles, ranking e demais fases permanecem no runtime existente.
@@ -36,6 +47,6 @@ Chuva de códigos visível após ativar BREACH no desktop:
 | `pnpm test` | 12 arquivos; 79 testes aprovados |
 | `pnpm build` | Aprovado; typecheck, Vite, cópia dos assets e limite de tamanho |
 | `pnpm smoke` | Aprovado; 39 arquivos estáticos, modelos e áudio local na `dist/` |
-| `CHROMIUM_PATH=/usr/bin/chromium pnpm e2e` | Aprovado; seis fases, chuva BREACH com movimento reduzido, conexão/progresso/root, falha magenta, áudio, reflow mobile, botões touch e ausência de erros JS/HTTP |
+| `CHROMIUM_PATH=/usr/bin/chromium pnpm e2e` | Aprovado; emblema e narração da introdução, mixer de bip/cliques com mute, seis fases, chuva BREACH com movimento reduzido, conexão/progresso/root, falha magenta, áudio, reflow mobile, botões touch e ausência de erros JS/HTTP |
 
 A compilação mantém somente o aviso conhecido do script clássico legado `assets/dados/manifesto.js`, intencional no projeto. O breakpoint mobile foi exercitado em Chromium touch a 390 × 844 px; não substitui a verificação em aparelhos físicos. Os MP3 são pré-cacheados pelo service worker, portanto a disponibilidade offline ocorre após a primeira instalação/cache.

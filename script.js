@@ -1481,23 +1481,67 @@ function hackDone(t) {
   }
 }
 function introTerm(done) {
+  const logo = [
+    "                 .-=================-.",
+    "              .-'   /\\   /\\   /\\     '-.",
+    "            .'     /##\\ /##\\ /##\\       '.",
+    "           /      |####|####|####|        \\",
+    "          ;       |##  ANARCO  ##|         ;",
+    "          |       |##   .EXE    ##|        |",
+    "          |       |### [CAPUZ] ###|        |",
+    "          ;        \\#############/         ;",
+    "           \\        '-----------'         /",
+    "            '.   // REDE CLANDESTINA  .'",
+    "              '-._________________.-'",
+  ];
   const L = [
-    "> conectando a rede anonima...",
-    "> identidade: BRECH",
-    "> hacker de periferia, 19 anos.",
-    "> as corporacoes vigiam, lucram e mentem.",
-    "> missao: invadir os servidores e vazar a verdade.",
-    "> cuidado com os drones. correr faz barulho.",
-    "> boa sorte. a escolha final sera sua.",
+    "> 03:17:09 // DISTRITO FINANCEIRO",
+    "> luzes acesas. ruas vazias.",
+    "> a cidade dorme. as câmeras, não.",
+    "> CAPUZ // sinal clandestino ativo.",
+    "> três torres mantêm a vigilância em pé.",
+    "> drones fechando o perímetro.",
+    "> derrube os núcleos. libere os arquivos.",
+    "> quando o alerta tocar... desapareça.",
+    "> OPERAÇÃO BREACH // INICIANDO",
   ];
   const o = document.createElement("div");
-  o.style.cssText =
-    "position:fixed;inset:0;z-index:9999;background:#000;color:#39ff6a;font:18px 'Special Elite',monospace;padding:8vh 8vw;white-space:pre-wrap;cursor:pointer;line-height:1.6";
+  o.setAttribute("aria-label", "Terminal clandestino CAPUZ — clique ou pressione qualquer tecla para iniciar");
+  o.style.cssText = "position:fixed;inset:0;z-index:9999;overflow:auto;display:grid;place-items:center;box-sizing:border-box;padding:5vh 5vw;background:radial-gradient(ellipse at 50% 42%,#071509 0%,#020603 48%,#000 100%);color:#48ff72;font:clamp(12px,2vw,18px)/1.45 'Special Elite',monospace;cursor:pointer";
+  const shell = document.createElement("div");
+  shell.style.cssText = "box-sizing:border-box;width:min(900px,100%);padding:clamp(16px,4vw,38px);border-left:2px solid #39ff6a;background:linear-gradient(90deg,#07120b88,transparent 78%);box-shadow:-12px 0 36px #39ff6a16";
+  const tag = document.createElement("div");
+  tag.textContent = "// ANARCO.EXE :: NODE 03 // ACESSO NÃO AUTORIZADO";
+  tag.style.cssText = "margin-bottom:12px;color:#2fe6ff;font-size:.72em;letter-spacing:.12em;text-shadow:0 0 10px #2fe6ff88";
+  const art = document.createElement("pre");
+  art.textContent = logo.join("\n");
+  art.style.cssText = "overflow:hidden;margin:0 0 22px;color:#55ff78;font:clamp(7px,2vw,12px)/1.08 monospace;text-shadow:0 0 9px #39ff6a99;white-space:pre;user-select:none";
+  const readout = document.createElement("pre");
+  readout.setAttribute("aria-live", "polite");
+  readout.style.cssText = "min-height:12em;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#a7ffb9;text-shadow:0 0 7px #39ff6a44";
+  const prompt = document.createElement("div");
+  prompt.textContent = "[ CLIQUE OU PRESSIONE UMA TECLA PARA ENTRAR ]";
+  prompt.style.cssText = "margin-top:18px;color:#2fe6ff;font-size:.78em;letter-spacing:.08em;animation:introCursor 1s steps(2,start) infinite";
+  const style = document.createElement("style");
+  style.textContent = "@keyframes introCursor{to{opacity:.35}}@media(max-width:520px){.anarco-intro-tag{letter-spacing:.04em}}";
+  tag.classList.add("anarco-intro-tag");
+  shell.append(tag, art, readout);
+  o.append(style, shell);
   document.body.appendChild(o);
-  let i = 0,
-    c = 0,
-    fin = false,
-    txt = "";
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  if (actx) {
+    if (actx.state === "suspended") actx.resume().catch(() => {});
+    ensureAudioLayers();
+    if (audioLayers) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.04);
+    sfx("ready");
+  }
+  const fullText = L.join("\n");
+  const startAt = performance.now();
+  let shown = 0,
+    lastKeySoundAt = -Infinity,
+    fin = false;
   const end = () => {
     if (fin) return;
     fin = true;
@@ -1506,22 +1550,21 @@ function introTerm(done) {
     done();
   };
   const t = setInterval(() => {
-    if (i >= L.length) {
+    const elapsed = performance.now() - startAt;
+    shown = Math.min(fullText.length, Math.floor(elapsed / 5));
+    readout.textContent = fullText.slice(0, shown) + (shown < fullText.length ? "█" : "");
+    if (shown > 0 && elapsed - lastKeySoundAt >= 65) {
+      sfx("terminal", Math.floor(shown / 3));
+      lastKeySoundAt = elapsed;
+    }
+    if (shown >= fullText.length) {
       clearInterval(t);
-      o.innerHTML = txt + "\n\n<b>[ clique ou aperte qualquer tecla ]</b>";
-      return;
+      shell.appendChild(prompt);
     }
-    txt += L[i][c++] || "";
-    if (c > L[i].length) {
-      txt += "\n";
-      i++;
-      c = 0;
-    }
-    o.textContent = txt + "█";
-  }, 15);
+  }, 24);
   o.onclick = end;
   addEventListener("keydown", function k() {
-    if (i >= L.length || fin) {
+    if (shown >= fullText.length || fin) {
       removeEventListener("keydown", k);
       end();
     }
@@ -2080,6 +2123,10 @@ function sfx(n, i) {
     src.start(t + at);
   };
   if (n === "tick") tone(1200, 0.04, "square", 0.03);
+  else if (n === "terminal") {
+    noise(0.014, 0.025, 4200);
+    tone(1050 + ((i || 0) % 5) * 85, 0.018, "square", 0.016, 0.002);
+  }
   else if (n === "ready") {
     tone(660, 0.07, "triangle", 0.05);
     tone(990, 0.1, "triangle", 0.05, 0.06);

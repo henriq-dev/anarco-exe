@@ -22,6 +22,12 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.selectOption('#codeRainMode', 'on')
   await page.click('#st')
+  await page.waitForFunction(() => document.body.lastElementChild?.querySelectorAll('pre')[1]?.textContent.startsWith('>'), null, { timeout: 4000 })
+  const roteiro = await page.evaluate(async () => await (await fetch('/script.js')).text())
+  const arteTerminal = await page.evaluate(() => document.body.lastElementChild?.querySelector('pre')?.textContent || '')
+  ok(arteTerminal.includes('ANARCO') && arteTerminal.includes('[CAPUZ]') && roteiro.includes('03:17:09 // DISTRITO FINANCEIRO') && roteiro.includes('a cidade dorme. as câmeras, não.') && roteiro.includes('OPERAÇÃO BREACH // INICIANDO') && roteiro.includes('Math.floor(elapsed / 5)') && roteiro.includes('}, 24);'), 'a arte ASCII CAPUZ/ANARCO aparece, a narração cinematográfica foi acelerada e o terminal inicia antes da partida')
+  const audioDoTerminal = await page.evaluate(() => ({ state: actx?.state, master: audioLayers?.master?.gain.value, muted: mute }))
+  ok(audioDoTerminal.state === 'running' && audioDoTerminal.master > 0.1 && !audioDoTerminal.muted && roteiro.includes('sfx("ready")') && roteiro.includes('sfx("terminal"') && roteiro.includes('else if (n === "terminal")'), 'bip/cliques do terminal soam pelo mixer ativo e respeitam o mute')
   await page.waitForTimeout(1500)
   await page.mouse.click(500, 300) // encerra o terminal de introdução
   await page.waitForFunction(() => state === 'play', null, { timeout: 30000 })

@@ -1,5 +1,5 @@
 /* ÂNCORA: service worker = "porteiro" que guarda os arquivos no aparelho. Depois da 1ª visita o jogo abre até sem internet. */
-const VERSAO = "anarco-v4.0.0-breach-rain";
+const VERSAO = "anarco-v4.0.0-terminal-audio";
 // Só nomes estáveis; os arquivos com hash (assets/index-XXXX.js) entram no cache na 1ª visita, pela regra de fetch abaixo.
 const BASICO = ["./", "index.html", "style.css", "script.js", "manifest.webmanifest", "assets/dados/manifesto.js",
   "assets/share/favicon-192.png", "assets/share/favicon-512.png", "assets/img/skins/vanta.png",
