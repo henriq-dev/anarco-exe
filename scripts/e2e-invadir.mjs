@@ -11,24 +11,35 @@ const ok = (cond, msg) => { console.log((cond ? 'ok   ' : 'FALHA'), msg); if (!c
 try {
   await new Promise((r) => setTimeout(r, 1200))
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] })
-  const page = await (await browser.newContext({ viewport: { width: 1000, height: 560 } })).newPage()
+  const context = await browser.newContext({ viewport: { width: 1000, height: 560 } })
+  const page = await context.newPage()
+  const lazyAssetRequests = []
+  page.on('request', request => {
+    const pathname = new URL(request.url()).pathname
+    if (/\/assets\/(?:audio\/[^/]+\.mp3|models\/(?:laptop\.mdl|boss-[^/]+\.glb))$/i.test(pathname)) lazyAssetRequests.push(pathname)
+  })
   const erros = []
   page.on('pageerror', (e) => erros.push(String(e).slice(0, 160)))
   page.on('response', (r) => { if (r.status() >= 400) erros.push(`HTTP ${r.status()} ${r.url()}`) })
   await page.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('#st', { state: 'visible', timeout: 30000 })
   await page.waitForTimeout(3000)
+  ok(lazyAssetRequests.length === 0, 'menu inicial não baixa MP3s, notebook ou modelos de chefão')
   ok(await page.locator('#codeRainMode').inputValue() === 'on', 'chuva de códigos fica ativada por padrão no desktop')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.selectOption('#codeRainMode', 'on')
   await page.click('#st')
   await page.waitForFunction(() => document.body.lastElementChild?.querySelectorAll('pre')[1]?.textContent.startsWith('>'), null, { timeout: 4000 })
+  await page.waitForFunction(() => Object.keys(customAudioBuffers).length === 5, null, { timeout: 15000 })
+  const audioRequestPaths = [...new Set(lazyAssetRequests.filter(pathname => pathname.includes('/assets/audio/')))]
+  ok(audioRequestPaths.length === 5, 'os cinco arquivos de áudio só são solicitados após clicar em Invadir')
   const roteiro = await page.evaluate(async () => await (await fetch('/script.js')).text())
+  const roteiroCompacto = roteiro.replace(/\s+/g, '')
   const arteTerminal = await page.evaluate(() => document.body.lastElementChild?.querySelector('pre')?.textContent || '')
-  ok(arteTerminal.split('\n').length >= 16 && arteTerminal.includes('ANARCO.EXE') && arteTerminal.includes('CAPUZ') && roteiro.includes('03:17:09 // DISTRITO FINANCEIRO') && roteiro.includes('a cidade dorme. as câmeras, não.') && roteiro.includes('OPERAÇÃO BREACH // INICIANDO') && roteiro.includes('Math.floor(elapsed / 5)') && roteiro.includes('}, 24);'), 'a arte ASCII maior CAPUZ/ANARCO aparece no topo e a narração rápida inicia antes da partida')
+  ok(arteTerminal.split('\n').length >= 16 && arteTerminal.includes('ANARCO.EXE') && arteTerminal.includes('CAPUZ') && roteiro.includes('03:17:09 // DISTRITO FINANCEIRO') && roteiro.includes('a cidade dorme.') && roteiro.includes('BREACH // INICIANDO') && roteiroCompacto.includes('Math.floor(elapsed/5)') && roteiroCompacto.includes('},24);'), 'a arte ASCII maior CAPUZ/ANARCO aparece no topo e a narração rápida inicia antes da partida')
   await page.screenshot({ path: '/tmp/anarco-intro-desktop.png' })
   const audioDoTerminal = await page.evaluate(() => ({ state: actx?.state, master: audioLayers?.master?.gain.value, muted: mute }))
-  ok(audioDoTerminal.state === 'running' && audioDoTerminal.master > 0.1 && !audioDoTerminal.muted && roteiro.includes('sfx("ready")') && roteiro.includes('sfx("terminal"') && roteiro.includes('else if (n === "terminal")'), 'bip/cliques do terminal soam pelo mixer ativo e respeitam o mute')
+  ok(audioDoTerminal.state === 'running' && audioDoTerminal.master > 0.1 && !audioDoTerminal.muted && roteiro.includes('sfx("ready")') && roteiro.includes('sfx("terminal"') && roteiroCompacto.includes('elseif(n==="terminal")'), 'bip/cliques do terminal soam pelo mixer ativo e respeitam o mute')
   await page.waitForTimeout(1500)
   await page.mouse.click(500, 300) // encerra o terminal de introdução
   await page.waitForFunction(() => state === 'play', null, { timeout: 30000 })
@@ -53,6 +64,22 @@ try {
     const r = await page.evaluate(() => ({ s: state, lv: document.getElementById('lv').textContent, boss: !!boss, p: pick.length }))
     ok(r.s === 'play' && r.lv === `NÍVEL ${i + 1}/6` && r.p === 3 && r.boss === (i === 5), `fase ${i + 1}/6 carrega (${r.lv}, chefão: ${r.boss})`)
   }
+  await page.waitForFunction(() => boss?.cfg?.model === 'banqueiro' && !!boss.g.userData.art, null, { timeout: 15000 })
+  const bossOne = await page.evaluate(() => {
+    let rig = false
+    boss.g.userData.art.traverse(node => { if (node.isSkinnedMesh) rig = true })
+    return { model: boss.cfg.model, rig, animated: !!boss.g.userData.mixer, next: bossModelPreload?.index }
+  })
+  ok(bossOne.model === 'banqueiro' && bossOne.rig && bossOne.animated && bossOne.next === 1, 'Banqueiro Meshopt/WebP carrega o rig animado e mantém apenas o próximo pré-carregado')
+  const firstBossLoads = new Set(lazyAssetRequests.filter(pathname => pathname.includes('/assets/models/boss-')))
+  ok(firstBossLoads.has('/assets/models/boss-banqueiro-animated.glb') && firstBossLoads.has('/assets/models/boss-petroleo-rigged.glb') && !firstBossLoads.has('/assets/models/boss-ceo-rigged.glb'), 'antes de vencer o primeiro, apenas Banqueiro e próximo chefe foram solicitados')
+  await page.evaluate(() => { if (boss?.g?.parent) boss.g.parent.remove(boss.g); boss = null; spawnBoss(1) })
+  await page.waitForFunction(() => boss?.cfg?.model === 'petroleo' && !!boss.g.userData.art && !!boss.g.userData.mixer, null, { timeout: 15000 })
+  ok(await page.evaluate(() => bossModelPreload?.index === 2) && lazyAssetRequests.some(pathname => pathname.endsWith('/boss-ceo-rigged.glb')), 'após o primeiro chefe, o Petróleo usa o rig e o CEO passa a ser o único próximo')
+  await page.evaluate(() => { if (boss?.g?.parent) boss.g.parent.remove(boss.g); boss = null; spawnBoss(2) })
+  await page.waitForFunction(() => boss?.cfg?.model === 'ceo' && !!boss.g.userData.art && !!boss.g.userData.mixer, null, { timeout: 15000 })
+  ok(await page.evaluate(() => { let rig = false; boss.g.userData.art.traverse(node => { if (node.isSkinnedMesh) rig = true }); return rig }), 'CEO também carrega o GLB comprimido com rig e animação')
+  await page.evaluate(() => { if (boss?.g?.parent) boss.g.parent.remove(boss.g); boss = null })
   await page.evaluate(() => { tut = -1; tutShow(); lvl = 0; reset(true); breach() })
   await page.waitForFunction(() => {
     const canvas = document.getElementById('rain'), data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
@@ -69,6 +96,7 @@ try {
   await page.screenshot({ path: '/tmp/anarco-breach-desktop.png' })
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   // HUD de hack: conexão contextual, progresso, erro glitchado, root e trilha carregada.
+  ok(!lazyAssetRequests.some(pathname => pathname.endsWith('/laptop.mdl')), 'notebook permanece adiado até a aproximação do primeiro hack')
   await page.evaluate(() => {
     tut = -1; tutShow(); lvl = 0; reset(true); alert_ = 0; grace = 120;
     drones.forEach(d => d.position.set(90, 5, 90));
@@ -76,6 +104,8 @@ try {
   })
   await page.waitForFunction(() => !document.getElementById('hackPanel').hidden && document.getElementById('hackState').textContent === 'CONEXÃO ESTABELECIDA', null, { timeout: 10000 })
   ok(true, 'núcleo da Vigilância abre HUD contextual de conexão')
+  await page.waitForFunction(() => lapModelReady, null, { timeout: 10000 })
+  ok(lazyAssetRequests.filter(pathname => pathname.endsWith('/laptop.mdl')).length === 1, 'notebook é buscado uma vez no primeiro hack e substitui o placeholder')
   await page.waitForFunction(() => Number(document.getElementById('hackPercent').textContent.replace('%', '')) > 20, null, { timeout: 5000 })
   ok(await page.evaluate(() => document.getElementById('hackPanel').dataset.state === 'extract'), 'extração inicia e preenche a barra')
   // ÂNCORA: o hack completo leva ~22 s; 10 s era pouco e dava falso erro
@@ -93,8 +123,11 @@ try {
   await page.screenshot({ path: '/tmp/anarco-hack-desktop.png' })
 
   // O mesmo fluxo em viewport touch: HUD compacto acima do minigame e fora dos botões inferiores.
-  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' })
   const mobilePage = await mobileContext.newPage()
+  let blockedLaptopAttempts = 0
+  await mobilePage.route('**/assets/models/laptop.mdl', route => route.abort())
+  mobilePage.on('request', request => { if (new URL(request.url()).pathname.endsWith('/laptop.mdl')) blockedLaptopAttempts++ })
   mobilePage.on('pageerror', e => erros.push('mobile pageerror: ' + String(e).slice(0, 160)))
   await mobilePage.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
   await mobilePage.waitForSelector('#st', { state: 'visible', timeout: 30000 })
@@ -113,6 +146,9 @@ try {
     P.position.set(t.x + 4.75, 0, t.z + 0.2); vel.set(0, 0, 0); t.p = 0.995; grace = 120;
   })
   await mobilePage.waitForFunction(() => !!mini && !document.getElementById('hackPanel').hidden, null, { timeout: 10000 })
+  await mobilePage.waitForFunction(() => !lapModelLoad && !lapModelReady, null, { timeout: 5000 })
+  const laptopFallback = await mobilePage.evaluate(() => ({ ready: lapModelReady, placeholder: lapG.children.length >= 2, playing: !!mini }))
+  ok(blockedLaptopAttempts === 1 && !laptopFallback.ready && laptopFallback.placeholder && laptopFallback.playing, 'se o modelo do notebook falha, o placeholder permanece e o hack continua sem bloqueio')
   const layoutTouch = await mobilePage.evaluate(() => {
     const rect = id => { const r = document.getElementById(id).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
     return { panel: rect('hackPanel'), mini: rect('mini'), actions: rect('touchActions'), routeDisplay: getComputedStyle(document.getElementById('routePicker')).display }
@@ -125,6 +161,27 @@ try {
   // teclas não ficam presas ao perder o foco
   await page.evaluate(() => { keys.w = 1; window.dispatchEvent(new Event('blur')) })
   ok((await page.evaluate(() => keys.w)) === 0, 'tecla solta ao perder o foco (blur)')
+  const swControlReady = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 10000 }).then(() => true).catch(() => false)
+  ok(swControlReady, 'service worker controla a sessão para cache offline')
+  if (swControlReady) {
+    const offlinePage = await context.newPage()
+    try {
+      await offlinePage.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
+      await offlinePage.waitForSelector('#st', { state: 'visible', timeout: 30000 })
+      await offlinePage.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 10000 })
+      await context.setOffline(true)
+      await offlinePage.reload({ waitUntil: 'domcontentloaded' })
+      await offlinePage.waitForSelector('#st', { state: 'visible', timeout: 15000 })
+      await offlinePage.click('#st')
+      const cachedAudio = await offlinePage.waitForFunction(() => Object.keys(customAudioBuffers).length === 5, null, { timeout: 20000 }).then(() => true).catch(() => false)
+      ok(cachedAudio, 'jogo e os cinco sons carregados anteriormente funcionam offline após Invadir')
+    } catch (error) {
+      ok(false, `shell/áudio offline após primeira carga: ${String(error).slice(0, 140)}`)
+    } finally {
+      await context.setOffline(false)
+      await offlinePage.close()
+    }
+  }
   ok(erros.length === 0, `nenhum erro no console/HTTP ${erros.length ? JSON.stringify(erros.slice(0, 3)) : ''}`)
   await browser.close()
 } finally {

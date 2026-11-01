@@ -7,7 +7,7 @@ export const GAME_SHARING_FILE = 'game-sharing.json'
 export const MAX_SHARE_IMAGE_BYTES = 8 * 1024 * 1024
 const MAX_SNAPSHOT_BYTES = 128 * 1024
 const DIGEST = /^sha256:[a-f0-9]{64}$/
-const PROJECT_IMAGE = /^assets\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\\%?#\u0000-\u001f]+\.png$/i
+const PROJECT_IMAGE = /^assets\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\\%?#\u0000-\u001f]+\.(?:png|jpe?g)$/i
 const PLATFORMS = ['x', 'facebook', 'reddit', 'discord']
 export class GameSharingValidationError extends Error {}
 const fail = message => { throw new GameSharingValidationError(message || 'Game sharing metadata is invalid') }
@@ -37,7 +37,7 @@ function captions(value = {}) {
   return result
 }
 function projectImage(value) {
-  if (typeof value !== 'string' || value.length > 512 || !PROJECT_IMAGE.test(value) || value.split('/').some(part => !part || part === '.' || part === '..')) fail('Game sharing image must be a PNG under assets/')
+  if (typeof value !== 'string' || value.length > 512 || !PROJECT_IMAGE.test(value) || value.split('/').some(part => !part || part === '.' || part === '..')) fail('Game sharing image must be a PNG or JPEG under assets/')
   return value
 }
 
@@ -61,7 +61,8 @@ export function canonicalProjectShare(value) { return JSON.stringify(parseProjec
 
 function releaseAsset(value) {
   exact(value, ['digest', 'path', 'mime', 'width', 'height', 'sizeBytes', 'sourcePath'])
-  if (!DIGEST.test(value.digest) || value.path !== `share/${value.digest.slice(7)}.png` || value.mime !== 'image/png' ||
+  const extension = value.mime === 'image/png' ? 'png' : value.mime === 'image/jpeg' ? 'jpg' : ''
+  if (!DIGEST.test(value.digest) || !extension || value.path !== `share/${value.digest.slice(7)}.${extension}` ||
       !Number.isSafeInteger(value.width) || value.width < 1 || !Number.isSafeInteger(value.height) || value.height < 1 || value.width * value.height > 16 * 1024 * 1024 ||
       !Number.isSafeInteger(value.sizeBytes) || value.sizeBytes < 1 || value.sizeBytes > MAX_SHARE_IMAGE_BYTES ||
       (value.sourcePath !== undefined && !PROJECT_IMAGE.test(value.sourcePath))) fail('Game sharing release image is invalid')
@@ -121,10 +122,38 @@ export function readPreparedShare(root) {
   try { return parseShareSnapshot(JSON.parse(regularFile(root, [GAME_SHARING_FILE], MAX_SNAPSHOT_BYTES).toString('utf8'))) }
   catch (error) { if (error.code === 'ENOENT') return null; throw error }
 }
+const JPEG_SOF_MARKERS = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf])
+function jpegDimensions(bytes) {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) return null
+  let offset = 2
+  while (offset + 4 < bytes.length) {
+    if (bytes[offset] !== 0xff) return null
+    while (offset < bytes.length && bytes[offset] === 0xff) offset++
+    const marker = bytes[offset++]
+    if (marker === 0xda || marker === 0xd9) break
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue
+    if (offset + 2 > bytes.length) return null
+    const segmentLength = bytes.readUInt16BE(offset)
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) return null
+    if (JPEG_SOF_MARKERS.has(marker)) {
+      if (segmentLength < 7) return null
+      return { width: bytes.readUInt16BE(offset + 5), height: bytes.readUInt16BE(offset + 3) }
+    }
+    offset += segmentLength
+  }
+  return null
+}
+function imageDimensions(bytes, mime) {
+  if (mime === 'image/png' && bytes.length >= 33 &&
+      bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) && bytes.readUInt32BE(8) === 13 &&
+      bytes.toString('ascii', 12, 16) === 'IHDR') return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) }
+  if (mime === 'image/jpeg') return jpegDimensions(bytes)
+  return null
+}
 export function verifyShareImage(bytes, expected) {
-  if (!Buffer.isBuffer(bytes) || bytes.length !== expected.sizeBytes || bytes.length > MAX_SHARE_IMAGE_BYTES || bytes.length < 33 || digest(bytes) !== expected.digest ||
-      !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || bytes.readUInt32BE(8) !== 13 || bytes.toString('ascii', 12, 16) !== 'IHDR' ||
-      bytes.readUInt32BE(16) !== expected.width || bytes.readUInt32BE(20) !== expected.height) fail('Game sharing image bytes do not match the checkpoint')
+  if (!Buffer.isBuffer(bytes) || bytes.length !== expected.sizeBytes || bytes.length > MAX_SHARE_IMAGE_BYTES || bytes.length < 4 || digest(bytes) !== expected.digest) fail('Game sharing image bytes do not match the checkpoint')
+  const dimensions = imageDimensions(bytes, expected.mime)
+  if (!dimensions || dimensions.width !== expected.width || dimensions.height !== expected.height) fail('Game sharing image bytes do not match the checkpoint')
   return bytes
 }
 function directory(parent, name) {
@@ -175,12 +204,15 @@ function projectDescription(root) {
 }
 function projectAsset(root, sourcePath) {
   const bytes = regularFile(root, sourcePath.split('/'), MAX_SHARE_IMAGE_BYTES)
-  if (extname(sourcePath).toLowerCase() !== '.png' || bytes.length < 33 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-      bytes.readUInt32BE(8) !== 13 || bytes.toString('ascii', 12, 16) !== 'IHDR') fail(`Game sharing image is not a valid PNG: ${sourcePath}`)
-  const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20)
+  const extension = extname(sourcePath).toLowerCase()
+  const mime = extension === '.png' ? 'image/png' : 'image/jpeg'
+  const dimensions = imageDimensions(bytes, mime)
+  if (!dimensions) fail(`Game sharing image is not a valid ${mime === 'image/png' ? 'PNG' : 'JPEG'}: ${sourcePath}`)
+  const { width, height } = dimensions
   if (!width || !height || width * height > 16 * 1024 * 1024) fail(`Game sharing image dimensions are invalid: ${sourcePath}`)
   const hash = digest(bytes)
-  return { bytes, release: { digest: hash, path: `share/${hash.slice(7)}.png`, mime: 'image/png', width, height, sizeBytes: bytes.length, sourcePath } }
+  const outputExtension = mime === 'image/jpeg' ? 'jpg' : 'png'
+  return { bytes, release: { digest: hash, path: `share/${hash.slice(7)}.${outputExtension}`, mime, width, height, sizeBytes: bytes.length, sourcePath } }
 }
 export function materializeShareSnapshot(root, preparation, defaults = {}) {
   const project = readProjectShare(root)
@@ -318,7 +350,7 @@ export function assembleShareSite(_root, site, materialized, options) {
   const snapshot = parseShareSnapshot(materialized.snapshot ?? materialized), realSite = realpathSync(site), shared = directory(realSite, 'share')
   for (const purpose of ['og', 'favicon']) {
     const expected = snapshot.assets[purpose]
-    if (expected) atomicWrite(shared, expected.digest.slice(7) + '.png', verifyShareImage(materialized.bytes?.[purpose], expected))
+    if (expected) atomicWrite(shared, expected.digest.slice(7) + (expected.mime === 'image/jpeg' ? '.jpg' : '.png'), verifyShareImage(materialized.bytes?.[purpose], expected))
   }
   atomicWrite(realSite, GAME_SHARING_FILE, canonicalShareSnapshot(snapshot))
   if (!options?.preserveHtml) atomicWrite(realSite, 'index.html', applyShareHtml(regularFile(site, ['index.html'], 8 * 1024 * 1024).toString('utf8'), snapshot, options))

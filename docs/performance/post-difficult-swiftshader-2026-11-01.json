@@ -1,0 +1,340 @@
+{
+  "benchmarkSchemaVersion": 1,
+  "capturedAt": "2026-11-01T06:59:41.442Z",
+  "environment": {
+    "browser": "Chromium 156.0.8078.47 via Playwright",
+    "renderer": "SwiftShader WebGL software rendering",
+    "physicalDevice": false,
+    "viewportComparison": "desktop 1000×560 DPR 1; touch-emulated 390×844 DPR 2",
+    "warning": "Métricas da sessão de software emulada; não são FPS de GPU física nem de telefone real. Para aparelhos, abra a build com ?perf=1 e exporte o JSON pelo painel local."
+  },
+  "skylineDrawCalls": {
+    "method": "contagem dos comandos WebGL draw* por quadro em sessão fresca, mesma câmera e FX Baixa fixa; perfil separado da telemetria de frame time",
+    "visible": {
+      "scene": "skyline-visible",
+      "quality": "low",
+      "level": 1,
+      "samples": 45,
+      "drawCalls": {
+        "p50": 144,
+        "p95": 147,
+        "min": 138,
+        "max": 152
+      },
+      "frameIntervalMs": {
+        "p50": 66.69999999999982,
+        "p95": 83.30000000000018
+      }
+    },
+    "hiddenControl": {
+      "scene": "skyline-hidden-control",
+      "quality": "low",
+      "level": 1,
+      "samples": 38,
+      "drawCalls": {
+        "p50": 131,
+        "p95": 136,
+        "min": 130,
+        "max": 138
+      },
+      "frameIntervalMs": {
+        "p50": 83.30000000000018,
+        "p95": 83.40000000000055
+      }
+    },
+    "savedAtMedian": 13,
+    "savedAtP95": 11
+  },
+  "frameProfiles": [
+    {
+      "schemaVersion": 1,
+      "generatedAt": "2026-11-01T06:59:31.853Z",
+      "capture": {
+        "scene": "desktop-emulated",
+        "targetSeconds": 6,
+        "actualSeconds": 6,
+        "samples": 57,
+        "totalSamples": 57,
+        "overwrittenSamples": 0,
+        "activeFrameTimeMs": 5416.6,
+        "excludedIntervals": 1,
+        "backgroundGaps": 1,
+        "complete": true
+      },
+      "frameCadence": {
+        "averageFps": 10.52,
+        "frameIntervalMs": {
+          "p50": 100,
+          "p95": 116.7,
+          "p99": 183.3,
+          "average": 95.03,
+          "max": 183.3
+        },
+        "slowFrames": {
+          "over16_7ms": 57,
+          "over22ms": 57,
+          "over33_3ms": 57,
+          "over50ms": 57
+        }
+      },
+      "cpuTimeMs": {
+        "updateAndGameLogic": {
+          "p50": 0.4,
+          "p95": 0.7,
+          "p99": 1.1,
+          "average": 0.43,
+          "max": 1.1
+        },
+        "renderSubmission": {
+          "p50": 2,
+          "p95": 2.5,
+          "p99": 119.3,
+          "average": 4,
+          "max": 119.3
+        },
+        "note": "Tempo síncrono no main thread; renderSubmission não é tempo de GPU."
+      },
+      "device": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "userAgentData": {
+          "platform": "Linux",
+          "mobile": false,
+          "brands": [
+            {
+              "brand": "Not:A-Brand",
+              "version": "8"
+            },
+            {
+              "brand": "Chromium",
+              "version": "156"
+            }
+          ]
+        },
+        "viewport": {
+          "width": 1000,
+          "height": 560,
+          "devicePixelRatio": 1,
+          "screenWidth": 1000,
+          "screenHeight": 560,
+          "screenPixelDepth": 24
+        },
+        "pointerCoarse": false,
+        "maxTouchPoints": 0,
+        "hardwareConcurrency": 6,
+        "deviceMemoryGiB": 16
+      },
+      "renderer": {
+        "quality": {
+          "selected": "high",
+          "effective": "medium",
+          "resolutionScale": 1
+        },
+        "pixelRatio": 1,
+        "canvas": {
+          "backingWidth": 1000,
+          "backingHeight": 560,
+          "cssWidth": 1000,
+          "cssHeight": 560
+        },
+        "render": {
+          "calls": 137,
+          "triangles": 57604,
+          "points": 520,
+          "lines": 247
+        },
+        "memory": {
+          "geometries": 200,
+          "textures": 43
+        },
+        "particles": {
+          "active": 0,
+          "limit": 280
+        },
+        "qualityLabel": "FX · ALTA → MÉDIA · AUTO",
+        "bodyQuality": {
+          "selected": "high",
+          "effective": "medium"
+        }
+      },
+      "qualityTransitions": [
+        {
+          "offsetMs": 0,
+          "selected": "high",
+          "effective": "high",
+          "resolutionScale": 1,
+          "pixelRatio": 1
+        },
+        {
+          "offsetMs": 4440.9,
+          "selected": "high",
+          "effective": "medium",
+          "resolutionScale": 1,
+          "pixelRatio": 1
+        }
+      ],
+      "sceneTransitions": [
+        {
+          "offsetMs": 0,
+          "scene": "desktop-emulated"
+        }
+      ],
+      "limitations": [
+        "Cadência RAF não prova FPS de GPU.",
+        "A captura descarta abas ocultas e intervalos de 250 ms ou mais.",
+        "UA, pointer e hardwareConcurrency são indícios do dispositivo, não prova de modelo físico."
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "generatedAt": "2026-11-01T06:59:41.412Z",
+      "capture": {
+        "scene": "mobile-touch-emulated",
+        "targetSeconds": 6,
+        "actualSeconds": 6,
+        "samples": 221,
+        "totalSamples": 221,
+        "overwrittenSamples": 0,
+        "activeFrameTimeMs": 5983,
+        "excludedIntervals": 0,
+        "backgroundGaps": 0,
+        "complete": true
+      },
+      "frameCadence": {
+        "averageFps": 36.94,
+        "frameIntervalMs": {
+          "p50": 33.3,
+          "p95": 33.4,
+          "p99": 50,
+          "average": 27.07,
+          "max": 66.7
+        },
+        "slowFrames": {
+          "over16_7ms": 155,
+          "over22ms": 130,
+          "over33_3ms": 96,
+          "over50ms": 2
+        }
+      },
+      "cpuTimeMs": {
+        "updateAndGameLogic": {
+          "p50": 0.3,
+          "p95": 0.6,
+          "p99": 2.7,
+          "average": 0.39,
+          "max": 3.5
+        },
+        "renderSubmission": {
+          "p50": 1.1,
+          "p95": 1.7,
+          "p99": 2.1,
+          "average": 1.13,
+          "max": 3.5
+        },
+        "note": "Tempo síncrono no main thread; renderSubmission não é tempo de GPU."
+      },
+      "device": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "userAgentData": {
+          "platform": "Linux",
+          "mobile": false,
+          "brands": [
+            {
+              "brand": "Not:A-Brand",
+              "version": "8"
+            },
+            {
+              "brand": "Chromium",
+              "version": "156"
+            }
+          ]
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "devicePixelRatio": 2,
+          "screenWidth": 390,
+          "screenHeight": 844,
+          "screenPixelDepth": 24
+        },
+        "pointerCoarse": true,
+        "maxTouchPoints": 1,
+        "hardwareConcurrency": 6,
+        "deviceMemoryGiB": 16
+      },
+      "renderer": {
+        "quality": {
+          "selected": "medium",
+          "effective": "low",
+          "resolutionScale": 0.75
+        },
+        "pixelRatio": 0.75,
+        "canvas": {
+          "backingWidth": 292,
+          "backingHeight": 633,
+          "cssWidth": 390,
+          "cssHeight": 844
+        },
+        "render": {
+          "calls": 43,
+          "triangles": 52804,
+          "points": 520,
+          "lines": 113
+        },
+        "memory": {
+          "geometries": 117,
+          "textures": 14
+        },
+        "particles": {
+          "active": 0,
+          "limit": 100
+        },
+        "qualityLabel": "FX · MÉDIA → BAIXA · AUTO",
+        "bodyQuality": {
+          "selected": "medium",
+          "effective": "low"
+        }
+      },
+      "qualityTransitions": [
+        {
+          "offsetMs": 0,
+          "selected": "medium",
+          "effective": "medium",
+          "resolutionScale": 1,
+          "pixelRatio": 1.25
+        },
+        {
+          "offsetMs": 558.1,
+          "selected": "medium",
+          "effective": "low",
+          "resolutionScale": 1,
+          "pixelRatio": 1
+        },
+        {
+          "offsetMs": 2457.5,
+          "selected": "medium",
+          "effective": "low",
+          "resolutionScale": 0.85,
+          "pixelRatio": 0.85
+        },
+        {
+          "offsetMs": 4026.5,
+          "selected": "medium",
+          "effective": "low",
+          "resolutionScale": 0.75,
+          "pixelRatio": 0.75
+        }
+      ],
+      "sceneTransitions": [
+        {
+          "offsetMs": 0,
+          "scene": "mobile-touch-emulated"
+        }
+      ],
+      "limitations": [
+        "Cadência RAF não prova FPS de GPU.",
+        "A captura descarta abas ocultas e intervalos de 250 ms ou mais.",
+        "UA, pointer e hardwareConcurrency são indícios do dispositivo, não prova de modelo físico."
+      ]
+    }
+  ]
+}

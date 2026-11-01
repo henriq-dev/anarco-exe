@@ -21,7 +21,7 @@ try {
 } catch (error) {
   const reason = error instanceof GameSharingValidationError ? error.message
     : error instanceof SyntaxError ? 'game-sharing.json must contain valid JSON'
-    : error?.code === 'ENOENT' ? 'A configured PNG asset or build output is missing'
+    : error?.code === 'ENOENT' ? 'A configured image asset or build output is missing'
     : 'Check file access and the configured build output'
-  console.warn('[sharing] ' + reason + '. Could not include the OG image. Check game-sharing.json and its PNG assets, then prepare sharing and rebuild. The game build will continue.')
+  console.warn('[sharing] ' + reason + '. Could not include the OG image. Check game-sharing.json and its PNG/JPEG assets, then prepare sharing and rebuild. The game build will continue.')
 }

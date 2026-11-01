@@ -38,23 +38,23 @@
       "groupId": "skins-do-jogador"
     },
     "assets/models/boss-banqueiro-animated.glb": {
-      "path": "/manus-storage/game/sha256/8a14fa3440f506c49f78d587808436cb610a4ae8ebe063b69a36d46cf9496e5b.glb",
-      "sha256": "sha256:8a14fa3440f506c49f78d587808436cb610a4ae8ebe063b69a36d46cf9496e5b",
-      "size": 4321124,
+      "path": "https://files.manuscdn.com/user_upload_by_module/session_file/310519664048180482/ERTjdUJzNUIHnCPw.glb",
+      "sha256": "sha256:0694fb53244bfc29eb262c5841ffac4d2b540fad38c8844e1cd7d9b06c20e2e5",
+      "size": 723640,
       "assetType": "model",
       "groupId": "chefes"
     },
     "assets/models/boss-ceo-rigged.glb": {
-      "path": "/manus-storage/game/sha256/38b0faaa368d4491112f48d8d1f8f1cbb4481ad02f84ac72f92ca09494d26e2a.glb",
-      "sha256": "sha256:38b0faaa368d4491112f48d8d1f8f1cbb4481ad02f84ac72f92ca09494d26e2a",
-      "size": 4034124,
+      "path": "https://files.manuscdn.com/user_upload_by_module/session_file/310519664048180482/GiqMKUyMKFMQUlxO.glb",
+      "sha256": "sha256:ff1b8ce67220363bf0f4075429e4a3a22470f57c305af62819ae19220138b6b6",
+      "size": 524280,
       "assetType": "model",
       "groupId": "chefes"
     },
     "assets/models/boss-petroleo-rigged.glb": {
-      "path": "/manus-storage/game/sha256/80f014fe0a9a2e3ce27f42bbebfcd7afb7bcb483381db08fa1c1c4b4e1d81ab8.glb",
-      "sha256": "sha256:80f014fe0a9a2e3ce27f42bbebfcd7afb7bcb483381db08fa1c1c4b4e1d81ab8",
-      "size": 4036844,
+      "path": "https://files.manuscdn.com/user_upload_by_module/session_file/310519664048180482/zohqDKbAhqPJENBK.glb",
+      "sha256": "sha256:a2b8c7c85b9bd67a6d05f08e52d5aa247b83d7becd8bd87f02673eb62bb92d07",
+      "size": 443544,
       "assetType": "model",
       "groupId": "chefes"
     },
@@ -93,10 +93,10 @@
       "assetType": "image",
       "groupId": "identidade-do-jogo"
     },
-    "assets/share/og.png": {
-      "path": "/manus-storage/game/sha256/e53733f551ad66486033919a5011d0d6b18936a2476872488f1862edd4b25c27.png",
-      "sha256": "sha256:e53733f551ad66486033919a5011d0d6b18936a2476872488f1862edd4b25c27",
-      "size": 1253263,
+    "assets/share/og.jpg": {
+      "path": "https://files.manuscdn.com/user_upload_by_module/session_file/310519664048180482/CnNhMLTBcpdvqrMB.jpg",
+      "sha256": "sha256:10af5aeac51438021d6577115ac8df5426c49ebdde78959131bcb94ab13777c3",
+      "size": 171534,
       "assetType": "image",
       "groupId": "identidade-do-jogo"
     }

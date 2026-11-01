@@ -11,6 +11,23 @@ export function lowerQuality(value: FxQuality): FxQuality {
   return FX_QUALITY_ORDER[Math.max(0, FX_QUALITY_ORDER.indexOf(value) - 1)]
 }
 
+export const FX_ADAPTIVE_WINDOW_FRAMES = 60
+export const FX_SLOW_FRAME_SECONDS = 0.022
+export const FX_SLOW_FRAME_RATIO = 0.4
+
+export function isSlowFxFrame(frameSeconds: number): boolean {
+  return frameSeconds > FX_SLOW_FRAME_SECONDS
+}
+
+export function shouldDegradeFxPerformance(frameCount: number, slowFrames: number): boolean {
+  return frameCount >= FX_ADAPTIVE_WINDOW_FRAMES && frameCount > 0 && slowFrames / frameCount > FX_SLOW_FRAME_RATIO
+}
+
+export function resolveFxPixelRatio(nativeDpr: number, presetDpr: number, coarse: boolean, resolutionScale = 1): number {
+  const cappedDpr = Math.min(nativeDpr || 1, coarse ? Math.min(presetDpr, 1.25) : presetDpr)
+  return Math.max(0.75, cappedDpr * resolutionScale)
+}
+
 export const FX_QUALITY_PRESETS: Record<FxQuality, { particles: number; dpr: number; lights: number; fullBloom: boolean; shadows: boolean }> = {
   low: { particles: 100, dpr: 1, lights: 0, fullBloom: false, shadows: false },
   medium: { particles: 280, dpr: 1.35, lights: 4, fullBloom: false, shadows: false },
@@ -218,6 +235,29 @@ export class AnarcoFxSystem {
   get selectedQuality(): FxQuality { return this.quality }
   get effectiveQuality(): FxQuality { return FX_QUALITY_ORDER[Math.max(0, FX_QUALITY_ORDER.indexOf(this.quality) - this.adaptiveLoss)] }
 
+  getDiagnostics(): {
+    quality: { selected: FxQuality; effective: FxQuality; resolutionScale: number }
+    pixelRatio: number
+    canvas: { backingWidth: number; backingHeight: number; cssWidth: number; cssHeight: number }
+    render: { calls: number; triangles: number; points: number; lines: number }
+    memory: { geometries: number; textures: number }
+    particles: { active: number; limit: number }
+  } {
+    const canvas = this.renderer.domElement
+    const rect = canvas.getBoundingClientRect()
+    const render = this.renderer.info.render
+    let active = 0
+    for (let i = 0; i < this.activeParticleLimit; i += 1) if (this.slots[i].active) active += 1
+    return {
+      quality: { selected: this.quality, effective: this.effectiveQuality, resolutionScale: this.resolutionScale },
+      pixelRatio: this.renderer.getPixelRatio(),
+      canvas: { backingWidth: canvas.width, backingHeight: canvas.height, cssWidth: rect.width, cssHeight: rect.height },
+      render: { calls: render.calls, triangles: render.triangles, points: render.points, lines: render.lines },
+      memory: { geometries: this.renderer.info.memory.geometries, textures: this.renderer.info.memory.textures },
+      particles: { active, limit: this.activeParticleLimit },
+    }
+  }
+
   private readSavedQuality(): FxQuality {
     try {
       const saved = localStorage.getItem('anarco_fx_quality')
@@ -265,8 +305,7 @@ export class AnarcoFxSystem {
     const effective = this.effectiveQuality
     const preset = FX_QUALITY_PRESETS[effective]
     const coarse = matchMedia('(pointer: coarse)').matches
-    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? Math.min(preset.dpr, 1.25) : preset.dpr) * this.resolutionScale
-    this.renderer.setPixelRatio(Math.max(0.75, dpr))
+    this.renderer.setPixelRatio(resolveFxPixelRatio(window.devicePixelRatio || 1, preset.dpr, coarse, this.resolutionScale))
     this.renderer.setSize(window.innerWidth, window.innerHeight, false)
     this.material.uniforms.uPixelRatio.value = this.renderer.getPixelRatio()
     this.activeParticleLimit = preset.particles
@@ -343,9 +382,9 @@ export class AnarcoFxSystem {
   samplePerformance(frameSeconds: number, playing: boolean): void {
     if (!playing || frameSeconds >= 1) return
     this.frameCount += 1
-    if (frameSeconds > 0.025) this.slowFrames += 1
-    if (this.frameCount < 90) return
-    if (this.slowFrames / this.frameCount > 0.5) {
+    if (isSlowFxFrame(frameSeconds)) this.slowFrames += 1
+    if (this.frameCount < FX_ADAPTIVE_WINDOW_FRAMES) return
+    if (shouldDegradeFxPerformance(this.frameCount, this.slowFrames)) {
       const previous = this.effectiveQuality
       if (this.adaptiveLoss < FX_QUALITY_ORDER.indexOf(this.quality)) this.adaptiveLoss += 1
       else this.resolutionScale = Math.max(0.75, this.resolutionScale - 0.15)
@@ -358,7 +397,10 @@ export class AnarcoFxSystem {
   private configureSlot(slot: ParticleSlot, position: THREE.Vector3, start: THREE.ColorRepresentation, end: THREE.ColorRepresentation, options: { life?: number; size?: number; force?: number; gravity?: number; drag?: number; attraction?: number; repulsion?: number; bounce?: number }): void {
     const horizontal = Math.random() * Math.PI * 2
     const up = Math.random() * 2 - 0.35
-    const direction = new THREE.Vector3(Math.cos(horizontal), up, Math.sin(horizontal)).normalize()
+    const directionX = Math.cos(horizontal)
+    const directionZ = Math.sin(horizontal)
+    const directionLength = Math.sqrt(directionX * directionX + up * up + directionZ * directionZ) || 1
+    const inverseDirectionLength = 1 / directionLength
     const force = options.force ?? 6
     slot.active = true
     slot.age = 0
@@ -372,7 +414,8 @@ export class AnarcoFxSystem {
     slot.spin = (Math.random() - 0.5) * 10
     slot.phase = Math.random() * Math.PI * 2
     slot.position.copy(position)
-    slot.velocity.copy(direction).multiplyScalar(force * (0.45 + Math.random() * 0.7))
+    const velocityScale = force * (0.45 + Math.random() * 0.7)
+    slot.velocity.set(directionX * inverseDirectionLength * velocityScale, up * inverseDirectionLength * velocityScale, directionZ * inverseDirectionLength * velocityScale)
     slot.start.set(start)
     slot.end.set(end)
   }

@@ -260,3 +260,6 @@ Dano por segundo no chefão agora: BREACH 4,9 · EMP 2,5 · VÍRUS 2,0. Cada uma
 
 ## Item Z — Mescla v4.0.1 (Difícil)
 Resumo: nossa v3.9.9 + pacote v4.0.0 (Vigilância Total, áudio, terminal, chuva de código, menu horizontal), com 8 correções. Relatório completo: `docs/RELATORIO-MESCLA-V4.0.1.md`.
+
+## Item AA — Mescla v4.1.1 (Difícil)
+Pacote v4.1.0 (otimizações: skyline em lotes, chefões comprimidos, áudio/notebook sob demanda, fonte CJK removida, `?perf=1`) + nossas correções da v4.0.1. `dist` 14,4 → 7,2 MB. Relatório: `docs/RELATORIO-MESCLA-V4.1.1.md`.

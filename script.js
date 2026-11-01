@@ -310,26 +310,75 @@ const cityEdgeMats = [
 ];
 const cityRoofMat = new T.MeshStandardMaterial({ color: 0x0b0e18, metalness: 0.8, roughness: 0.32, emissive: 0x101c36, emissiveIntensity: 0.55 });
 const sky = [];
-for (let i = 0; i < 46; i++) {
+const CITY_SECTORS = 8;
+const CITY_BUILDINGS = 46;
+const cityBodyMaterials = sk.map((texture) => new T.MeshStandardMaterial({
+  color: 0x151518, emissive: 0xffffff, emissiveMap: texture, emissiveIntensity: 0.9,
+}));
+const cityUnitBox = new T.BoxGeometry(1, 1, 1);
+const cityUnitAntenna = new T.CylinderGeometry(0.035, 0.055, 1, 6);
+const cityDummy = new T.Object3D();
+const cityBuckets = Array.from({ length: CITY_SECTORS }, () => []);
+const mergeCityGeometries = window.ANARCO_FX.modules.mergeGeometries;
+for (let i = 0; i < CITY_BUILDINGS; i++) {
   const a = rnd() * Math.PI * 2,
     r = 50 + rnd() * 25,
     h = 10 + rnd() * 34;
   const w = 5 + rnd() * 6, d = 5 + rnd() * 6;
-  const b = bld(w, h, d, sk[i % 3]);
-  const edgeMat = cityEdgeMats[i % cityEdgeMats.length];
-  const edge = new T.Mesh(new T.BoxGeometry(0.12, h * 0.82, 0.12), edgeMat);
-  edge.position.set(-w * 0.34, h * 0.02, d * 0.5 + 0.05);
-  const edge2 = edge.clone();
-  edge2.position.x = w * 0.34;
-  const crown = new T.Mesh(new T.BoxGeometry(w * 0.86, 0.16, d * 0.86), cityRoofMat);
-  crown.position.y = h * 0.5 + 0.08;
-  const antenna = new T.Mesh(new T.CylinderGeometry(0.035, 0.055, 1.4 + (i % 3) * 0.45, 6), edgeMat);
-  antenna.position.set((i % 2 ? 1 : -1) * w * 0.18, h * 0.5 + 0.82, 0);
-  b.add(edge, edge2, crown, antenna);
-  b.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r);
-  S.add(b);
-  sky.push(b);
+  const x = Math.cos(a) * r, z = Math.sin(a) * r;
+  const sector = Math.min(CITY_SECTORS - 1, Math.floor(a / (Math.PI * 2) * CITY_SECTORS));
+  cityBuckets[sector].push({ i, x, z, h, w, d, antennaHeight: 1.4 + (i % 3) * 0.45 });
 }
+function makeCityPart(baseGeometry, x, y, z, sx, sy, sz) {
+  const geometry = baseGeometry.clone();
+  cityDummy.position.set(x, y, z);
+  cityDummy.scale.set(sx, sy, sz);
+  cityDummy.updateMatrix();
+  geometry.applyMatrix4(cityDummy.matrix);
+  return geometry;
+}
+function addCityBatch(group, name, material, parts) {
+  if (!parts.length) return;
+  const geometry = parts.length === 1 ? parts[0] : mergeCityGeometries(parts, false);
+  for (const part of parts) if (part !== geometry) part.dispose();
+  geometry.name = `${name}-geometry`;
+  geometry.computeBoundingSphere();
+  const mesh = new T.Mesh(geometry, material);
+  mesh.name = name;
+  group.add(mesh);
+}
+cityBuckets.forEach((buildings, sector) => {
+  const group = new T.Group();
+  group.name = `city-sector-${sector}`;
+  S.add(group);
+  sky.push(group);
+  const bodiesByTexture = Array.from({ length: sk.length }, () => []);
+  const trimsByColor = Array.from({ length: cityEdgeMats.length }, () => []);
+  const crowns = [];
+  for (const building of buildings) {
+    const textureIndex = building.i % sk.length;
+    bodiesByTexture[textureIndex].push(makeCityPart(cityUnitBox, building.x, building.h / 2, building.z, building.w, building.h, building.d));
+    crowns.push(makeCityPart(cityUnitBox, building.x, building.h + 0.08, building.z, building.w * 0.86, 0.16, building.d * 0.86));
+    const colorIndex = building.i % cityEdgeMats.length;
+    for (let side = -1; side <= 1; side += 2) {
+      trimsByColor[colorIndex].push(makeCityPart(cityUnitBox,
+        building.x + side * building.w * 0.34, building.h * 0.52, building.z + building.d * 0.5 + 0.05,
+        0.12, building.h * 0.82, 0.12));
+    }
+    trimsByColor[colorIndex].push(makeCityPart(cityUnitAntenna,
+      building.x + (building.i % 2 ? 1 : -1) * building.w * 0.18, building.h + 0.82, building.z,
+      1, building.antennaHeight, 1));
+  }
+  for (let textureIndex = 0; textureIndex < sk.length; textureIndex++) {
+    addCityBatch(group, `city-sector-${sector}-body-${textureIndex}`, cityBodyMaterials[textureIndex], bodiesByTexture[textureIndex]);
+  }
+  for (let colorIndex = 0; colorIndex < cityEdgeMats.length; colorIndex++) {
+    addCityBatch(group, `city-sector-${sector}-trim-antenna-${colorIndex}`, cityEdgeMats[colorIndex], trimsByColor[colorIndex]);
+  }
+  addCityBatch(group, `city-sector-${sector}-crowns`, cityRoofMat, crowns);
+});
+cityUnitBox.dispose();
+cityUnitAntenna.dispose();
 
 // anarchy sprite
 const ac = document.createElement("canvas");
@@ -915,41 +964,71 @@ P.add(lapG);
 const HACK_ANG = Math.PI / 2, LAP_POS = [0, 0.02, 1.05], LAP_ROT = 3.84, LAP_TAM = 1.3;
 const LAP_N = 10764, LAP_F = 20000, LAP_ESCALA = 1.0;
 let lapEsc = 0; // escala atual do "pop" ao abrir (0 -> 1)
-fetch("assets/models/laptop.mdl")
-  .then((r) => r.arrayBuffer())
-  .then((buf) => {
-    if (buf.byteLength !== LAP_N * 10 + LAP_F * 6) throw new Error("laptop.bin com tamanho inesperado");
-    const pos = new Float32Array(LAP_N * 3), uv = new Float32Array(LAP_N * 2);
-    const i16 = new Int16Array(buf, 0, LAP_N * 3), u16 = new Uint16Array(buf, LAP_N * 6, LAP_N * 2);
-    for (let i = 0; i < pos.length; i++) pos[i] = i16[i] / 10000;
-    for (let i = 0; i < uv.length; i++) uv[i] = u16[i] / 65535;
-    const g = new T.BufferGeometry();
-    g.setAttribute("position", new T.BufferAttribute(pos, 3));
-    g.setAttribute("uv", new T.BufferAttribute(uv, 2));
-    g.setIndex(new T.BufferAttribute(new Uint16Array(buf, LAP_N * 10, LAP_F * 3), 1));
-    g.computeVertexNormals();
-    new T.TextureLoader().load(PR.laptop.src, (tex) => {
-      // ÂNCORA: tela "digitando" — a textura vira um canvas; a área da tela (topo do atlas) recebe um terminal
-      // que escreve letra por letra durante o hack, e teclas do teclado (base do atlas) acendem como se fossem apertadas.
-      const cv = document.createElement("canvas");
-      cv.width = cv.height = 1024;
-      const cx = cv.getContext("2d");
-      const ctex = new T.CanvasTexture(cv);
-      ctex.anisotropy = 4;
-      ctex.colorSpace = tex.colorSpace;
-      ctex.flipY = tex.flipY;
-      lapTela = { cv, cx, ctex, img: tex.image, txt: "", li: 0, ci: 0, t: 0, keys: [] };
-      desenharTela(0);
-      const m = new T.MeshStandardMaterial({ map: ctex, emissiveMap: ctex, emissive: 0xffffff, emissiveIntensity: 0.4, roughness: 0.6, metalness: 0.1 });
-      const mesh = new T.Mesh(g, m);
-      mesh.scale.setScalar(LAP_ESCALA);
-      lapG.children.slice().forEach((c) => { lapG.remove(c); c.geometry.dispose(); c.material.dispose(); });
-      lapG.add(mesh);
-    });
-  })
-  .catch((e) => console.warn("notebook 3D indisponível, usando o de caixas:", e));
+let lapTela = null, lapModelLoad = null, lapModelReady = false, lapModelRetryAt = 0;
+function ensureLaptopModel() {
+  if (lapModelReady) return Promise.resolve(true);
+  if (lapModelLoad) return lapModelLoad;
+  if (performance.now() < lapModelRetryAt) return Promise.resolve(false);
+  lapModelLoad = fetch("assets/models/laptop.mdl")
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.arrayBuffer();
+    })
+    .then((buf) => {
+      if (buf.byteLength !== LAP_N * 10 + LAP_F * 6) throw new Error("laptop.bin com tamanho inesperado");
+      const pos = new Float32Array(LAP_N * 3), uv = new Float32Array(LAP_N * 2);
+      const i16 = new Int16Array(buf, 0, LAP_N * 3), u16 = new Uint16Array(buf, LAP_N * 6, LAP_N * 2);
+      for (let i = 0; i < pos.length; i++) pos[i] = i16[i] / 10000;
+      for (let i = 0; i < uv.length; i++) uv[i] = u16[i] / 65535;
+      const g = new T.BufferGeometry();
+      g.setAttribute("position", new T.BufferAttribute(pos, 3));
+      g.setAttribute("uv", new T.BufferAttribute(uv, 2));
+      g.setIndex(new T.BufferAttribute(new Uint16Array(buf, LAP_N * 10, LAP_F * 3), 1));
+      g.computeVertexNormals();
+      return new Promise((resolveModel, rejectModel) => {
+        new T.TextureLoader().load(PR.laptop.src, (tex) => {
+          try {
+            // ÂNCORA: tela "digitando" — o atlas recebe terminal e teclas animadas no primeiro hack.
+            const cv = document.createElement("canvas");
+            cv.width = cv.height = 1024;
+            const cx = cv.getContext("2d");
+            const ctex = new T.CanvasTexture(cv);
+            ctex.anisotropy = 4;
+            ctex.colorSpace = tex.colorSpace;
+            ctex.flipY = tex.flipY;
+            lapTela = { cv, cx, ctex, img: tex.image, txt: "", li: 0, ci: 0, t: 0, keys: [] };
+            desenharTela(0);
+            const m = new T.MeshStandardMaterial({ map: ctex, emissiveMap: ctex, emissive: 0xffffff, emissiveIntensity: 0.4, roughness: 0.6, metalness: 0.1 });
+            const mesh = new T.Mesh(g, m);
+            mesh.scale.setScalar(LAP_ESCALA);
+            lapG.children.slice().forEach((child) => {
+              lapG.remove(child);
+              child.geometry?.dispose();
+              (Array.isArray(child.material) ? child.material : [child.material]).forEach((material) => material?.dispose());
+            });
+            lapG.add(mesh);
+            lapModelReady = true;
+            lapModelRetryAt = 0;
+            resolveModel(true);
+          } catch (error) {
+            g.dispose();
+            rejectModel(error);
+          }
+        }, undefined, (error) => {
+          g.dispose();
+          rejectModel(error);
+        });
+      });
+    })
+    .catch((error) => {
+      lapModelRetryAt = performance.now() + 8000;
+      console.warn("notebook 3D indisponível, usando o de caixas:", error);
+      return false;
+    })
+    .finally(() => { lapModelLoad = null; });
+  return lapModelLoad;
+}
 // ÂNCORA: terminal que aparece digitando na tela do notebook
-let lapTela = null;
 const TERM = [
   "root@kali-anarc:~# nmap -sS 10.0.0.0/24",
   "Host up: 10.0.0.13  (torre-corp)",
@@ -1539,6 +1618,7 @@ function introTerm(done) {
   if (actx) {
     if (actx.state === "suspended") actx.resume().catch(() => {});
     ensureAudioLayers();
+    requestGameAudio();
     if (audioLayers) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.04);
     sfx("ready");
   }
@@ -1589,6 +1669,8 @@ function startGame() {
       actx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {}
   }
+  ensureAudioLayers();
+  requestGameAudio();
   runT = 0;
   tmShown = "";
   $("tmv").textContent = fmtTempo(0);
@@ -2014,6 +2096,7 @@ let actx = null,
   audioStateShown = "",
   customAudioBuffers = Object.create(null),
   customAudioLoad = null,
+  customAudioRequested = false,
   customMusicSource = null,
   hackStreamSource = null,
   hackStreamGain = null,
@@ -2060,8 +2143,11 @@ function setHackStream(active) {
   }
 }
 async function loadCustomAudio() {
-  if (customAudioLoad || !actx) return customAudioLoad;
-  customAudioLoad = Promise.all(Object.entries(CUSTOM_AUDIO).map(async ([key, path]) => {
+  if (!actx) return;
+  if (customAudioLoad) return customAudioLoad;
+  const missing = Object.entries(CUSTOM_AUDIO).filter(([key]) => !customAudioBuffers[key]);
+  if (!missing.length) return;
+  customAudioLoad = Promise.all(missing.map(async ([key, path]) => {
     try {
       const response = await fetch(new URL(path, document.baseURI).toString());
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -2070,7 +2156,8 @@ async function loadCustomAudio() {
       if (key === "stream" && hackStreamWanted) setHackStream(true);
     } catch (error) { console.warn(`Áudio local indisponível (${key}); usando síntese de reserva.`, error); }
   }));
-  return customAudioLoad;
+  try { await customAudioLoad; }
+  finally { customAudioLoad = null; }
 }
 $("snd").onclick = () => {
   mute = !mute;
@@ -2078,6 +2165,7 @@ $("snd").onclick = () => {
   if (audioLayers && actx) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.1);
   if (hackStreamGain && actx) hackStreamGain.gain.setTargetAtTime(mute ? 0.0001 : hackStreamWanted ? 0.13 : 0.0001, actx.currentTime, 0.08);
   audioStateShown = "";
+  if (!mute && customAudioRequested) void loadCustomAudio();
 };
 function sfx(n, i) {
   if (mute || !actx) return;
@@ -2216,7 +2304,10 @@ function ensureAudioLayers() {
   audioLayers.bossLfo = { o: lfo, g: lfoG };
   audioLayers.musicStep = 0;
   audioLayers.musicTimer = window.setInterval(playMusicTick, 520);
-  void loadCustomAudio();
+}
+function requestGameAudio() {
+  customAudioRequested = true;
+  if (!mute) void loadCustomAudio();
 }
 // Música procedural leve: motivos diferentes para menu, infiltração, tensão e encerramento.
 // Tudo passa pelo master existente, portanto mute e o volume geral continuam funcionando.
@@ -2579,6 +2670,7 @@ function applyLevel() {
   applyPhaseReadout();
   bz = 0;
   bi = 0;
+  if (lvl === 4) preloadBossModel(0);
   if (boss) {
     S.remove(boss.g, boss.disc);
     boss = null;
@@ -2640,6 +2732,32 @@ const BOSS = [
 const BOSS_MODEL_URLS = globalThis.BOSS_MODEL_URLS || {};
 const BossGLTFLoader = globalThis.GLTFLoader;
 let bossClips = null; // clipes idle/walk do banqueiro, compartilhados entre chefões
+let bossModelPreload = null;
+function beginBossModelLoad(index) {
+  const config = BOSS[index], url = config && BOSS_MODEL_URLS[config.model];
+  if (!url || !BossGLTFLoader) return Promise.resolve(null);
+  const loader = new BossGLTFLoader();
+  return loader.loadAsync(url).catch((error) => {
+    console.warn(`modelo de chefão indisponível (${config.model}); usando visual reserva:`, error);
+    return null;
+  });
+}
+function preloadBossModel(index) {
+  if (index < 0 || index >= BOSS.length || bossModelPreload) return;
+  const promise = beginBossModelLoad(index);
+  bossModelPreload = { index, promise };
+  promise.then((result) => {
+    if (!result && bossModelPreload?.promise === promise) bossModelPreload = null;
+  });
+}
+function loadBossModel(index) {
+  if (bossModelPreload?.index === index) {
+    const promise = bossModelPreload.promise;
+    bossModelPreload = null;
+    return promise;
+  }
+  return beginBossModelLoad(index);
+}
 function clearBossHazards() {
   bossHazards.forEach((h) => S.remove(h.g));
   bossHazards = [];
@@ -2857,9 +2975,10 @@ function spawnBoss(i) {
   sfx("bossIn", i);
   const modelUrl = BOSS_MODEL_URLS[c.model];
   if (modelUrl && BossGLTFLoader) {
-    const loader = new BossGLTFLoader();
-    loader.load(modelUrl, (res) => {
-      if (!boss || boss.g !== g) return;
+    const modelLoad = loadBossModel(i);
+    if (i + 1 < BOSS.length) preloadBossModel(i + 1);
+    modelLoad.then((res) => {
+      if (!res || !boss || boss.g !== g) return;
       const art = res.scene;
       const box = new T.Box3().setFromObject(art);
       const size = box.getSize(new T.Vector3());
@@ -2904,13 +3023,14 @@ function spawnBoss(i) {
         montar(idle, walk, false);
       } else if (bossClips) montar(bossClips.idle, bossClips.walk, true);
       else
-        new BossGLTFLoader().load(BOSS_MODEL_URLS.banqueiro, (r2) => {
+        loadBossModel(0).then((r2) => {
+          if (!r2 || !boss || boss.g !== g) return;
           bossClips = bossClips || { idle: achar(r2.animations, "idle") || r2.animations[0], walk: achar(r2.animations, "walk") };
           montar(bossClips.idle, bossClips.walk, true);
         });
       g.children.slice(0, 3).forEach((o) => (o.visible = false));
       g.userData.art = art;
-    }, undefined, () => undefined);
+    });
   }
   $("bn").textContent = "CHEFÃO " + (i + 1) + "/3 — " + c.n;
   $("bh").style.width = "100%";
@@ -3232,18 +3352,21 @@ function fxTick(dt) {
     if (ringT > 0.9) ringT = -1;
   } else ringM.material.opacity = 0;
 }
+const perfCapture = window.__ANARCO_PERF_FACTORY__ ? window.__ANARCO_PERF_FACTORY__(fxSystem) : null;
 let slowT = 0,
   collisionFxCd = 0;
 const clock = new T.Clock();
 let time = 0;
 let ultimoQuadro = performance.now();
 function ajustarResolucao(dtReal) {
-  // Janela móvel de 90 quadros: reduz primeiro o preset de FX e depois a resolução.
+  // Janela móvel de 60 quadros: reduz primeiro o preset de FX e depois a resolução.
   if (fxSystem) fxSystem.samplePerformance(dtReal, state === "play");
 }
 let mapAcc = 1;
-function loop() {
+const fxFrameState = { player: P, boss: null, playing: false, dodge: false, ghost: false, alert: 0, hacking: false, blackout: false, phase: "finance" };
+function loop(rafTimestamp) {
   requestAnimationFrame(loop);
+  const perfStart = perfCapture ? performance.now() : 0;
   const rawDt = Math.min(clock.getDelta(), 0.05);
   // tempo REAL do quadro para o ranking (o jogo limita rawDt a 0,05 s; aqui só ignora travadas > 1 s, ex.: aba escondida)
   const agora = performance.now(),
@@ -3251,7 +3374,9 @@ function loop() {
   ultimoQuadro = agora;
   ajustarResolucao(dtReal);
   if (state === "pause") {
+    const updateEnd = perfCapture ? performance.now() : 0;
     fxSystem.render();
+    if (perfCapture) perfCapture.frame(rafTimestamp, updateEnd - perfStart, performance.now() - updateEnd);
     return;
   }
   if (state === "play" && !(endT > 0)) {
@@ -3596,6 +3721,7 @@ function loop() {
     });
     $("hk").style.width = (near ? near.p * 100 : 0) + "%";
     hacking = !!near;
+    if (near) void ensureLaptopModel();
     if (near && lastHackTarget !== near) {
       playHackFeedback("connect");
       lastHackTarget = near;
@@ -3702,21 +3828,22 @@ function loop() {
   C.lookAt(lookX, lookY, lookZ);
   C.updateMatrixWorld();
   positionHackPanel();
-  fxSystem.update(rawDt, {
-    player: P,
-    boss: boss ? boss.g : null,
-    playing: state === "play",
-    dodge: dodgeT > 0,
-    ghost: ghostT > 0,
-    alert: alert_,
-    hacking,
-    blackout: blackoutOn,
-    phase: (PHASE_THEME[lvl] || PHASE_THEME[0]).key,
-  });
+  fxFrameState.player = P;
+  fxFrameState.boss = boss ? boss.g : null;
+  fxFrameState.playing = state === "play";
+  fxFrameState.dodge = dodgeT > 0;
+  fxFrameState.ghost = ghostT > 0;
+  fxFrameState.alert = alert_;
+  fxFrameState.hacking = hacking;
+  fxFrameState.blackout = blackoutOn;
+  fxFrameState.phase = (PHASE_THEME[lvl] || PHASE_THEME[0]).key;
+  fxSystem.update(rawDt, fxFrameState);
   fxTick(dt);
   mapAcc += rawDt;
   if (mapAcc >= 0.05) { mapAcc = 0; drawMap(); }
+  const updateEnd = perfCapture ? performance.now() : 0;
   fxSystem.render();
+  if (perfCapture) perfCapture.frame(rafTimestamp, updateEnd - perfStart, performance.now() - updateEnd);
 }
 C.position.set(0, 14, 36);
 loop();

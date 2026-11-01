@@ -1,10 +1,20 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { AnarcoFxSystem } from './anarco-fx'
+import type { AnarcoPerfCaptureFactory } from './anarco-perf'
+
+class MeshoptGLTFLoader extends GLTFLoader {
+  constructor(manager?: THREE.LoadingManager) {
+    super(manager)
+    this.setMeshoptDecoder(MeshoptDecoder)
+  }
+}
 
 const legacy = window as typeof window & {
   THREE?: typeof THREE
@@ -13,13 +23,14 @@ const legacy = window as typeof window & {
   ANARCO_FX?: { AnarcoFxSystem: typeof AnarcoFxSystem; modules: Record<string, unknown> }
   __ANARCO_FX_INSTANCE__?: AnarcoFxSystem
   __ANARCO_DEBUG__?: boolean
+  __ANARCO_PERF_FACTORY__?: AnarcoPerfCaptureFactory
 }
 
 legacy.THREE = THREE
-legacy.GLTFLoader = GLTFLoader
+legacy.GLTFLoader = MeshoptGLTFLoader
 legacy.ANARCO_FX = {
   AnarcoFxSystem,
-  modules: { EffectComposer, RenderPass, UnrealBloomPass, OutputPass },
+  modules: { EffectComposer, RenderPass, UnrealBloomPass, OutputPass, mergeGeometries },
 }
 legacy.__ANARCO_DEBUG__ = import.meta.env.DEV
 legacy.BOSS_MODEL_URLS = {
@@ -68,4 +79,17 @@ runtime.onload = () => {
     await registerGameTuning(tuning)
   })().catch(error => console.error('ANARCO.EXE Tweak registration failed', error))
 }
-document.body.appendChild(runtime)
+
+async function bootRuntime(): Promise<void> {
+  if (new URLSearchParams(location.search).get('perf') === '1') {
+    try {
+      const { createAnarcoPerfCapture } = await import('./anarco-perf')
+      legacy.__ANARCO_PERF_FACTORY__ = createAnarcoPerfCapture
+    } catch (error) {
+      console.warn('ANARCO.EXE performance capture could not be loaded; continuing without it.', error)
+    }
+  }
+  document.body.appendChild(runtime)
+}
+
+void bootRuntime()
