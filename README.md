@@ -1,4 +1,4 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.0.0)
+# ANARCO.EXE 3D — Breach Protocol (v4.0.1)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**);
 o TypeScript fica só no módulo de efeitos (`src/anarco-fx.ts`) e no carregador (`src/anarco-entry.ts`).
@@ -35,9 +35,10 @@ WASD/setas movem · Shift corre · Espaço = BREACH · E = EMP · Q = VÍRUS · 
 ## Upgrade v4.0.0 — Vigilância Total
 A torre Vigilância Total Corp. agora tem blindagem modular, antena de datacenter e placa identificadora. Ao entrar no raio de hack, um uplink ciano contextual mostra conexão, extração, autenticação root e comprometimento; o fluxo de partículas acompanha o progresso e glitcha em magenta quando a sequência falha. Em telas touch, a interface compacta fica acima do minigame sem bloquear os controles. A chuva de códigos do BREACH fica ativa por padrão no desktop, inclusive com movimento reduzido; no menu, escolha Ativa, Automática ou Desativada. O pacote inclui uma trilha cyberpunk instrumental e quatro efeitos originais (conexão, fluxo de dados, erro e acesso root), armazenados localmente e compatíveis com o mute e o funcionamento offline.
 
-A abertura do terminal apresenta CAPUZ e a operação BREACH em uma sequência cinematográfica, com emblema ASCII original ANARCO.EXE // CAPUZ, digitação acelerada, bip de inicialização e cliques retro de teclado. Os sons são discretos e respeitam o botão Mudo.
+A abertura do terminal apresenta CAPUZ e a operação BREACH em uma sequência cinematográfica, com arte ASCII original ampliada ANARCO.EXE // CAPUZ, digitação acelerada, bip de inicialização e cliques retro de teclado. A habilidade exclusiva NÓ FANTASMA toca um erro curto se tentada com outro operador. Os sons são discretos e respeitam o botão Mudo.
 
 ## Documentação
+- `docs/RELATORIO-MESCLA-V4.0.1.md` — mescla da v4.0.0 com a nossa v3.9.9, correções e validação.
 - `docs/RELATORIO-historico-A-a-P.md` — nossos relatórios (itens A a P, mais o item Q da mescla v3.9).
 - `docs/relatorios-v3.6-a-v3.8/` — relatórios e evidências da linha v3.6 → v3.8.
 - `docs/capturas/` — capturas da v3.9.

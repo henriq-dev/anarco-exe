@@ -109,7 +109,7 @@ canvas {
   z-index: 20; /* ÂNCORA: o menu fica acima do HUD (z-index 8), senão o painel de cima cobre o título do menu */
   overflow-y: auto; /* em tela baixa o painel rola em vez de cortar */
 }
-#ov div {
+#ov > div {
   background: var(--paper);
   color: var(--ink);
   border: 4px solid var(--ink);
@@ -1594,3 +1594,36 @@ body[data-hud="discreto"] #hud:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .hack-panel, .hack-panel *, .hack-trace-cursor { animation: none !important; transition: none !important; }
 }
+
+/* ÂNCORA: AJUSTES v4.0.1 no menu — seletores iguais (inclui o do HUD) e cartão que cabe em telas baixas */
+#ov .fx-settings select { display: block; width: 100%; margin-top: 6px; padding: 7px 9px; border: 2px solid #2fe6ff; border-radius: 2px; background: #080b12; color: #fff; font: inherit; font-size: .82rem; }
+@media (max-height: 760px) and (min-width: 761px) {
+  #ov .fx-settings small:not([id]) { display: none; }
+  #ov { padding-block: 8px; }
+  #ov > .ov-card { gap: 8px 26px; padding-block: 18px; margin-block: 0; }
+}
+@media (max-height: 520px) and (min-width: 761px) { #ov .ov-copy, #ov .fx-settings small { display: none; } }
+
+/* ÂNCORA: PAINÉIS SECUNDÁRIOS (v4.0.1) — mesmo visual neon do menu e sem cobrir os controles do jogo */
+/* Briefing: sobe para o topo (embaixo ele escondia os botões de habilidade e a escolha de rota) */
+#bf { align-items: flex-start; justify-content: center; padding: calc(56px + env(safe-area-inset-top, 0px)) 12px 0; background: none; pointer-events: none; }
+#bf > div { width: min(760px, 100%); padding: 12px 16px; background: linear-gradient(135deg, rgba(11, 13, 27, .9), rgba(18, 8, 27, .88)); border: 1px solid rgba(83, 246, 255, .3); border-left: 4px solid #ff3fd0; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+#bf h2 { font-size: clamp(1.5rem, 3.4vw, 2.2rem); }
+#bf .brief-grid { margin-top: 8px; }
+@media (max-width: 760px), (max-height: 520px) { #bf p:not(.eyebrow) { font-size: .82rem; } #bf .brief-grid strong { font-size: .76rem; } }
+/* Vazamentos e Ranking: cartão escuro neon, lista rolável, botões lado a lado */
+#lk > div, #rk > div { width: min(600px, 100%); max-height: calc(100dvh - 40px); color: #ece9e1; background: linear-gradient(135deg, rgba(11, 13, 27, .97), rgba(18, 8, 27, .95)); border: 1px solid rgba(83, 246, 255, .36); border-left: 4px solid #ff3fd0; box-shadow: 0 18px 70px rgba(0,0,0,.5); }
+#lk h2, #rk h2 { font-size: clamp(1.6rem, 4vw, 2.1rem); color: #fff; }
+#lk h2 span, #rk h2 span { background: none; color: #ff3fd0; padding: 0; text-shadow: 0 0 18px rgba(255, 63, 208, .6); }
+#lk li, #rk li { border-bottom: 1px dashed rgba(255,255,255,.18); padding: 7px 0; font-size: .9rem; }
+#lk li b, #rk li b { color: #53f6ff; }
+#lk ul, #rk ul { max-height: 46dvh; overflow-y: auto; margin: 8px 0 12px; }
+#lk button, #rk button { border: 1px solid rgba(255,255,255,.35); background: #1a1226; color: #fff; padding: 8px 14px; }
+#lk button:first-of-type, #rk button:first-of-type { background: linear-gradient(135deg, #53f6ff, #ff3fd0); color: #080a12; font-weight: 700; }
+/* Pausa: mesmo cartão neon */
+#pz > div { background: linear-gradient(135deg, rgba(11, 13, 27, .97), rgba(18, 8, 27, .95)); color: #ece9e1; border: 1px solid rgba(83, 246, 255, .36); border-left: 4px solid #ff3fd0; transform: none; }
+#pz h2 { color: #fff; } #pz h2 span { background: none; color: #ff3fd0; padding: 0; }
+#pz button { border: 1px solid rgba(255,255,255,.35); background: #1a1226; color: #fff; }
+#pz #pzc { background: linear-gradient(135deg, #53f6ff, #ff3fd0); color: #080a12; font-weight: 700; }
+/* ÂNCORA: caixas de opção com a altura do próprio conteúdo (antes a 1ª esticava e sobrava espaço vazio) */
+#ov .fx-settings { align-self: start; }

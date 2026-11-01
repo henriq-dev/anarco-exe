@@ -1482,17 +1482,22 @@ function hackDone(t) {
 }
 function introTerm(done) {
   const logo = [
-    "                 .-=================-.",
-    "              .-'   /\\   /\\   /\\     '-.",
-    "            .'     /##\\ /##\\ /##\\       '.",
-    "           /      |####|####|####|        \\",
-    "          ;       |##  ANARCO  ##|         ;",
-    "          |       |##   .EXE    ##|        |",
-    "          |       |### [CAPUZ] ###|        |",
-    "          ;        \\#############/         ;",
-    "           \\        '-----------'         /",
-    "            '.   // REDE CLANDESTINA  .'",
-    "              '-._________________.-'",
+    "                         .-==========-.",
+    "                     _.-'  / /\\ \\  '-._",
+    "                  .-'    _/ /####\\ \\_    '-.",
+    "                .'     .-'  /######\\  '-.     '.",
+    "               /      /    |########|    \\      \\",
+    "              ;      |     |##0##0##|     |      ;",
+    "              |      |     |####^###|     |      |",
+    "              |      |      \\#####/      |      |",
+    "              ;       \\      '---'      /       ;",
+    "               \\       '-.           .-'       /",
+    "                '.         '---------        .'",
+    "                  '-._    ._________.    _.-'",
+    "                      \\  /         \\  /",
+    "                       \\/  CAPUZ    \\/",
+    "                    .-==[ ANARCO.EXE ]==-.",
+    "                  // BREACH // NODE 03 //",
   ];
   const L = [
     "> 03:17:09 // DISTRITO FINANCEIRO",
@@ -1515,17 +1520,17 @@ function introTerm(done) {
   tag.style.cssText = "margin-bottom:12px;color:#2fe6ff;font-size:.72em;letter-spacing:.12em;text-shadow:0 0 10px #2fe6ff88";
   const art = document.createElement("pre");
   art.textContent = logo.join("\n");
-  art.style.cssText = "overflow:hidden;margin:0 0 22px;color:#55ff78;font:clamp(7px,2vw,12px)/1.08 monospace;text-shadow:0 0 9px #39ff6a99;white-space:pre;user-select:none";
+  art.style.cssText = "overflow:hidden;margin:0 0 22px;color:#55ff78;font:clamp(7px,1.5vw,15px)/.98 monospace;text-shadow:0 0 12px #39ff6acc;white-space:pre;user-select:none";
   const readout = document.createElement("pre");
   readout.setAttribute("aria-live", "polite");
-  readout.style.cssText = "min-height:12em;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#a7ffb9;text-shadow:0 0 7px #39ff6a44";
+  readout.style.cssText = "min-height:9.6em;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#a7ffb9;text-shadow:0 0 7px #39ff6a44";
   const prompt = document.createElement("div");
   prompt.textContent = "[ CLIQUE OU PRESSIONE UMA TECLA PARA ENTRAR ]";
   prompt.style.cssText = "margin-top:18px;color:#2fe6ff;font-size:.78em;letter-spacing:.08em;animation:introCursor 1s steps(2,start) infinite";
   const style = document.createElement("style");
   style.textContent = "@keyframes introCursor{to{opacity:.35}}@media(max-width:520px){.anarco-intro-tag{letter-spacing:.04em}}";
   tag.classList.add("anarco-intro-tag");
-  shell.append(tag, art, readout);
+  shell.append(art, tag, readout);
   o.append(style, shell);
   document.body.appendChild(o);
   if (!actx) {
@@ -3082,10 +3087,16 @@ function dodge() {
   noteT = 0.8;
   buzz(18);
 }
+let lastGhostDeniedAt = -Infinity;
 function ghostAttack() {
   if (skinAtual !== "vanta") {
     note = "NÓ FANTASMA: selecione a operadora VANTA.";
     noteT = 1.6;
+    const now = performance.now();
+    if (now - lastGhostDeniedAt >= 320) {
+      playHackFeedback("error");
+      lastGhostDeniedAt = now;
+    }
     return;
   }
   if (state !== "play" || ghostCd > 0 || mini) return;

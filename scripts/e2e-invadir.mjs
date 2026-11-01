@@ -25,13 +25,25 @@ try {
   await page.waitForFunction(() => document.body.lastElementChild?.querySelectorAll('pre')[1]?.textContent.startsWith('>'), null, { timeout: 4000 })
   const roteiro = await page.evaluate(async () => await (await fetch('/script.js')).text())
   const arteTerminal = await page.evaluate(() => document.body.lastElementChild?.querySelector('pre')?.textContent || '')
-  ok(arteTerminal.includes('ANARCO') && arteTerminal.includes('[CAPUZ]') && roteiro.includes('03:17:09 // DISTRITO FINANCEIRO') && roteiro.includes('a cidade dorme. as câmeras, não.') && roteiro.includes('OPERAÇÃO BREACH // INICIANDO') && roteiro.includes('Math.floor(elapsed / 5)') && roteiro.includes('}, 24);'), 'a arte ASCII CAPUZ/ANARCO aparece, a narração cinematográfica foi acelerada e o terminal inicia antes da partida')
+  ok(arteTerminal.split('\n').length >= 16 && arteTerminal.includes('ANARCO.EXE') && arteTerminal.includes('CAPUZ') && roteiro.includes('03:17:09 // DISTRITO FINANCEIRO') && roteiro.includes('a cidade dorme. as câmeras, não.') && roteiro.includes('OPERAÇÃO BREACH // INICIANDO') && roteiro.includes('Math.floor(elapsed / 5)') && roteiro.includes('}, 24);'), 'a arte ASCII maior CAPUZ/ANARCO aparece no topo e a narração rápida inicia antes da partida')
+  await page.screenshot({ path: '/tmp/anarco-intro-desktop.png' })
   const audioDoTerminal = await page.evaluate(() => ({ state: actx?.state, master: audioLayers?.master?.gain.value, muted: mute }))
   ok(audioDoTerminal.state === 'running' && audioDoTerminal.master > 0.1 && !audioDoTerminal.muted && roteiro.includes('sfx("ready")') && roteiro.includes('sfx("terminal"') && roteiro.includes('else if (n === "terminal")'), 'bip/cliques do terminal soam pelo mixer ativo e respeitam o mute')
   await page.waitForTimeout(1500)
   await page.mouse.click(500, 300) // encerra o terminal de introdução
   await page.waitForFunction(() => state === 'play', null, { timeout: 30000 })
   ok(true, 'clicar em Invadir inicia a partida (estado "play", sem travar)')
+  const restrictedSkill = await page.evaluate(() => {
+    const feedback = [], originalFeedback = playHackFeedback, originalSkin = skinAtual
+    playHackFeedback = kind => feedback.push(kind)
+    skinAtual = 'capuz'; lastGhostDeniedAt = -Infinity
+    const button = document.getElementById('gx')
+    for (let i = 0; i < 2; i++) button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }))
+    const result = { feedback, message: note }
+    playHackFeedback = originalFeedback; skinAtual = originalSkin
+    return result
+  })
+  ok(restrictedSkill.feedback.length === 1 && restrictedSkill.feedback[0] === 'error' && restrictedSkill.message.includes('selecione a operadora VANTA'), 'habilidade restrita de VANTA toca falha uma vez e preserva a orientação para trocar operador')
   ok((await page.evaluate(() => pick.length)) === 3, 'os 3 itens foram gerados (spawnPickups terminou)')
   ok((await page.evaluate(() => towers.length)) === 3, 'as 3 torres existem')
   // as 6 fases carregam e o chefão só aparece na última
@@ -66,7 +78,8 @@ try {
   ok(true, 'núcleo da Vigilância abre HUD contextual de conexão')
   await page.waitForFunction(() => Number(document.getElementById('hackPercent').textContent.replace('%', '')) > 20, null, { timeout: 5000 })
   ok(await page.evaluate(() => document.getElementById('hackPanel').dataset.state === 'extract'), 'extração inicia e preenche a barra')
-  await page.waitForFunction(() => !!mini, null, { timeout: 10000 })
+  // ÂNCORA: o hack completo leva ~22 s; 10 s era pouco e dava falso erro
+  await page.waitForFunction(() => !!mini, null, { timeout: 45000 })
   ok(await page.evaluate(() => document.getElementById('hackState').textContent === 'ACESSO ROOT'), 'barra completa e começa a autenticação root')
   const audioReady = await page.waitForFunction(() => customAudioBuffers.music && customAudioBuffers.connect && customAudioBuffers.stream && customAudioBuffers.error && customAudioBuffers.root, null, { timeout: 15000 }).then(() => true).catch(() => false)
   ok(audioReady, 'trilha e quatro efeitos originais são decodificados localmente')
@@ -86,7 +99,13 @@ try {
   await mobilePage.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
   await mobilePage.waitForSelector('#st', { state: 'visible', timeout: 30000 })
   await mobilePage.click('#st')
-  await mobilePage.waitForTimeout(1500)
+  await mobilePage.waitForFunction(() => document.body.lastElementChild?.querySelectorAll('pre')[1]?.textContent.includes('OPERAÇÃO BREACH'), null, { timeout: 8000 })
+  const arteMobile = await mobilePage.evaluate(() => {
+    const overlay = document.body.lastElementChild, art = overlay.querySelector('pre'), shell = art.parentElement
+    return { lines: art.textContent.split('\n').length, clipped: art.scrollWidth > shell.clientWidth, pageWidth: document.documentElement.scrollWidth, viewport: innerWidth }
+  })
+  ok(arteMobile.lines >= 16 && !arteMobile.clipped && arteMobile.pageWidth === arteMobile.viewport, 'emblema ASCII maior completo e sem rolagem horizontal no celular')
+  await mobilePage.screenshot({ path: '/tmp/anarco-intro-mobile.png' })
   await mobilePage.mouse.click(195, 300)
   await mobilePage.waitForFunction(() => state === 'play', null, { timeout: 30000 })
   await mobilePage.evaluate(() => {

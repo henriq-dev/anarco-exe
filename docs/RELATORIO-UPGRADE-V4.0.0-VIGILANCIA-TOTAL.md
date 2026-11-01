@@ -10,8 +10,9 @@
 - Os cinco MP3 entram no pré-cache do service worker para uso offline após a primeira visita.
 - A chuva de códigos do especial BREACH fica ativada por padrão no desktop. O menu oferece `Ativa`, `Automática` (respeita a preferência do sistema) e `Desativada`, com escolha persistente; o modo explícito permite ver os códigos mesmo quando o sistema solicita movimento reduzido.
 - A introdução em terminal foi reescrita como uma abertura cinematográfica sobre CAPUZ, as três torres e a operação BREACH, mantendo a estética verde e a digitação progressiva.
-- O terminal ganhou um emblema ASCII original `ANARCO.EXE // CAPUZ`, responsivo, e a velocidade de digitação passou de 15 ms para 5 ms por caractere.
+- O terminal ganhou uma arte ASCII original ampliada `ANARCO.EXE // CAPUZ`, responsiva, e a velocidade de digitação passou de 15 ms para 5 ms por caractere.
 - A introdução toca um bip curto de inicialização e cliques digitais espaçados enquanto o texto aparece; os efeitos são sintetizados pelo Web Audio e passam pelo master existente, respeitando o botão Mudo.
+- A tentativa de acionar `NÓ FANTASMA` com um operador diferente de VANTA toca o som de falha já existente e informa como liberar a habilidade; o guard central cobre botão e tecla `R`, com proteção contra repetição rápida.
 
 ## Capturas do fluxo
 
@@ -47,6 +48,6 @@ Emblema ASCII e narração ajustados à largura do celular:
 | `pnpm test` | 12 arquivos; 79 testes aprovados |
 | `pnpm build` | Aprovado; typecheck, Vite, cópia dos assets e limite de tamanho |
 | `pnpm smoke` | Aprovado; 39 arquivos estáticos, modelos e áudio local na `dist/` |
-| `CHROMIUM_PATH=/usr/bin/chromium pnpm e2e` | Aprovado; emblema e narração da introdução, mixer de bip/cliques com mute, seis fases, chuva BREACH com movimento reduzido, conexão/progresso/root, falha magenta, áudio, reflow mobile, botões touch e ausência de erros JS/HTTP |
+| `CHROMIUM_PATH=/usr/bin/chromium pnpm e2e` | Aprovado; arte ASCII maior sem cortes em desktop/celular, narração, mixer com mute, recusa sonora VANTA sem spam, seis fases, chuva BREACH com movimento reduzido, conexão/progresso/root, falha magenta, áudio, reflow mobile, botões touch e ausência de erros JS/HTTP |
 
 A compilação mantém somente o aviso conhecido do script clássico legado `assets/dados/manifesto.js`, intencional no projeto. O breakpoint mobile foi exercitado em Chromium touch a 390 × 844 px; não substitui a verificação em aparelhos físicos. Os MP3 são pré-cacheados pelo service worker, portanto a disponibilidade offline ocorre após a primeira instalação/cache.

@@ -257,3 +257,6 @@ Dano por segundo no chefão agora: BREACH 4,9 · EMP 2,5 · VÍRUS 2,0. Cada uma
 **Conceitos:** especificidade de CSS (`body[data-hud] #hud #id` vence `#hud .b`), `grid-template-areas` com `grid-area` em cada filho, `font-size: 0` para esconder um rótulo sem mexer no HTML, `border-left` + `box-shadow` como linha-guia, valor salvo em `localStorage`.
 **Teste:** captura 1200 × 680 sem corte nem sobreposição, objetivo no topo livre, 0 erros no console.
 **Lição:** regra escrita depois e com mais IDs ganha. Foi isso que deixou o primeiro rascunho quebrado (textos empilhados e barras sumidas).
+
+## Item Z — Mescla v4.0.1 (Difícil)
+Resumo: nossa v3.9.9 + pacote v4.0.0 (Vigilância Total, áudio, terminal, chuva de código, menu horizontal), com 8 correções. Relatório completo: `docs/RELATORIO-MESCLA-V4.0.1.md`.
