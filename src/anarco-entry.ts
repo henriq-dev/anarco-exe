@@ -69,16 +69,6 @@ runtime.onload = () => {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (!bootFailed && bootScreen) bootScreen.hidden = true
   }))
-  if (!import.meta.env.DEV) return
-  void (async () => {
-    const [{ registerGameTuning }, { tuning }] = await Promise.all([
-      import('../scripts/manus-tuning/adapter.js'),
-      import('./game/tuning'),
-    ])
-    const fx = legacy.__ANARCO_FX_INSTANCE__
-    if (fx) tuning.apply({ 'fx.quality': ['low', 'medium', 'high'].indexOf(fx.selectedQuality) })
-    await registerGameTuning(tuning)
-  })().catch(error => console.error('ANARCO.EXE Tweak registration failed', error))
 }
 
 async function bootRuntime(): Promise<void> {

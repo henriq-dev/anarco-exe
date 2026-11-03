@@ -51,6 +51,9 @@ export class VersionedSaveStorage {
     if (validEnvelope(parsed)) {
       this.values = { ...parsed.values }
       this.readOnlyFutureSchema = false
+      // As chaves legadas são espelhadas a cada gravação, então uma chave legada que diverge do envelope
+      // só pode ter sido escrita por fora dele (build antiga após rollback, outra aba). Ela vence.
+      if (this.reconcileWithLegacy()) this.persistEnvelope()
       return
     }
 
@@ -64,6 +67,22 @@ export class VersionedSaveStorage {
       } catch { /* inaccessible key is left untouched */ }
     }
     if (!this.readOnlyFutureSchema) this.persistEnvelope()
+  }
+
+  /** Aplica ao envelope as chaves legadas que divergem dele ou que ele não conhece. Retorna true se algo mudou. */
+  private reconcileWithLegacy(): boolean {
+    let changed = false
+    for (const key of LEGACY_SAVE_KEYS) {
+      let legacy: string | null | undefined
+      try { legacy = this.storage?.getItem(key) } catch { continue /* chave inacessível: mantém o envelope */ }
+      // Chave legada ausente não apaga o valor do envelope (pode ser falha de espelhamento/cota).
+      if (legacy === null || legacy === undefined) continue
+      if (this.values[key] !== legacy) {
+        this.values[key] = legacy
+        changed = true
+      }
+    }
+    return changed
   }
 
   getItem(key: string): string | null {

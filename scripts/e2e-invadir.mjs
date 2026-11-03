@@ -354,6 +354,29 @@ try {
     return { actions: height('#touchActions button'), routes: height('#routePicker button'), hud: height('#hudActions button'), pageWidth: document.documentElement.scrollWidth }
   })
   ok([...touchTargetsLandscape.actions, ...touchTargetsLandscape.routes, ...touchTargetsLandscape.hud].every(height => height >= 44) && touchTargetsLandscape.pageWidth === 844, 'alvos touch mantêm 44px em paisagem sem rolagem horizontal')
+  // v4.2.1: celular deitado — HUD enxuto e tutorial fora dos botões de habilidade (regressão do HUD de ~40% da altura).
+  for (const [width, height] of [[844, 390], [667, 375], [932, 430]]) {
+    await mobilePage.setViewportSize({ width, height })
+    await mobilePage.evaluate(() => { tut = 0; tutShow() })
+    await mobilePage.waitForFunction(() => !document.getElementById('tut').hidden, null, { timeout: 5000 })
+    await mobilePage.waitForTimeout(400)
+    const landscapeHud = await mobilePage.evaluate(() => {
+      const rect = id => { const r = document.getElementById(id).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom } }
+      const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+      const tut = rect('tut'), hud = rect('hud')
+      const skills = ['bz', 'hx', 'vx'].map(id => [id, rect(id)])
+      return {
+        hudRatio: hud.bottom / innerHeight, tutBelowHud: tut.top >= hud.bottom, tutInside: tut.left >= 0 && tut.right <= innerWidth && tut.bottom <= innerHeight,
+        coveredSkills: skills.filter(([, r]) => hit(tut, r)).map(([id]) => id),
+        objClear: !hit(rect('obj'), tut), pageWidth: document.documentElement.scrollWidth, viewport: innerWidth,
+        readoutsStillAnnounced: ['drread', 'sideRead', 'routeRead'].every(id => document.getElementById(id).getBoundingClientRect().width <= 2 && getComputedStyle(document.getElementById(id)).display !== 'none'),
+      }
+    })
+    ok(landscapeHud.hudRatio <= 0.15 && landscapeHud.tutBelowHud && landscapeHud.tutInside && landscapeHud.coveredSkills.length === 0 && landscapeHud.objClear && landscapeHud.pageWidth === landscapeHud.viewport,
+      `HUD enxuto (${(landscapeHud.hudRatio * 100).toFixed(0)}% da altura) e tutorial sem cobrir BREACH/EMP/VÍRUS em ${width}×${height}`)
+    ok(landscapeHud.readoutsStillAnnounced, `leituras secundárias do HUD continuam acessíveis a leitores de tela em ${width}×${height}`)
+  }
+  await mobilePage.evaluate(() => { tut = -1; tutShow() })
   await mobilePage.setViewportSize({ width: 390, height: 844 })
   await mobilePage.evaluate(() => {
     tut = -1; tutShow(); const t = towers[2]; drones.forEach(d => d.position.set(90, 5, 90));

@@ -41,13 +41,49 @@ describe('active legacy save migration', () => {
     expect(JSON.parse(values.get(VERSIONED_SAVE_KEY)!).values).not.toHaveProperty('anarco_tut')
   })
 
-  it('uses a valid v1 record on subsequent boots instead of re-importing stale legacy data', () => {
-    const { storage, values } = memoryStorage({ anarco_skin: 'capuz' })
+  it('prefers a diverging legacy key over the envelope on boot (rollback or another tab wrote it)', () => {
+    const { storage, values } = memoryStorage({ anarco_skin: 'capuz', anarco_progress: '{"wins":1}' })
     const first = new VersionedSaveStorage(storage)
     first.setItem('anarco_skin', 'vanta')
-    values.set('anarco_skin', 'capuz')
+    // Build antiga (rollback) ou outra aba grava só a chave legada, sem tocar no envelope.
+    values.set('anarco_skin', 'cachos')
     const second = new VersionedSaveStorage(storage)
-    expect(second.getItem('anarco_skin')).toBe('vanta')
+    expect(second.getItem('anarco_skin')).toBe('cachos')
+    expect(JSON.parse(values.get(VERSIONED_SAVE_KEY)!).values.anarco_skin).toBe('cachos')
+    expect(second.getItem('anarco_progress')).toBe('{"wins":1}')
+  })
+
+  it('imports legacy keys the envelope does not know yet', () => {
+    const { storage, values } = memoryStorage({ [VERSIONED_SAVE_KEY]: JSON.stringify({ version: 1, values: { anarco_skin: 'vanta' } }), anarco_rank: '[{"s":50}]' })
+    const migrated = new VersionedSaveStorage(storage)
+    expect(migrated.getItem('anarco_rank')).toBe('[{"s":50}]')
+    expect(JSON.parse(values.get(VERSIONED_SAVE_KEY)!).values.anarco_rank).toBe('[{"s":50}]')
+  })
+
+  it('keeps the envelope value when the legacy mirror is missing', () => {
+    const { storage, values } = memoryStorage({ anarco_skin: 'vanta' })
+    new VersionedSaveStorage(storage)
+    values.delete('anarco_skin')
+    expect(new VersionedSaveStorage(storage).getItem('anarco_skin')).toBe('vanta')
+  })
+
+  it('does not rewrite the envelope when legacy keys already match it', () => {
+    const { storage, values } = memoryStorage({ anarco_skin: 'vanta' })
+    new VersionedSaveStorage(storage)
+    const before = values.get(VERSIONED_SAVE_KEY)
+    let writes = 0
+    const counting: StorageLike = { ...storage, setItem: (k, v) => { writes++; storage.setItem(k, v) } }
+    new VersionedSaveStorage(counting)
+    expect(writes).toBe(0)
+    expect(values.get(VERSIONED_SAVE_KEY)).toBe(before)
+  })
+
+  it('does not touch a future-schema envelope even if legacy keys differ', () => {
+    const future = JSON.stringify({ version: 2, values: { anarco_skin: 'x' } })
+    const { storage, values } = memoryStorage({ [VERSIONED_SAVE_KEY]: future, anarco_skin: 'capuz' })
+    const migrated = new VersionedSaveStorage(storage)
+    migrated.setItem('anarco_skin', 'vanta')
+    expect(values.get(VERSIONED_SAVE_KEY)).toBe(future)
   })
 
   it('recovers a corrupt container from legacy keys without throwing', () => {

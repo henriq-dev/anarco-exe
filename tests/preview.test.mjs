@@ -23,13 +23,12 @@ function readSource(host) {
   })
 }
 
-it.each(['localhost', '127.0.0.1', 'preview.manus.computer', 'preview.manuspre.computer',
-  'preview.manus-asia.computer', 'preview.manuscomputer.ai', 'preview.manusvm.computer'])(
+it.each(['localhost', '127.0.0.1'])(
   'allows source requests through the supported preview host %s', async host => {
     expect(await readSource(host)).toBe(200)
   },
 )
-it.each(['attacker.example', 'manus.computer.attacker.example'])(
+it.each(['attacker.example', 'localhost.attacker.example', 'preview.manus.computer'])(
   'rejects source requests from untrusted Host %s', async host => {
     expect(await readSource(host)).toBe(403)
   },

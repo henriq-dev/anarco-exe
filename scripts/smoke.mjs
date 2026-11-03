@@ -42,7 +42,6 @@ const required = [
   'script.js',
   'assets/dados/manifesto.js',
   'manifest.webmanifest',
-  'manus-routes.json',
   'assets/share/favicon.svg',
   'assets/share/favicon.png',
   'assets/share/favicon-180.png',
@@ -66,9 +65,6 @@ const required = [
   'fonts/SpecialElite-Latin.woff2',
   'fonts/SpecialElite-LICENSE.txt',
   'fonts/SpecialElite-NOTICE.txt',
-  'fonts/ManusCC0-Regular.ttf',
-  'fonts/ManusCC0-Medium.ttf',
-  'fonts/ManusCC0-Bold.ttf',
 ]
 for (const path of required) assert.ok(existsSync(join(root, path)), `required local game asset is missing: ${path}`)
 const bossModels = [
@@ -123,8 +119,9 @@ const serviceWorker = readFileSync(join(root, 'sw.js'), 'utf8')
 assert.ok(!serviceWorker.includes('assets/audio/') && !serviceWorker.includes('assets/models/laptop.mdl'), 'large audio and laptop assets must not be precached')
 assert.ok(serviceWorker.includes('status: 503') && serviceWorker.includes('cache.put(request, response.clone())'), 'lazy assets must be cached on successful use and fail safely offline')
 
-const routes = JSON.parse(readFileSync(join(root, 'manus-routes.json'), 'utf8'))
-assert.deepEqual(routes.routes.map(route => route.path), ['/'], 'the route manifest must match the single-page game')
+for (const leftover of ['manus-routes.json', 'fonts/ManusCC0-Regular.ttf', 'fonts/ManusCC0-Medium.ttf', 'fonts/ManusCC0-Bold.ttf', 'fonts/ManusCC0-LICENSE.txt']) {
+  assert.ok(!existsSync(join(root, leftover)), `template leftover must not be published: ${leftover}`)
+}
 
 const walk = dir => readdirSync(dir).flatMap(name => {
   const path = join(dir, name)

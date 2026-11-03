@@ -1,6 +1,16 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.2.0)
+# ANARCO.EXE 3D — Breach Protocol (v4.2.1)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
+
+## v4.2.1 — save com chave legada, HUD de celular deitado e limpeza do template
+
+**Save.** Desde a v4.1.9 o envelope `anarco_save_v1` vencia sempre a chave antiga; se um rollback ou outra aba gravasse só a chave legada, essa gravação era ignorada. Agora, no boot, uma chave legada que **diverge** do envelope vence e o envelope é reescrito com ela; chaves legadas que o envelope ainda não conhece também são importadas. Chave legada **ausente** não apaga o valor do envelope (pode ser falha de espelhamento por cota). Um envelope de versão futura continua intocado. Cobertura em `tests/anarco-save-migration.test.ts` (4 casos novos e o teste antigo, que afirmava o comportamento contrário, foi substituído).
+
+**HUD em celular deitado (844×390 e similares).** Em `pointer: coarse`, até 980 px de largura e 500 px de altura em paisagem, o HUD vira uma faixa única de ~33 px (nível, tempo, torres, HACK, ALERTA e chefão); antes ocupava ~130 px (≈33% da altura). Fase, drones, operação secundária e rota deixam de aparecer, mas continuam no DOM e são anunciados por leitores de tela. Pausa e som saem da faixa e ficam fixos no canto, mantendo alvos de 44 px. O objetivo, o tutorial e o aviso de chefão seguem a altura real da faixa e ficam abaixo dela, sem cobrir BREACH/EMP/VÍRUS. O E2E valida 844×390, 667×375 e 932×430. Nenhuma regra de desktop ou retrato mudou. Não foi testado em aparelho físico.
+
+**Limpeza.** Removidos arquivos do template Manus que não faziam parte do jogo: `.manus-starter-init.json`, `template.json`, `app.config.ts`, `game-sharing.json`, `assets.lock.json` (apontava para `/manus-storage`), `bun.lock` (o projeto usa pnpm), `scripts/manus-*`, `scripts/__manus__`, `public/manus-routes.json`, as fontes ManusCC0 (não eram usadas pela interface) e o teste do metadado de compartilhamento. O `vite.config.ts` perdeu o plugin de tuning e os hosts `*.manus*`; o bloco de registro do Tweak em desenvolvimento saiu de `anarco-entry.ts`; o gancho `__ANARCO_PLAYTEST__` agora só existe em `localhost`/`127.0.0.1`. O `smoke` passou a exigir que esses arquivos não sejam publicados. `src/game` e `src/engine` (item 3) não foram tocados.
+
+Itens que continuam abertos: fonte única de verdade (destino do scaffold `src/game`/`src/engine`), antialias adaptativo por pós-processamento (FXAA), compressão dos `.mdl`, medição em aparelhos reais com `?perf=1`, Brotli/Lighthouse em produção e leitor de tela real.
 
 ## v4.2.0 — gamepad e Bloom sob demanda
 
@@ -65,7 +75,7 @@ Menu, pausa, vazamentos, ranking e terminal introdutório passaram a ter nomes d
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000 (ou a porta que o Vite mostrar)
-pnpm test         # 17 arquivos / 95 testes
+pnpm test         # 16 arquivos / 94 testes
 pnpm build        # gera dist/ (typecheck + Vite + assets + budgets por categoria)
 pnpm smoke        # depois do build: confere os arquivos e modelos da dist/
 pnpm e2e          # gameplay, modelos, áudio/offline, desktop e celular (Chromium)
@@ -93,7 +103,7 @@ No Windows (PowerShell), se o `npm` reclamar de scripts desabilitados: `Set-Exec
    - Install Command: `pnpm install`
 4. Plano B: rode `pnpm build` no seu computador e publique só a pasta `dist/`.
 
-Os assets do jogo estão incluídos no projeto. Os três modelos de chefes usam texturas WebP e geometria Meshopt; o `assets.lock.json` referencia as cópias verificadas do CDN para restaurar os arquivos binários.
+Os assets do jogo estão incluídos no projeto. Os três modelos de chefes usam texturas WebP e geometria Meshopt; os binários ficam versionados no próprio repositório (`assets/`).
 
 ## Controles
 

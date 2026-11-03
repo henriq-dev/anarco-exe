@@ -4414,7 +4414,7 @@ openModal("ov", "st");
 
 // Diagnóstico local: não é carregado em produção pública. Permite validar layouts
 // e colisões sem alterar o fluxo normal do jogador ou depender de estado global.
-if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.hostname.endsWith(".manus.computer")) {
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
   window.__ANARCO_PLAYTEST__ = {
     startLevel(index) {
       tut = -1;
