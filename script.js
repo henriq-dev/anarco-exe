@@ -7,12 +7,15 @@
 
 // ÂNCORA: armazenamento seguro — se o navegador bloquear o localStorage (modo privado, cookies
 // desligados), o jogo continua funcionando; só não guarda tutorial, finais e vazamentos.
+const saveStorage = globalThis.ANARCO_SAVE_STORAGE;
 const guardar = (chave, valor) => {
+  if (saveStorage) { saveStorage.setItem(chave, valor); return; }
   try {
     localStorage.setItem(chave, valor);
   } catch (e) {}
 };
 const ler = (chave) => {
+  if (saveStorage) return saveStorage.getItem(chave);
   try {
     return localStorage.getItem(chave);
   } catch (e) {
@@ -20,6 +23,7 @@ const ler = (chave) => {
   }
 };
 const apagar = (chave) => {
+  if (saveStorage) { saveStorage.removeItem(chave); return; }
   try {
     localStorage.removeItem(chave);
   } catch (e) {}
@@ -37,6 +41,8 @@ if (location.protocol === "file:") {
   av.querySelector("button").onclick = () => av.remove();
   document.body.append(av);
 }
+const gameplayConfig = window.ANARCO_GAMEPLAY_CONFIG;
+if (!gameplayConfig) throw new Error("ANARCO gameplay configuration was not installed before the runtime.");
 const T = THREE,
   $cache = new Map(),
   $ = (id) => {
@@ -49,9 +55,111 @@ const T = THREE,
     return el;
   };
 // OTIMIZAÇÃO: só mexe na página quando o valor muda (evita recalcular estilos a cada quadro)
-const setTxt = (el, v) => { if (el && el.__t !== v) { el.__t = v; el.textContent = v; } };
+const setTxt = (el, v) => { if (el) { const text = String(v); if (el.textContent !== text) el.textContent = text; } };
 const setCls = (el, c, on) => { if (!el) return; const k = "__c_" + c; if (el[k] !== on) { el[k] = on; el.classList.toggle(c, on); } };
 const setSty = (el, prop, v) => { if (el) { const k = "__s_" + prop; if (el[k] !== v) { el[k] = v; el.style[prop] = v; } } };
+const setAttr = (el, name, v) => { if (el) { const value = String(v); if (el.getAttribute(name) !== value) el.setAttribute(name, value); } };
+const modalIds = ["ov", "pz", "lk", "rk", "introTerminal"],
+  modalBackgroundIds = ["hud", "msg", "fxFlash", "leakcard", "obj", "objAnnounce", "hackPanel", "bf", "mini", "tut", "map-wrap", "touchActions", "routePicker", "joy"],
+  modalReturnTargets = new Map();
+function isRenderedInPage(el) {
+  if (!el || !el.isConnected) return false;
+  for (let node = el; node && node !== document; node = node.parentElement) {
+    if (node.hidden) return false;
+    const style = getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+  }
+  return true;
+}
+function isVisibleInPage(el) {
+  if (!isRenderedInPage(el)) return false;
+  for (let node = el; node && node !== document; node = node.parentElement) if (node.inert) return false;
+  return true;
+}
+function getActiveModal() {
+  for (const id of ["introTerminal", "lk", "rk", "pz", "ov"]) {
+    const el = $(id);
+    if (el && isRenderedInPage(el)) return el;
+  }
+  return null;
+}
+function getModalFocusables(dialog) {
+  return [...dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(isVisibleInPage);
+}
+function syncModalA11y() {
+  const active = getActiveModal();
+  for (const id of modalIds) {
+    const dialog = $(id);
+    if (!dialog) continue;
+    const isActive = dialog === active;
+    dialog.inert = !!active && !isActive;
+    setAttr(dialog, "aria-modal", isActive ? "true" : "false");
+    setAttr(dialog, "aria-hidden", isActive ? "false" : "true");
+  }
+  for (const id of modalBackgroundIds) {
+    const node = $(id);
+    if (node) node.inert = !!active;
+  }
+  document.querySelectorAll("canvas:not(#map)").forEach((canvas) => { canvas.inert = !!active; });
+  return active;
+}
+function focusInModal(dialog, preferredId) {
+  if (!dialog) return;
+  const preferred = preferredId ? $(preferredId) : null;
+  const target = preferred && dialog.contains(preferred) && isVisibleInPage(preferred) ? preferred : getModalFocusables(dialog)[0];
+  if (target) target.focus({ preventScroll: true });
+  else dialog.focus({ preventScroll: true });
+}
+function openModal(id, preferredId) {
+  const dialog = $(id);
+  if (!dialog) return;
+  const previous = getActiveModal();
+  if (previous !== dialog || !modalReturnTargets.has(dialog)) modalReturnTargets.set(dialog, document.activeElement);
+  const active = syncModalA11y();
+  if (active === dialog && (previous !== dialog || !dialog.contains(document.activeElement) || !isVisibleInPage(document.activeElement))) focusInModal(dialog, preferredId);
+}
+function closeModal(id, fallbackId, forceFallback = false) {
+  const dialog = $(id);
+  if (!dialog) return;
+  if (id === "ov") dialog.style.display = "none";
+  else dialog.hidden = true;
+  const returnTarget = modalReturnTargets.get(dialog);
+  modalReturnTargets.delete(dialog);
+  const active = syncModalA11y();
+  if (active) {
+    if (!forceFallback && returnTarget && returnTarget !== document.body && active.contains(returnTarget) && isVisibleInPage(returnTarget)) returnTarget.focus({ preventScroll: true });
+    else focusInModal(active);
+    return;
+  }
+  const fallback = fallbackId ? $(fallbackId) : null;
+  const target = !forceFallback && returnTarget && returnTarget !== document.body && returnTarget !== document.documentElement && isVisibleInPage(returnTarget) ? returnTarget : isVisibleInPage(fallback) ? fallback : null;
+  if (target) target.focus({ preventScroll: true });
+}
+document.addEventListener("keydown", (event) => {
+  const dialog = getActiveModal();
+  if (!dialog) return;
+  if (event.key === "Escape" && (dialog.id === "lk" || dialog.id === "rk")) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeModal(dialog.id, dialog.id === "lk" ? "lb" : "rb");
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const items = getModalFocusables(dialog);
+  if (!items.length) {
+    event.preventDefault();
+    dialog.focus({ preventScroll: true });
+    return;
+  }
+  const first = items[0], last = items[items.length - 1], focused = document.activeElement;
+  if (event.shiftKey && (focused === first || focused === dialog || !dialog.contains(focused))) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  } else if (!event.shiftKey && (focused === last || !dialog.contains(focused))) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+  }
+}, true);
 function syncHudClearance() {
   const hud = $("hud"), obj = $("obj"), routes = $("routePicker");
   if (!hud || !obj || !routes) return;
@@ -165,12 +273,16 @@ const rnd = () => {
 $("ic_d").src = ICON.data;
 $("ic_h").src = ICON.hack;
 $("ic_a").src = ICON.drone;
-// ÂNCORA: celular (toque) com tela densa gasta muita GPU: limita os pixels e dispensa o antialias (MSAA)
+// FXAA substitui o MSAA imutável do contexto para que os perfis/adaptação possam alternar antialias em runtime.
 let fxSystem = null;
 const toque = matchMedia("(pointer: coarse)").matches;
-const R = new T.WebGLRenderer({ antialias: !(toque && devicePixelRatio >= 2) });
+const R = new T.WebGLRenderer({ antialias: false });
 let pixelRatio = Math.min(devicePixelRatio, toque ? 1.25 : 2);
 R.setPixelRatio(pixelRatio);
+R.domElement.id = "gameCanvas";
+R.domElement.tabIndex = -1;
+R.domElement.setAttribute("role", "img");
+R.domElement.setAttribute("aria-label", "Cena 3D do ANARCO.EXE. WASD, setas ou analógico movem; Espaço ou botão A ativa BREACH; P, Escape ou Start abre a pausa.");
 document.body.prepend(R.domElement);
 const S = new T.Scene();
 S.background = new T.Color(0x0a0818);
@@ -184,11 +296,21 @@ const sun = new T.DirectionalLight(0xff6a5a, 0.5);
 sun.position.set(-10, 30, 10);
 sun.userData.anarcoKeyLight = true;
 S.add(sun);
+let resizeFramePending = false;
 function resize() {
   R.setSize(innerWidth, innerHeight);
   C.aspect = innerWidth / innerHeight;
   C.updateProjectionMatrix();
-  if (fxSystem) fxSystem.resize();
+  if (fxSystem) {
+    fxSystem.resize();
+    if ((state === "menu" || state === "pause") && !resizeFramePending) {
+      resizeFramePending = true;
+      requestAnimationFrame(() => {
+        resizeFramePending = false;
+        if (state === "menu" || state === "pause") fxSystem.render();
+      });
+    }
+  }
 }
 addEventListener("resize", resize);
 resize();
@@ -1258,8 +1380,72 @@ function updatePlayerFx(dt) {
 
 // input
 const keys = {};
+let gamepadMoveX = 0, gamepadMoveZ = 0, gamepadSprint = false;
+let gamepadPrevious = [], gamepadIdentity = "";
+function pollGamepad() {
+  let pad = null;
+  try { pad = [...(navigator.getGamepads?.() || [])].find((item) => item && item.connected && item.mapping === "standard") || null; } catch (e) {}
+  if (!pad) {
+    gamepadMoveX = gamepadMoveZ = 0;
+    gamepadSprint = false;
+    gamepadPrevious = [];
+    gamepadIdentity = "";
+    return null;
+  }
+  const identity = `${pad.index}:${pad.id}`;
+  if (identity !== gamepadIdentity) { gamepadPrevious = []; gamepadIdentity = identity; }
+  const down = pad.buttons.map((button) => !!button && (button.pressed || button.value > 0.5));
+  const pressed = (index) => !!down[index] && !gamepadPrevious[index];
+  const axis = (value) => Math.abs(value) < 0.18 ? 0 : Math.sign(value) * (Math.abs(value) - 0.18) / 0.82;
+  gamepadMoveX = axis(pad.axes[0] || 0) + (down[15] ? 1 : 0) - (down[14] ? 1 : 0);
+  gamepadMoveZ = axis(pad.axes[1] || 0) + (down[13] ? 1 : 0) - (down[12] ? 1 : 0);
+  const moveLength = Math.hypot(gamepadMoveX, gamepadMoveZ);
+  if (moveLength > 1) { gamepadMoveX /= moveLength; gamepadMoveZ /= moveLength; }
+  gamepadSprint = !!down[10];
+  const modal = getActiveModal();
+  if (modal) {
+    const nav = pressed(12) || pressed(13) || pressed(14) || pressed(15);
+    if (nav) {
+      const items = getModalFocusables(modal), current = items.indexOf(document.activeElement);
+      if (items.length) {
+        const delta = pressed(13) || pressed(15) ? 1 : -1;
+        const next = items[(Math.max(0, current) + delta + items.length) % items.length];
+        if ((pressed(14) || pressed(15)) && document.activeElement instanceof HTMLSelectElement) {
+          const select = document.activeElement, direction = pressed(15) ? 1 : -1;
+          select.selectedIndex = (select.selectedIndex + direction + select.options.length) % select.options.length;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        } else next.focus({ preventScroll: true });
+      }
+    }
+    if (pressed(0)) {
+      if (modal.id === "introTerminal") modal.click();
+      else if (document.activeElement instanceof HTMLElement) document.activeElement.click();
+    }
+    if (pressed(1) || (modal.id === "pz" && pressed(9))) {
+      if (modal.id === "lk" || modal.id === "rk") closeModal(modal.id, modal.id === "lk" ? "lb" : "rb");
+      else if (modal.id === "pz") togglePause();
+      else if (modal.id === "introTerminal") modal.click();
+    }
+  } else if (state === "play") {
+    if (pressed(9) || pressed(1)) togglePause();
+    else if (mini) {
+      if (pressed(14)) miniKey(0);
+      else if (pressed(12)) miniKey(1);
+      else if (pressed(15)) miniKey(2);
+      else if (pressed(13)) miniKey(3);
+    } else {
+      if (pressed(0)) breach();
+      if (pressed(2)) empAttack();
+      if (pressed(3)) virusAttack();
+      if (pressed(4)) dodge();
+      if (pressed(5)) ghostAttack();
+    }
+  } else if (state === "pause" && (pressed(9) || pressed(1))) togglePause();
+  gamepadPrevious = down;
+  return { connected: true };
+}
 // ÂNCORA: se a janela perde o foco (ou a aba some), o "soltar tecla" nunca chega — então zeramos tudo, senão o personagem anda sozinho
-const soltarTeclas = () => Object.keys(keys).forEach((k) => (keys[k] = 0));
+const soltarTeclas = () => { Object.keys(keys).forEach((k) => (keys[k] = 0)); gamepadMoveX = gamepadMoveZ = 0; gamepadSprint = false; gamepadPrevious = []; };
 addEventListener("blur", soltarTeclas);
 document.addEventListener("visibilitychange", () => document.hidden && soltarTeclas());
 addEventListener("keydown", (e) => (keys[e.key.toLowerCase()] = 1));
@@ -1363,7 +1549,7 @@ const codeRainSelect = $("codeRainMode");
 const codeRainStatus = $("codeRainStatus");
 let codeRainMode = matchMedia("(pointer: coarse)").matches ? "auto" : "on";
 try {
-  const savedCodeRainMode = localStorage.getItem("anarco_code_rain_mode");
+  const savedCodeRainMode = ler("anarco_code_rain_mode");
   if (["on", "auto", "off"].includes(savedCodeRainMode)) codeRainMode = savedCodeRainMode;
 } catch { /* preferência apenas desta sessão */ }
 if (codeRainSelect) {
@@ -1373,7 +1559,7 @@ if (codeRainSelect) {
     if (codeRainStatus) codeRainStatus.textContent = codeRainMode === "on"
       ? "ATIVA · chuva de códigos no BREACH"
       : codeRainMode === "auto" ? "AUTOMÁTICA · segue Reduzir Movimento do sistema" : "DESATIVADA";
-    try { localStorage.setItem("anarco_code_rain_mode", codeRainMode); } catch { /* preferência apenas desta sessão */ }
+    guardar("anarco_code_rain_mode", codeRainMode);
   };
   codeRainSelect.addEventListener("change", syncCodeRainSetting);
   syncCodeRainSetting();
@@ -1394,6 +1580,7 @@ function cameraShot(kind, x, z) {
   return shot;
 }
 function reset(keep) {
+  const menuWasOpen = getActiveModal()?.id === "ov";
   if (!keep) {
     lvl = 0;
     resetStats();
@@ -1421,6 +1608,7 @@ function reset(keep) {
   won = false;
   if (model) model.rotation.set(0, 0, 0);
   cnt = 0;
+  lastObjectiveAnnouncement = "";
   alert_ = 0;
   grace = 1.5;
   shake = 0;
@@ -1448,7 +1636,11 @@ function reset(keep) {
   state = "play";
   applyPhaseReadout();
   $("stats").hidden = true;
-  $("ov").style.display = "none";
+  if (menuWasOpen) closeModal("ov", "gameCanvas", true);
+  else {
+    $("ov").style.display = "none";
+    syncModalA11y();
+  }
   $("ov").dataset.mode = "menu";
 }
 function chooseEnd(k) {
@@ -1466,6 +1658,7 @@ function chooseEnd(k) {
       "Você guardou os arquivos e mandou um recado ao CEO. Agora as corporações pagam e obedecem... a você. O capuz sem chefe virou o novo chefe.";
   }
   $("st").textContent = "Jogar de novo";
+  openModal("ov", "st");
 }
 $("cCaos").onclick = () => chooseEnd("caos");
 $("cSomb").onclick = () => chooseEnd("sombrio");
@@ -1517,6 +1710,7 @@ function end(win) {
   }
   $("ov").style.display = "flex";
   $("ov").dataset.mode = "results";
+  openModal("ov", win ? "cCaos" : "st");
   // O mesmo cartão é reutilizado entre menu, vitória e derrota: sempre reabre no topo.
   $("ov").scrollTop = 0;
   const overlayCard = $("ov").querySelector(".ov-card");
@@ -1590,7 +1784,11 @@ function introTerm(done) {
     "> OPERAÇÃO BREACH // INICIANDO",
   ];
   const o = document.createElement("div");
+  o.id = "introTerminal";
+  o.setAttribute("role", "dialog");
+  o.setAttribute("aria-modal", "false");
   o.setAttribute("aria-label", "Terminal clandestino CAPUZ — clique ou pressione qualquer tecla para iniciar");
+  o.tabIndex = -1;
   o.style.cssText = "position:fixed;inset:0;z-index:9999;overflow:auto;display:grid;place-items:center;box-sizing:border-box;padding:5vh 5vw;background:radial-gradient(ellipse at 50% 42%,#071509 0%,#020603 48%,#000 100%);color:#48ff72;font:clamp(12px,2vw,18px)/1.45 'Special Elite',monospace;cursor:pointer";
   const shell = document.createElement("div");
   shell.style.cssText = "box-sizing:border-box;width:min(900px,100%);padding:clamp(16px,4vw,38px);border-left:2px solid #39ff6a;background:linear-gradient(90deg,#07120b88,transparent 78%);box-shadow:-12px 0 36px #39ff6a16";
@@ -1612,6 +1810,7 @@ function introTerm(done) {
   shell.append(art, tag, readout);
   o.append(style, shell);
   document.body.appendChild(o);
+  openModal("introTerminal");
   if (!actx) {
     try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
   }
@@ -1631,6 +1830,7 @@ function introTerm(done) {
     if (fin) return;
     fin = true;
     clearInterval(t);
+    closeModal("introTerminal", "pb");
     o.remove();
     done();
   };
@@ -1679,35 +1879,32 @@ function startGame() {
 }
 // níveis, minigame de sequência e itens
 // ÂNCORA: dr = drones, sp = velocidade, seq/t = sequência do hack e tempo, vis = raio de visão do drone (metros)
-const LV = [
-  { dr: 3, sp: 1, seq: 4, t: 7, vis: 3.4 },
-  { dr: 4, sp: 1.15, seq: 5, t: 7, vis: 3.6 },
-  { dr: 5, sp: 1.3, seq: 6, t: 7, vis: 3.8 },
-  { dr: 5, sp: 1.35, seq: 7, t: 6, vis: 4.0, room: true },
-  { dr: 5, sp: 1.4, seq: 6, t: 7, vis: 4.2, mode: 2, blackout: true },
-  { dr: 2, sp: 1.1, seq: 5, t: 7, vis: 3.6, boss: true, mode: 4 },
-];
+const { levels: LV, routeBalance: ROUTE_BALANCE, routes: ROUTES } = gameplayConfig;
 let blackoutClock = 0, blackoutOn = false;
 const VIS_BASE = 3.4; // raio com que o disco e o cone foram modelados
   routeMode = "fast";
-const ROUTE_BALANCE = [
-  { fast: { speed: 1.18, noise: 1.35, alertGain: 1.35, alertRecovery: 0.9, cd: 1 }, safe: { speed: 0.92, noise: 0.65, alertGain: 0.65, alertRecovery: 1.25, cd: 1 }, tech: { speed: 1, noise: 0.9, alertGain: 0.82, alertRecovery: 1, cd: 0.82 } },
-  { fast: { speed: 1.24, noise: 1.42, alertGain: 1.42, alertRecovery: 0.88, cd: 1 }, safe: { speed: 0.9, noise: 0.6, alertGain: 0.6, alertRecovery: 1.3, cd: 1 }, tech: { speed: 0.98, noise: 0.84, alertGain: 0.78, alertRecovery: 1.04, cd: 0.8 } },
-  { fast: { speed: 1.2, noise: 1.55, alertGain: 1.5, alertRecovery: 0.82, cd: 1 }, safe: { speed: 0.88, noise: 0.55, alertGain: 0.55, alertRecovery: 1.38, cd: 1 }, tech: { speed: 1, noise: 0.8, alertGain: 0.75, alertRecovery: 1.08, cd: 0.78 } },
-  { fast: { speed: 1.15, noise: 1.65, alertGain: 1.6, alertRecovery: 0.8, cd: 1 }, safe: { speed: 0.86, noise: 0.5, alertGain: 0.5, alertRecovery: 1.45, cd: 1 }, tech: { speed: 0.96, noise: 0.76, alertGain: 0.7, alertRecovery: 1.1, cd: 0.75 } },
-  { fast: { speed: 1.12, noise: 1.7, alertGain: 1.65, alertRecovery: 0.78, cd: 1 }, safe: { speed: 0.88, noise: 0.54, alertGain: 0.54, alertRecovery: 1.4, cd: 1 }, tech: { speed: 0.95, noise: 0.74, alertGain: 0.69, alertRecovery: 1.1, cd: 0.73 } },
-  { fast: { speed: 1.1, noise: 1.72, alertGain: 1.72, alertRecovery: 0.76, cd: 1 }, safe: { speed: 0.9, noise: 0.58, alertGain: 0.58, alertRecovery: 1.32, cd: 1 }, tech: { speed: 0.94, noise: 0.72, alertGain: 0.68, alertRecovery: 1.12, cd: 0.72 } },
-];
 function routeTune() { return (ROUTE_BALANCE[lvl] || ROUTE_BALANCE[0])[routeMode]; }
-const ROUTES = {
-  fast: { label: "RÁPIDA", text: "velocidade +18% · ruído +35%", speed: 1.18, noise: 1.35, alertGain: 1.35, alertRecovery: 0.9, color: "#2fe6ff" },
-  safe: { label: "PROTEGIDA", text: "detecção -35% · velocidade -8%", speed: 0.92, noise: 0.65, alertGain: 0.65, alertRecovery: 1.25, color: "#39ff88" },
-  tech: { label: "TÉCNICA", text: "hack estável · habilidades -18%", speed: 1, noise: 0.9, alertGain: 0.82, alertRecovery: 1.0, color: "#ff3fd0" },
-};
+function routeEffectText(mode = routeMode) {
+  const tune = (ROUTE_BALANCE[lvl] || ROUTE_BALANCE[0])[mode];
+  const percent = (factor) => {
+    const delta = Math.round((factor - 1) * 100);
+    return delta > 0 ? `+${delta}%` : delta < 0 ? `−${Math.abs(delta)}%` : "0%";
+  };
+  const effects = [];
+  if (tune.speed !== 1) effects.push(`vel. ${percent(tune.speed)}`);
+  if (tune.noise !== 1) effects.push(`ruído ${percent(tune.noise)}`);
+  if (tune.alertGain !== 1) effects.push(`alerta ${percent(tune.alertGain)}`);
+  if (tune.alertRecovery !== 1) effects.push(`recup. alerta ${percent(tune.alertRecovery)}`);
+  if (tune.cd !== 1) effects.push(`cooldown ${percent(tune.cd)}`);
+  return effects.join(" · ") || "sem modificadores";
+}
 function renderRoute() {
-  const r = { ...ROUTES[routeMode], ...routeTune() };
-  $("routeText").textContent = r.label + " · " + r.text;
+  const r = ROUTES[routeMode];
+  const description = r.label + " · " + routeEffectText(routeMode);
+  $("routeText").textContent = description;
   $("routeRead").style.color = r.color;
+  $("routeRead").title = description;
+  $("routeRead").setAttribute("aria-label", description);
   ["fast", "safe", "tech"].forEach((k) => {
     const b = $("route" + (k === "fast" ? "Fast" : k === "safe" ? "Safe" : "Tech"));
     b.dataset.route = k;
@@ -1720,7 +1917,7 @@ function setRoute(mode) {
   routeMode = mode;
   renderRoute();
   sfx("route", mode === "fast" ? 0 : mode === "safe" ? 1 : 2);
-  note = "Rota " + ROUTES[mode].label + " selecionada: " + ROUTES[mode].text;
+  note = "Rota " + ROUTES[mode].label + " selecionada: " + routeEffectText(mode);
   noteT = 2.4;
   flashFeedback(mode === "safe" ? "collect" : mode === "tech" ? "hack" : "danger");
 }
@@ -1800,7 +1997,7 @@ function miniKey(d) {
     buzz(18);
     runStats.failedHacks++;
     mini.pos = 0;
-    alert_ = Math.min(0.98, alert_ + 0.2 * ROUTES[routeMode].alertGain);
+    alert_ = Math.min(0.98, alert_ + 0.2 * routeTune().alertGain);
     if (!calm) shake = 0.3;
   }
   drawMini();
@@ -2045,7 +2242,6 @@ S.add(gr);
 const mc = $("map").getContext("2d"),
   MK = 130 / 74;
 function drawMap() {
-  sign.material.opacity = 0.85 + Math.sin(time * 3) * 0.1;
   mc.clearRect(0, 0, 130, 130);
   const X = (x) => (x + 37) * MK,
     Y = (z) => (z + 37) * MK;
@@ -2095,19 +2291,21 @@ let actx = null,
   audioLayers = null,
   audioStateShown = "",
   customAudioBuffers = Object.create(null),
-  customAudioLoad = null,
+  customAudioSfxLoad = null,
+  customAudioMusicLoad = null,
   customAudioRequested = false,
+  customMusicRequested = false,
   customMusicSource = null,
   hackStreamSource = null,
   hackStreamGain = null,
   hackStreamWanted = false;
-const CUSTOM_AUDIO = {
-  music: "assets/audio/anarco-cyberpunk-ost.mp3",
+const CUSTOM_AUDIO_SFX = {
   connect: "assets/audio/hack-connect.mp3",
   stream: "assets/audio/data-stream-loop.mp3",
   error: "assets/audio/hack-fail.mp3",
   root: "assets/audio/root-access.mp3",
 };
+const CUSTOM_AUDIO_MUSIC = { music: "assets/audio/anarco-cyberpunk-ost.mp3" };
 function startCustomMusic() {
   const buffer = customAudioBuffers.music;
   if (!actx || !audioLayers || !buffer || customMusicSource) return;
@@ -2142,22 +2340,31 @@ function setHackStream(active) {
     window.setTimeout(() => { try { source.stop(); } catch (e) {} }, 260);
   }
 }
-async function loadCustomAudio() {
-  if (!actx) return;
-  if (customAudioLoad) return customAudioLoad;
-  const missing = Object.entries(CUSTOM_AUDIO).filter(([key]) => !customAudioBuffers[key]);
-  if (!missing.length) return;
-  customAudioLoad = Promise.all(missing.map(async ([key, path]) => {
+async function loadCustomAudioGroup(assets, onLoaded) {
+  if (!actx || mute) return;
+  const missing = Object.entries(assets).filter(([key]) => !customAudioBuffers[key]);
+  if (!missing.length) { if (onLoaded) onLoaded(); return; }
+  await Promise.all(missing.map(async ([key, path]) => {
     try {
       const response = await fetch(new URL(path, document.baseURI).toString());
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       customAudioBuffers[key] = await actx.decodeAudioData(await response.arrayBuffer());
-      if (key === "music") startCustomMusic();
       if (key === "stream" && hackStreamWanted) setHackStream(true);
     } catch (error) { console.warn(`Áudio local indisponível (${key}); usando síntese de reserva.`, error); }
   }));
-  try { await customAudioLoad; }
-  finally { customAudioLoad = null; }
+  if (onLoaded) onLoaded();
+}
+function loadCustomSfx() {
+  if (!actx || mute || !customAudioRequested) return;
+  if (customAudioSfxLoad) return customAudioSfxLoad;
+  customAudioSfxLoad = loadCustomAudioGroup(CUSTOM_AUDIO_SFX).finally(() => { customAudioSfxLoad = null; });
+  return customAudioSfxLoad;
+}
+function loadCustomMusic() {
+  if (!actx || mute || !customMusicRequested) return;
+  if (customAudioMusicLoad) return customAudioMusicLoad;
+  customAudioMusicLoad = loadCustomAudioGroup(CUSTOM_AUDIO_MUSIC, startCustomMusic).finally(() => { customAudioMusicLoad = null; });
+  return customAudioMusicLoad;
 }
 $("snd").onclick = () => {
   mute = !mute;
@@ -2165,7 +2372,10 @@ $("snd").onclick = () => {
   if (audioLayers && actx) audioLayers.master.gain.setTargetAtTime(mute ? 0.0001 : 0.9, actx.currentTime, 0.1);
   if (hackStreamGain && actx) hackStreamGain.gain.setTargetAtTime(mute ? 0.0001 : hackStreamWanted ? 0.13 : 0.0001, actx.currentTime, 0.08);
   audioStateShown = "";
-  if (!mute && customAudioRequested) void loadCustomAudio();
+  if (!mute) {
+    if (customAudioRequested) void loadCustomSfx();
+    if (customMusicRequested) requestGameMusic();
+  }
 };
 function sfx(n, i) {
   if (mute || !actx) return;
@@ -2307,12 +2517,22 @@ function ensureAudioLayers() {
 }
 function requestGameAudio() {
   customAudioRequested = true;
-  if (!mute) void loadCustomAudio();
+  if (!mute) void loadCustomSfx();
+}
+function requestGameMusic() {
+  customMusicRequested = true;
+  if (mute || !actx) return;
+  const effectsReady = customAudioSfxLoad || loadCustomSfx();
+  void Promise.resolve(effectsReady).then(() => {
+    if (customMusicRequested && !mute) return loadCustomMusic();
+  });
 }
 // Música procedural leve: motivos diferentes para menu, infiltração, tensão e encerramento.
 // Tudo passa pelo master existente, portanto mute e o volume geral continuam funcionando.
 function playMusicTick() {
-  if (!actx || !audioLayers || mute || customAudioBuffers.music) return;
+  if (!actx || !audioLayers) return;
+  if ((state === "play" || state === "brief") && customAudioRequested && !customMusicRequested) requestGameMusic();
+  if (mute || customAudioBuffers.music) return;
   const now = actx.currentTime;
   const over = state === "over";
   const playing = state === "play" || state === "brief";
@@ -2668,6 +2888,7 @@ function applyLevel() {
   sun.color.set(theme.sun);
   applyPhaseKit();
   applyPhaseReadout();
+  renderRoute();
   bz = 0;
   bi = 0;
   if (lvl === 4) preloadBossModel(0);
@@ -3362,10 +3583,12 @@ function ajustarResolucao(dtReal) {
   // Janela móvel de 60 quadros: reduz primeiro o preset de FX e depois a resolução.
   if (fxSystem) fxSystem.samplePerformance(dtReal, state === "play");
 }
-let mapAcc = 1;
+let mapAcc = 1,
+  mapState = null;
 const fxFrameState = { player: P, boss: null, playing: false, dodge: false, ghost: false, alert: 0, hacking: false, blackout: false, phase: "finance" };
 function loop(rafTimestamp) {
   requestAnimationFrame(loop);
+  if (!document.hidden) pollGamepad();
   const perfStart = perfCapture ? performance.now() : 0;
   const rawDt = Math.min(clock.getDelta(), 0.05);
   // tempo REAL do quadro para o ranking (o jogo limita rawDt a 0,05 s; aqui só ignora travadas > 1 s, ex.: aba escondida)
@@ -3374,9 +3597,13 @@ function loop(rafTimestamp) {
   ultimoQuadro = agora;
   ajustarResolucao(dtReal);
   if (state === "pause") {
+    if (mapState !== state) {
+      mapState = state;
+      mapAcc = 0;
+      drawMap();
+    }
     const updateEnd = perfCapture ? performance.now() : 0;
-    fxSystem.render();
-    if (perfCapture) perfCapture.frame(rafTimestamp, updateEnd - perfStart, performance.now() - updateEnd);
+    if (perfCapture) perfCapture.frame(rafTimestamp, updateEnd - perfStart, 0);
     return;
   }
   if (state === "play" && !(endT > 0)) {
@@ -3390,6 +3617,7 @@ function loop(rafTimestamp) {
   const dt = slowT > 0 ? rawDt * 0.25 : rawDt; // câmera lenta de 0,2 s após um hack
   slowT = Math.max(0, slowT - rawDt);
   time += dt;
+  sign.material.opacity = 0.85 + Math.sin(time * 3) * 0.1;
   updatePlayerFx(dt);
   puddles.forEach(({ mat, phase }) => { mat.emissiveIntensity = 0.1 + Math.abs(Math.sin(time * 1.8 + phase)) * 0.12; });
   syncAudioLayers();
@@ -3474,8 +3702,8 @@ function loop(rafTimestamp) {
     boost = Math.max(0, boost - dt);
     noteT -= dt;
     collisionFxCd = Math.max(0, collisionFxCd - dt);
-    let ix = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0) + jx,
-      iz = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0) + jz;
+    let ix = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0) + jx + gamepadMoveX,
+      iz = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0) + jz + gamepadMoveZ;
     if (mini) {
       ix = iz = 0;
     }
@@ -3484,7 +3712,7 @@ function loop(rafTimestamp) {
       ix /= l;
       iz /= l;
     }
-    const running = keys.shift && l > 0.1 && !mini;
+    const running = (keys.shift || gamepadSprint) && l > 0.1 && !mini;
     const SP = (boost > 0 ? 13 : 9) * routeTune().speed * (running ? 1.55 : 1);
     if (running && grace <= 0) {
       // Corrida: rota rapida, mas deixa uma assinatura de ruido no alerta.
@@ -3630,9 +3858,9 @@ function loop(rafTimestamp) {
     const priority = ["detected", "chase", "virus", "frozen", "patrol"];
     const drState = priority.find((kind) => activeDrones.some((d) => d.state === kind)) || "patrol";
     const drLabels = { detected: "DETECCAO", chase: "PERSEGUICAO", virus: "VIRUS", frozen: "CONGELADOS", patrol: "PATRULHA" };
-    $("drstate").textContent = drLabels[drState];
-    $("sideRead").title = sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase();
-    $("drread").style.color = drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00";
+    setTxt($("drstate"), drLabels[drState]);
+    setAttr($("sideRead"), "title", sideMission.done ? "Recompensa: " + sideMission.reward : "Item especial no minimapa: " + sideMission.type.toUpperCase());
+    setSty($("drread"), "color", drState === "detected" ? "#ffe14a" : drState === "chase" ? "#ff8a00" : drState === "virus" ? "#ff3fd0" : drState === "frozen" ? "#2fe6ff" : "#ff8a00");
     bossIn = false;
     if (boss) {
       const b = boss,
@@ -3769,10 +3997,10 @@ function loop(rafTimestamp) {
     lapG.rotation.y = LAP_ROT;
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
-      $("msg").textContent = mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...";
+      setTxt($("msg"), mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...");
       if (near.p >= 1 && !mini) startMini(near);
     } else if (cnt < 3 && !shake)
-      $("msg").textContent = inside ? "Drone te viu! Saia da luz." : noteT > 0 ? note : "";
+      setTxt($("msg"), inside ? "Drone te viu! Saia da luz." : noteT > 0 ? note : "");
     updObjective();
     if (endT > 0) {
       endT -= dt;
@@ -3840,12 +4068,18 @@ function loop(rafTimestamp) {
   fxSystem.update(rawDt, fxFrameState);
   fxTick(dt);
   mapAcc += rawDt;
-  if (mapAcc >= 0.05) { mapAcc = 0; drawMap(); }
+  const mapInterval = state === "play" ? 0.1 : 0.5;
+  if (state !== mapState || mapAcc >= mapInterval) {
+    mapState = state;
+    mapAcc = 0;
+    drawMap();
+  }
   const updateEnd = perfCapture ? performance.now() : 0;
-  fxSystem.render();
-  if (perfCapture) perfCapture.frame(rafTimestamp, updateEnd - perfStart, performance.now() - updateEnd);
+  if (state !== "menu") fxSystem.render();
+  if (perfCapture) perfCapture.frame(rafTimestamp, updateEnd - perfStart, state === "menu" ? 0 : performance.now() - updateEnd);
 }
 C.position.set(0, 14, 36);
+fxSystem.render(); // quadro inicial do menu; depois, WebGL só renderiza sob demanda ou durante jogo
 loop();
 
 // ===== VAZAMENTOS COLETADOS =====
@@ -3861,7 +4095,8 @@ const DOCS = [
 ];
 function leaks() {
   try {
-    return JSON.parse(ler("anarco_leaks") || "[]");
+    const stored = JSON.parse(ler("anarco_leaks") || "[]");
+    return Array.isArray(stored) ? stored.filter((item) => item && typeof item === "object") : [];
   } catch (e) {
     return [];
   }
@@ -3889,13 +4124,24 @@ function leakCard(corp, doc) {
 }
 function showLeaks() {
   const L = leaks();
-  $("lkl").innerHTML = L.length
-    ? L.map((l) => `<li><b>#${l.id}</b> ${l.d}<br><small>${l.c} · nível ${l.n} · ${l.t}</small></li>`).join(
-        "",
-      )
-    : "<li>Nenhum vazamento ainda. Hackeie uma torre!</li>";
-  $("lkc").textContent = L.length + " arquivo(s)";
+  const list = $("lkl");
+  list.replaceChildren();
+  if (L.length) {
+    L.slice(0, 60).forEach((leak) => {
+      const item = document.createElement("li"), id = document.createElement("b"), detail = document.createElement("small");
+      id.textContent = "#" + String(leak.id ?? "");
+      detail.textContent = `${String(leak.c ?? "")} · nível ${String(leak.n ?? "")} · ${String(leak.t ?? "")}`;
+      item.append(id, document.createTextNode(" " + String(leak.d ?? "")), document.createElement("br"), detail);
+      list.append(item);
+    });
+  } else {
+    const item = document.createElement("li");
+    item.textContent = "Nenhum vazamento ainda. Hackeie uma torre!";
+    list.append(item);
+  }
+  setTxt($("lkc"), L.length + " arquivo(s)");
   $("lk").hidden = false;
+  openModal("lk", "lkx");
 }
 $("lb").onclick = showLeaks;
 
@@ -3930,22 +4176,33 @@ function registrarTempo(seg) {
 }
 function showRank(destaque) {
   const L = ranking();
-  $("rkl").innerHTML = L.length
-    ? L.map(
-        (r, i) =>
-          `<li${i + 1 === destaque ? ' class="novo"' : ""}><b>#${i + 1}</b> ${fmtTempo(r.s)}<br><small>${r.d}</small></li>`,
-      ).join("")
-    : "<li>Nenhuma corrida completa ainda. Derrube as 3 corporações!</li>";
-  $("rkc").textContent = L.length ? "Recorde: " + fmtTempo(L[0].s) : "";
+  const list = $("rkl");
+  list.replaceChildren();
+  if (L.length) {
+    L.slice(0, RK_MAX).forEach((record, index) => {
+      const item = document.createElement("li"), rank = document.createElement("b"), date = document.createElement("small");
+      if (index + 1 === destaque) item.className = "novo";
+      rank.textContent = "#" + (index + 1);
+      date.textContent = String(record.d ?? "");
+      item.append(rank, document.createTextNode(" " + fmtTempo(record.s)), document.createElement("br"), date);
+      list.append(item);
+    });
+  } else {
+    const item = document.createElement("li");
+    item.textContent = "Nenhuma corrida completa ainda. Derrube as 3 corporações!";
+    list.append(item);
+  }
+  setTxt($("rkc"), L.length ? "Recorde: " + fmtTempo(L[0].s) : "");
   $("rk").hidden = false;
+  openModal("rk", "rkx");
 }
 $("rb").onclick = () => showRank(0);
-$("rkx").onclick = () => ($("rk").hidden = true);
+$("rkx").onclick = () => closeModal("rk", "rb");
 $("rkz").onclick = () => {
   apagar("anarco_rank");
   showRank(0);
 };
-$("lkx").onclick = () => ($("lk").hidden = true);
+$("lkx").onclick = () => closeModal("lk", "lb");
 $("lkz").onclick = () => {
   apagar("anarco_leaks");
   showLeaks();
@@ -4005,6 +4262,7 @@ $("tuts").onclick = () => {
 };
 
 // ===== PRÓXIMO OBJETIVO =====
+let lastObjectiveAnnouncement = "";
 const arrow = new T.Mesh(
   new T.ConeGeometry(0.45, 1.2, 4).rotateX(Math.PI / 2),
   new T.MeshBasicMaterial({ color: 0xffe14a, transparent: true, opacity: 0.9, depthTest: false }),
@@ -4030,19 +4288,36 @@ function updObjective() {
   }
   if (!tg) {
     arrow.visible = false;
-    $("obj").dataset.state = "done";
-    $("obj").textContent = cnt >= 3 ? "OBJETIVO ▸ fuga em andamento…" : "";
+    setAttr($("obj"), "data-state", "done");
+    setTxt($("obj"), cnt >= 3 ? "OBJETIVO ▸ fuga em andamento…" : "");
+    const key = `${lvl}:done:${cnt >= 3}`;
+    if (key !== lastObjectiveAnnouncement) {
+      lastObjectiveAnnouncement = key;
+      setTxt($("objAnnounce"), cnt >= 3 ? "Torres concluídas. Fuga em andamento." : "");
+    }
     return;
   }
   const dx = tg.x - P.position.x,
     dz = tg.z - P.position.z,
     d = Math.hypot(dx, dz);
-  $("obj").dataset.state = boss ? "danger" : d < 5.5 ? "hack" : "target";
-  $("obj").textContent = "OBJETIVO ▸ " + label + " · " + Math.round(d) + " m";
+  const objState = boss ? "danger" : d < 5.5 ? "hack" : "target";
+  setAttr($("obj"), "data-state", objState);
+  setTxt($("obj"), "OBJETIVO ▸ " + label + " · " + Math.round(d) + " m");
+  const key = `${lvl}:${objState}:${label}`;
+  if (key !== lastObjectiveAnnouncement) {
+    lastObjectiveAnnouncement = key;
+    setTxt($("objAnnounce"), formatObjectiveAnnouncement(label, objState, !!boss));
+  }
   const a = Math.atan2(dx, dz);
   arrow.position.set(P.position.x + Math.sin(a) * 2.2, 0.4, P.position.z + Math.cos(a) * 2.2);
   arrow.rotation.y = a;
   arrow.visible = d > 5.5;
+}
+function formatObjectiveAnnouncement(label, state, isBoss) {
+  const terminal = /[.!?…]$/u.test(label) ? "" : ".";
+  if (isBoss) return `Objetivo do chefão: ${label}${terminal}`;
+  if (state === "hack") return `${label}: torre ao alcance para hackear.`;
+  return `Próximo objetivo: ${label}${terminal}`;
 }
 
 // ===== PAUSA =====
@@ -4052,12 +4327,13 @@ function togglePause() {
     $("hackPanel").hidden = true;
     setHackStream(false);
     $("pz").hidden = false;
-    $("pb").textContent = "▶";
+    setTxt($("pb"), "▶");
+    openModal("pz", "pzc");
   } else if (state === "pause") {
     state = "play";
-    $("pz").hidden = true;
-    $("pb").textContent = "⏸";
+    setTxt($("pb"), "⏸");
     clock.getDelta();
+    closeModal("pz", "gameCanvas", true);
   }
 }
 addEventListener("keydown", (e) => {
@@ -4073,16 +4349,17 @@ addEventListener("blur", () => {
 $("pb").onclick = togglePause;
 $("pzc").onclick = togglePause;
 $("pzm").onclick = () => {
-  $("pz").hidden = true;
-  $("pb").textContent = "⏸";
+  setTxt($("pb"), "⏸");
   $("hackPanel").hidden = true;
   setHackStream(false);
   state = "menu";
   arrow.visible = false;
-  $("obj").textContent = "";
+  setTxt($("obj"), "");
   $("mini").hidden = true;
   mini = null;
+  closeModal("pz", "pb");
   $("ov").style.display = "flex";
+  openModal("ov", "st");
 };
 
 
@@ -4128,6 +4405,8 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) naviga
     }
   };
 })();
+
+openModal("ov", "st");
 
 // Diagnóstico local: não é carregado em produção pública. Permite validar layouts
 // e colisões sem alterar o fluxo normal do jogador ou depender de estado global.

@@ -16,6 +16,27 @@ for (const [needle, label] of [
   ['og:image', 'Open Graph cover metadata'],
   ['assets/favicon-', 'game-specific favicon'],
 ]) assert.ok(html.includes(needle), `${label} is missing from the generated HTML`)
+const fontPreload = html.match(/<link rel="preload" href="([^"]+SpecialElite-Latin\.woff2)" as="font" type="font\/woff2" crossorigin>/)
+assert.ok(fontPreload, 'the actual Special Elite typewriter font must be preloaded')
+assert.ok(existsSync(join(root, fontPreload[1].replace(/^\.\//, ''))), 'the preloaded font path must exist in dist')
+const modulePreload = html.match(/<link rel="modulepreload" href="([^"]+)" crossorigin>/)
+assert.ok(modulePreload, 'the production entry module must have a modulepreload link')
+const modulePath = modulePreload[1].replace(/^\.\//, '')
+assert.ok(existsSync(join(root, modulePath)), 'the modulepreload must point to the built entry file')
+assert.ok(html.indexOf(modulePreload[0]) < html.indexOf('<script type="module"'), 'modulepreload must precede the entry script')
+const cssFile = readdirSync(join(root, 'assets')).find(name => name.endsWith('.css'))
+assert.ok(cssFile, 'the production stylesheet must exist')
+const css = readFileSync(join(root, 'assets', cssFile), 'utf8')
+assert.ok(css.includes('Special Elite') && css.includes('SpecialElite-Latin.woff2') && !css.includes('ManusCC0'), 'the game must keep its real Special Elite typewriter font, not the ManusCC0 substitution')
+const vercel = JSON.parse(readFileSync(resolve('vercel.json'), 'utf8'))
+const cacheRule = source => vercel.headers.find(rule => rule.source === source)?.headers?.find(header => header.key === 'Cache-Control')?.value
+assert.ok(cacheRule('/')?.includes('max-age=0') && cacheRule('/index.html')?.includes('must-revalidate'), 'Vercel must revalidate the HTML shell')
+assert.ok(cacheRule('/sw.js')?.includes('no-store'), 'Vercel must not cache the service worker')
+assert.ok(vercel.headers.some(rule => rule.source.startsWith('/assets/:file(') && rule.headers.some(header => header.key === 'Cache-Control' && header.value.includes('immutable'))), 'only hashed Vite assets should receive immutable caching')
+const immutableMatchers = vercel.headers.filter(rule => rule.source.startsWith('/assets/:file(')).map(rule => new RegExp(`^/assets/${rule.source.match(/^\/assets\/:file\((.*)\)$/)?.[1]}$`))
+const hashedRootAssets = readdirSync(join(root, 'assets')).filter(name => /-[A-Za-z0-9_-]{8}\.(js|css|png|svg)$/.test(name))
+assert.ok(hashedRootAssets.length > 0 && hashedRootAssets.every(name => immutableMatchers.some(pattern => pattern.test(`/assets/${name}`))), 'Vercel immutable routes must match every top-level hash-named asset')
+assert.ok(!immutableMatchers.some(pattern => pattern.test('/assets/dados/manifesto.js')), 'stable paths must not receive immutable caching')
 
 const required = [
   'script.js',
@@ -42,6 +63,9 @@ const required = [
   'assets/audio/data-stream-loop.mp3',
   'assets/audio/hack-fail.mp3',
   'assets/audio/root-access.mp3',
+  'fonts/SpecialElite-Latin.woff2',
+  'fonts/SpecialElite-LICENSE.txt',
+  'fonts/SpecialElite-NOTICE.txt',
 ]
 for (const path of required) assert.ok(existsSync(join(root, path)), `required local game asset is missing: ${path}`)
 const bossModels = [
@@ -91,7 +115,8 @@ assert.ok(html.includes('id="hackPanel"') && html.includes('id="hackProgressBar"
 assert.ok(html.includes('https://anarcoexe.vercel.app/assets/share/og.jpg') && html.includes('image/jpeg'), 'absolute JPEG social-image metadata is missing')
 assert.ok(statSync(join(root, 'assets/share/og.jpg')).size < 200 * 1024, 'social JPEG should remain below 200 KiB')
 assert.ok(!readdirSync(join(root, 'assets')).some(name => /^og-[^/]+\.(?:png|jpe?g)$/i.test(name)), 'Vite must not emit a duplicate hashed OG image')
-assert.ok(!existsSync(join(root, 'fonts/ManusCC0SansCJKSC-Regular.woff2')), 'unused CJK font should not be copied into dist')
+assert.ok(!existsSync(join(root, 'fonts/ManusCC0-Regular.ttf')) && !existsSync(join(root, 'fonts/ManusCC0-Medium.ttf')) && !existsSync(join(root, 'fonts/ManusCC0-Bold.ttf')), 'unused ManusCC0 starter fonts must not be copied into dist')
+assert.ok(css.includes('repeat(6,minmax(0,1fr)') && css.includes('max-height:500px') && css.includes('orientation:landscape'), 'compact touch landscape HUD must be present in the production CSS')
 const serviceWorker = readFileSync(join(root, 'sw.js'), 'utf8')
 assert.ok(!serviceWorker.includes('assets/audio/') && !serviceWorker.includes('assets/models/laptop.mdl'), 'large audio and laptop assets must not be precached')
 assert.ok(serviceWorker.includes('status: 503') && serviceWorker.includes('cache.put(request, response.clone())'), 'lazy assets must be cached on successful use and fail safely offline')

@@ -1,0 +1,5 @@
+export { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+export { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+export { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+export { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+export { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'

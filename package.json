@@ -1,18 +1,21 @@
 {
   "name": "anarco-exe-3d",
   "private": true,
-  "version": "4.1.1",
+  "version": "4.2.3",
   "type": "module",
   "scripts": {
-  "dev": "vite",
-  "build": "tsc --noEmit && vite build && node scripts/copy-game-assets.mjs && node scripts/check-size.mjs",
-  "compress:bosses": "node scripts/compress-boss-models.mjs",
-  "perf": "node scripts/perf-benchmark.mjs",
-  "preview": "vite preview --port 4173 --strictPort",
-  "typecheck": "tsc --noEmit",
-  "test": "vitest run",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/copy-game-assets.mjs && node scripts/check-size.mjs && node scripts/check-brotli.mjs",
+    "compress:bosses": "node scripts/compress-boss-models.mjs",
+    "brotli": "node scripts/check-brotli.mjs",
+    "verify:production-models": "node scripts/verify-production-model-encoding.mjs",
+    "perf": "node scripts/perf-benchmark.mjs",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "e2e": "node scripts/e2e-invadir.mjs"
+    "e2e": "node scripts/e2e-invadir.mjs",
+    "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm e2e"
   },
   "dependencies": {
     "three": "^0.186.1"

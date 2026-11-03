@@ -1,36 +1,37 @@
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { AnarcoFxSystem } from './anarco-fx'
+import { ANARCO_GAMEPLAY_CONFIG, type AnarcoGameplayConfig } from './anarco-gameplay-config'
+import { createVersionedSaveStorage, type VersionedSaveStorage } from './anarco-save-migration'
 import type { AnarcoPerfCaptureFactory } from './anarco-perf'
 
-class MeshoptGLTFLoader extends GLTFLoader {
-  constructor(manager?: THREE.LoadingManager) {
-    super(manager)
-    this.setMeshoptDecoder(MeshoptDecoder)
+class DeferredMeshoptGLTFLoader {
+  constructor(private readonly manager?: THREE.LoadingManager) {}
+
+  loadAsync(url: string): Promise<unknown> {
+    return import('./anarco-boss-loader').then(({ loadBossGltf }) => loadBossGltf(url, this.manager))
   }
 }
 
 const legacy = window as typeof window & {
   THREE?: typeof THREE
-  GLTFLoader?: typeof GLTFLoader
+  GLTFLoader?: new (manager?: THREE.LoadingManager) => { loadAsync(url: string): Promise<unknown> }
   BOSS_MODEL_URLS?: Record<string, string>
-  ANARCO_FX?: { AnarcoFxSystem: typeof AnarcoFxSystem; modules: Record<string, unknown> }
+  ANARCO_FX?: { AnarcoFxSystem: typeof AnarcoFxSystem; modules: { mergeGeometries: typeof mergeGeometries } }
   __ANARCO_FX_INSTANCE__?: AnarcoFxSystem
   __ANARCO_DEBUG__?: boolean
   __ANARCO_PERF_FACTORY__?: AnarcoPerfCaptureFactory
+  ANARCO_GAMEPLAY_CONFIG?: AnarcoGameplayConfig
+  ANARCO_SAVE_STORAGE?: VersionedSaveStorage
 }
 
+legacy.ANARCO_GAMEPLAY_CONFIG = ANARCO_GAMEPLAY_CONFIG
+legacy.ANARCO_SAVE_STORAGE = createVersionedSaveStorage()
 legacy.THREE = THREE
-legacy.GLTFLoader = MeshoptGLTFLoader
+legacy.GLTFLoader = DeferredMeshoptGLTFLoader
 legacy.ANARCO_FX = {
   AnarcoFxSystem,
-  modules: { EffectComposer, RenderPass, UnrealBloomPass, OutputPass, mergeGeometries },
+  modules: { mergeGeometries },
 }
 legacy.__ANARCO_DEBUG__ = import.meta.env.DEV
 legacy.BOSS_MODEL_URLS = {

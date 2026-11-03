@@ -12,38 +12,237 @@ try {
   await new Promise((r) => setTimeout(r, 1200))
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] })
   const context = await browser.newContext({ viewport: { width: 1000, height: 560 } })
+  await context.addInitScript(() => {
+    localStorage.setItem('anarco_fx_quality', 'medium')
+    const pad = { id: 'ANARCO E2E Standard Pad', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })), timestamp: 0 }
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] })
+    window.__testPad = pad
+  })
   const page = await context.newPage()
   const lazyAssetRequests = []
+  const jsChunkRequests = []
+  const bloomChunkRequests = []
+  const fxaaChunkRequests = []
   page.on('request', request => {
     const pathname = new URL(request.url()).pathname
     if (/\/assets\/(?:audio\/[^/]+\.mp3|models\/(?:laptop\.mdl|boss-[^/]+\.glb))$/i.test(pathname)) lazyAssetRequests.push(pathname)
+    if (/\/assets\/[^/]+\.js$/i.test(pathname)) jsChunkRequests.push(pathname)
+    if (/\/assets\/[^/]*postprocessing[^/]*\.js$/i.test(pathname)) bloomChunkRequests.push(pathname)
+    if (/\/assets\/[^/]*anarco-fxaa[^/]*\.js$/i.test(pathname)) fxaaChunkRequests.push(pathname)
   })
   const erros = []
   page.on('pageerror', (e) => erros.push(String(e).slice(0, 160)))
   page.on('response', (r) => { if (r.status() >= 400) erros.push(`HTTP ${r.status()} ${r.url()}`) })
   await page.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('#st', { state: 'visible', timeout: 30000 })
+  await page.waitForFunction(() => document.activeElement.id === 'st' && document.getElementById('ov').getAttribute('aria-modal') === 'true', null, { timeout: 10000 })
+  const setPadButton = (index, pressed) => page.evaluate(({ index, pressed }) => {
+    const button = window.__testPad.buttons[index]
+    button.pressed = pressed; button.value = pressed ? 1 : 0
+  }, { index, pressed })
+  await setPadButton(13, true)
+  await page.waitForFunction(() => document.activeElement.id !== 'st', null, { timeout: 3000 })
+  await setPadButton(13, false)
+  const menuMovedFocus = await page.evaluate(() => document.activeElement.id)
+  await setPadButton(12, true)
+  await page.waitForFunction(() => document.activeElement.id === 'st', null, { timeout: 3000 })
+  await setPadButton(12, false)
+  const menuRestoredFocus = await page.evaluate(() => document.activeElement.id)
+  ok(menuMovedFocus !== 'st' && menuRestoredFocus === 'st', 'D-pad navega o foco do menu do controle padrão')
   await page.waitForTimeout(3000)
+  const specialEliteFont = await page.evaluate(async () => {
+    const faces = await document.fonts.load('16px "Special Elite"', 'ANARCO áéíóú çãõ')
+    const fontUrls = performance.getEntriesByType('resource').map(entry => entry.name).filter(url => new URL(url).pathname.endsWith('/fonts/SpecialElite-Latin.woff2'))
+    return { family: getComputedStyle(document.body).fontFamily, loaded: faces.length > 0 && faces.every(face => face.status === 'loaded'), fontUrls }
+  })
+  ok(specialEliteFont.family.startsWith('"Special Elite"') && specialEliteFont.loaded && specialEliteFont.fontUrls.length > 0 && specialEliteFont.fontUrls.every(url => new URL(url).origin === `http://localhost:${PORT}`), 'Special Elite WOFF2 local é carregada e usada pela interface')
+  const sharedRules = await page.evaluate(() => ({ levels: LV === ANARCO_GAMEPLAY_CONFIG.levels, routes: ROUTES === ANARCO_GAMEPLAY_CONFIG.routes, balance: ROUTE_BALANCE === ANARCO_GAMEPLAY_CONFIG.routeBalance, count: LV.length }))
+  ok(sharedRules.levels && sharedRules.routes && sharedRules.balance && sharedRules.count === 6, 'runtime usa a mesma configuração de níveis e rotas coberta pelos testes')
+  const saveMigration = await page.evaluate(() => ({ version: JSON.parse(localStorage.getItem('anarco_save_v1') || 'null')?.version, bridge: typeof ANARCO_SAVE_STORAGE?.getItem === 'function', legacySkinReadable: ANARCO_SAVE_STORAGE?.getItem('anarco_skin') === localStorage.getItem('anarco_skin') }))
+  ok(saveMigration.version === 1 && saveMigration.bridge && saveMigration.legacySkinReadable, 'saves antigos migram para schema v1 e permanecem compatíveis com as chaves legadas')
+  const startupAntialias = await page.evaluate(() => R.getContext().getContextAttributes()?.antialias)
+  ok(startupAntialias === false, 'contexto WebGL dispensa MSAA imutável para permitir antialias adaptativo em runtime')
+  ok(!jsChunkRequests.some(pathname => pathname.includes('anarco-boss-loader')), 'chunk do loader GLTF/Meshopt não é transferido no menu inicial')
+  await page.waitForFunction(() => fxSystem.getDiagnostics().antialias.fxaa, null, { timeout: 30000 })
+  ok(fxaaChunkRequests.length === 1 && (await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa)), 'qualidade média carrega o pass FXAA e o mantém ativo')
+  ok(bloomChunkRequests.length === 0, 'qualidade média mantém o chunk de Bloom fora das transferências iniciais')
+  await page.evaluate(() => { fxSystem.setQuality('high', false); fxSystem.render() })
+  await page.waitForFunction(() => !!fxSystem.composer, null, { timeout: 30000 })
+  ok(bloomChunkRequests.length === 1 && (await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa)), 'qualidade alta carrega Bloom sob demanda e preserva FXAA no composer')
+  await page.evaluate(() => fxSystem.setQuality('medium', false))
+  await page.waitForFunction(() => fxSystem.getDiagnostics().antialias.fxaa && !fxSystem.getDiagnostics().postprocessing.bloom, null, { timeout: 5000 })
+  ok(await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa && !fxSystem.getDiagnostics().postprocessing.bloom && document.body.dataset.fxQuality === 'medium'), 'reduzir para média mantém FXAA e remove Bloom')
+  await page.evaluate(() => { for (let frame = 0; frame < 60; frame++) fxSystem.samplePerformance(0.03, true) })
+  await page.waitForFunction(() => fxSystem.getDiagnostics().quality.effective === 'low' && !fxSystem.getDiagnostics().antialias.fxaa, null, { timeout: 5000 })
+  ok(await page.evaluate(() => fxSystem.getDiagnostics().quality.selected === 'medium' && fxSystem.getDiagnostics().quality.effective === 'low' && document.body.dataset.fxAntialias === 'off'), 'adaptação automática rebaixa para Baixa e desativa FXAA em runtime')
+  await page.evaluate(() => fxSystem.setQuality('medium', false))
+  await page.waitForFunction(() => fxSystem.getDiagnostics().antialias.fxaa, null, { timeout: 5000 })
+  ok(await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa), 'qualidade Média reativa FXAA em runtime')
   ok(lazyAssetRequests.length === 0, 'menu inicial não baixa MP3s, notebook ou modelos de chefão')
+  await page.evaluate(() => {
+    window.__webglRenderProbe = { count: 0, original: fxSystem.render }
+    fxSystem.render = function (...args) { window.__webglRenderProbe.count++; return window.__webglRenderProbe.original.apply(this, args) }
+  })
+  await page.waitForTimeout(250)
+  const menuRenderCount = await page.evaluate(() => window.__webglRenderProbe.count)
+  ok(menuRenderCount === 0, 'menu mantém WebGL parado após a instrumentação')
+  await page.setViewportSize({ width: 1000, height: 600 })
+  await page.waitForFunction((before) => window.__webglRenderProbe.count === before + 1, menuRenderCount, { timeout: 5000 })
+  const menuResizeOne = await page.evaluate(() => window.__webglRenderProbe.count)
+  await page.waitForTimeout(120)
+  const menuResizeStable = await page.evaluate(() => window.__webglRenderProbe.count)
+  await page.setViewportSize({ width: 1000, height: 560 })
+  await page.waitForFunction((before) => window.__webglRenderProbe.count === before + 1, menuResizeStable, { timeout: 5000 })
+  const menuRenderBaseline = await page.evaluate(() => window.__webglRenderProbe.count)
+  ok(menuResizeOne === menuRenderCount + 1 && menuResizeStable === menuResizeOne && menuRenderBaseline === menuResizeStable + 1, 'resize no menu produz um quadro por mudança e continua suspenso depois')
+  const initialDialog = await page.evaluate(() => ({ role: document.getElementById('ov').getAttribute('role'), modal: document.getElementById('ov').getAttribute('aria-modal'), label: document.getElementById('ov').getAttribute('aria-labelledby'), focus: document.activeElement.id, hudInert: document.getElementById('hud').inert, objectiveHidden: document.getElementById('obj').getAttribute('aria-hidden'), objectiveRole: document.getElementById('objAnnounce').getAttribute('role'), objectiveLive: document.getElementById('objAnnounce').getAttribute('aria-live') }))
+  ok(initialDialog.role === 'dialog' && initialDialog.modal === 'true' && initialDialog.label === 'ot' && initialDialog.focus === 'st' && initialDialog.hudInert && initialDialog.objectiveHidden === 'true' && initialDialog.objectiveRole === 'status' && initialDialog.objectiveLive === 'polite', 'menu e objetivo têm semântica acessível, foco inicial e conteúdo de fundo inerte')
+  const previousLeaks = await page.evaluate(() => {
+    const previous = ANARCO_SAVE_STORAGE.getItem('anarco_leaks')
+    ANARCO_SAVE_STORAGE.setItem('anarco_leaks', JSON.stringify([{ id: '<img src=x onerror="window.__leakXss=1">', d: '<img src=x onerror="window.__leakXss=1">', c: 'Teste', n: 1, t: 'hoje' }]))
+    return previous
+  })
+  await page.click('#lb')
+  const leakDialog = await page.evaluate(() => ({ role: document.getElementById('lk').getAttribute('role'), modal: document.getElementById('lk').getAttribute('aria-modal'), active: document.activeElement.id, menuInert: document.getElementById('ov').inert, z: Number(getComputedStyle(document.getElementById('lk')).zIndex), menuZ: Number(getComputedStyle(document.getElementById('ov')).zIndex), img: !!document.querySelector('#lkl img'), literal: document.getElementById('lkl').textContent.includes('<img') }))
+  ok(leakDialog.role === 'dialog' && leakDialog.modal === 'true' && leakDialog.active === 'lkx' && leakDialog.menuInert && leakDialog.z > leakDialog.menuZ && !leakDialog.img && leakDialog.literal, 'vazamentos abre como diálogo superior, recebe foco e trata valores locais como texto')
+  await page.keyboard.press('Shift+Tab')
+  const trappedLeakFocus = await page.evaluate(() => document.activeElement.id)
+  await page.keyboard.press('Escape')
+  const leakClosed = await page.evaluate(() => ({ hidden: document.getElementById('lk').hidden, focus: document.activeElement.id, menuModal: document.getElementById('ov').getAttribute('aria-modal') }))
+  ok(trappedLeakFocus === 'lkz' && leakClosed.hidden && leakClosed.focus === 'lb' && leakClosed.menuModal === 'true', 'Escape fecha a lista, mantém o foco contido e o devolve ao acionador')
+  await page.evaluate((previous) => previous === null ? ANARCO_SAVE_STORAGE.removeItem('anarco_leaks') : ANARCO_SAVE_STORAGE.setItem('anarco_leaks', previous), previousLeaks)
+  const previousRank = await page.evaluate(() => {
+    const previous = ANARCO_SAVE_STORAGE.getItem('anarco_rank')
+    ANARCO_SAVE_STORAGE.setItem('anarco_rank', JSON.stringify([{ s: 12.3, d: '<img src=x onerror="window.__rankXss=1">' }]))
+    return previous
+  })
+  await page.click('#rb')
+  const rankDialog = await page.evaluate(() => ({ modal: document.getElementById('rk').getAttribute('aria-modal'), active: document.activeElement.id, img: !!document.querySelector('#rkl img'), literal: document.getElementById('rkl').textContent.includes('<img') }))
+  await page.click('#rkx')
+  const rankClosed = await page.evaluate(() => ({ hidden: document.getElementById('rk').hidden, focus: document.activeElement.id }))
+  ok(rankDialog.modal === 'true' && rankDialog.active === 'rkx' && !rankDialog.img && rankDialog.literal && rankClosed.hidden && rankClosed.focus === 'rb', 'ranking também usa texto seguro e devolve foco ao fechar')
+  await page.evaluate((previous) => previous === null ? ANARCO_SAVE_STORAGE.removeItem('anarco_rank') : ANARCO_SAVE_STORAGE.setItem('anarco_rank', previous), previousRank)
   ok(await page.locator('#codeRainMode').inputValue() === 'on', 'chuva de códigos fica ativada por padrão no desktop')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.selectOption('#codeRainMode', 'on')
-  await page.click('#st')
-  await page.waitForFunction(() => document.body.lastElementChild?.querySelectorAll('pre')[1]?.textContent.startsWith('>'), null, { timeout: 4000 })
-  await page.waitForFunction(() => Object.keys(customAudioBuffers).length === 5, null, { timeout: 15000 })
+  await page.evaluate(() => document.getElementById('st').focus())
+  await setPadButton(0, true)
+  await page.waitForSelector('#introTerminal', { state: 'visible', timeout: 5000 })
+  await setPadButton(0, false)
+  const invadeTransition = await page.evaluate(() => ({ state, terminal: !!document.getElementById('introTerminal') }))
+  ok(invadeTransition.state === 'menu' && invadeTransition.terminal, 'Invadir abre primeiro o terminal introdutório; a partida ainda não iniciou')
+  await page.waitForFunction(() => document.getElementById('introTerminal')?.querySelectorAll('pre')[1]?.textContent.startsWith('>'), null, { timeout: 8000 })
+  await page.waitForFunction(() => ['connect', 'stream', 'error', 'root'].every(key => !!customAudioBuffers[key]), null, { timeout: 15000 })
+  const terminalAudio = await page.evaluate(() => ({ musicLoaded: !!customAudioBuffers.music, musicRequested: customMusicRequested }))
   const audioRequestPaths = [...new Set(lazyAssetRequests.filter(pathname => pathname.includes('/assets/audio/')))]
-  ok(audioRequestPaths.length === 5, 'os cinco arquivos de áudio só são solicitados após clicar em Invadir')
+  ok(audioRequestPaths.length === 4 && !terminalAudio.musicLoaded && !terminalAudio.musicRequested && !lazyAssetRequests.some(pathname => pathname.endsWith('/anarco-cyberpunk-ost.mp3')), 'os quatro efeitos curtos carregam após Invadir e a trilha continua adiada no terminal')
   const roteiro = await page.evaluate(async () => await (await fetch('/script.js')).text())
   const roteiroCompacto = roteiro.replace(/\s+/g, '')
   const arteTerminal = await page.evaluate(() => document.body.lastElementChild?.querySelector('pre')?.textContent || '')
   ok(arteTerminal.split('\n').length >= 16 && arteTerminal.includes('ANARCO.EXE') && arteTerminal.includes('CAPUZ') && roteiro.includes('03:17:09 // DISTRITO FINANCEIRO') && roteiro.includes('a cidade dorme.') && roteiro.includes('BREACH // INICIANDO') && roteiroCompacto.includes('Math.floor(elapsed/5)') && roteiroCompacto.includes('},24);'), 'a arte ASCII maior CAPUZ/ANARCO aparece no topo e a narração rápida inicia antes da partida')
   await page.screenshot({ path: '/tmp/anarco-intro-desktop.png' })
-  const audioDoTerminal = await page.evaluate(() => ({ state: actx?.state, master: audioLayers?.master?.gain.value, muted: mute }))
+  const audioDoTerminal = await page.evaluate(() => ({ state: actx?.state, master: audioLayers?.master?.gain.value, muted: mute, role: document.getElementById('introTerminal')?.getAttribute('role'), modal: document.getElementById('introTerminal')?.getAttribute('aria-modal'), focus: document.activeElement.id, renders: window.__webglRenderProbe.count }))
+  ok(audioDoTerminal.role === 'dialog' && audioDoTerminal.modal === 'true' && audioDoTerminal.focus === 'introTerminal', 'terminal introdutório anuncia papel modal e recebe o foco')
+  ok(audioDoTerminal.renders === menuRenderBaseline, 'terminal introdutório não renderiza WebGL fora dos quadros de resize')
   ok(audioDoTerminal.state === 'running' && audioDoTerminal.master > 0.1 && !audioDoTerminal.muted && roteiro.includes('sfx("ready")') && roteiro.includes('sfx("terminal"') && roteiroCompacto.includes('elseif(n==="terminal")'), 'bip/cliques do terminal soam pelo mixer ativo e respeitam o mute')
   await page.waitForTimeout(1500)
-  await page.mouse.click(500, 300) // encerra o terminal de introdução
+  await setPadButton(0, true) // A confirma o terminal e inicia
   await page.waitForFunction(() => state === 'play', null, { timeout: 30000 })
-  ok(true, 'clicar em Invadir inicia a partida (estado "play", sem travar)')
+  await setPadButton(0, false)
+  ok(true, 'A do controle confirma o terminal e inicia a partida (estado "play", sem travar)')
+  const gamepadMovement = await page.evaluate(async () => {
+    P.position.set(0, 0, 0); vel.set(0, 0, 0); window.__testPad.axes[0] = 1
+    await new Promise(resolve => setTimeout(resolve, 250))
+    const moved = P.position.x
+    window.__testPad.axes[0] = 0
+    return moved
+  })
+  ok(gamepadMovement > 0.2, 'stick analógico do gamepad move o personagem no runtime publicado')
+  await page.evaluate(() => { window.__gamepadBreachCount = 0; const original = breach; breach = function () { window.__gamepadBreachCount++; return original() } })
+  await setPadButton(0, true)
+  await page.waitForTimeout(240)
+  await setPadButton(0, false)
+  ok(await page.evaluate(() => window.__gamepadBreachCount) === 1, 'botão A aciona BREACH uma vez por pressionamento, sem repetir enquanto segurado')
+  await setPadButton(9, true)
+  await page.waitForFunction(() => state === 'pause', null, { timeout: 5000 })
+  await setPadButton(9, false)
+  await setPadButton(1, true)
+  await page.waitForFunction(() => state === 'play', null, { timeout: 5000 })
+  await setPadButton(1, false)
+  ok(true, 'Start pausa e B retoma a partida pelo controle')
+  const musicReadyAfterStart = await page.waitForFunction(() => !!customAudioBuffers.music, null, { timeout: 20000 }).then(() => true).catch(() => false)
+  const fullAudioRequestPaths = [...new Set(lazyAssetRequests.filter(pathname => pathname.includes('/assets/audio/')))]
+  ok(musicReadyAfterStart && fullAudioRequestPaths.length === 5 && fullAudioRequestPaths.some(pathname => pathname.endsWith('/anarco-cyberpunk-ost.mp3')), 'trilha só é solicitada após a partida ativa e depois dos quatro efeitos curtos')
+  const startFocus = await page.evaluate(() => ({ id: document.activeElement.id, role: document.activeElement.getAttribute('role') }))
+  ok(startFocus.id === 'gameCanvas' && startFocus.role === 'img', 'após iniciar, foco vai ao canvas neutro e não ao botão Pausar')
+  await page.waitForTimeout(120)
+  const renderInPlay = await page.evaluate(() => window.__webglRenderProbe.count)
+  ok(renderInPlay > 0, 'a renderização WebGL retoma durante a partida')
+  await page.evaluate(() => {
+    window.__mapProbe = { times: [], original: drawMap }
+    drawMap = function () { window.__mapProbe.times.push(performance.now()); window.__mapProbe.original() }
+  })
+  await page.waitForTimeout(1100)
+  const mapPlayStats = await page.evaluate(() => {
+    const times = window.__mapProbe.times
+    return { count: times.length, minGap: times.length > 1 ? Math.min(...times.slice(1).map((time, index) => time - times[index])) : Infinity }
+  })
+  ok(mapPlayStats.count >= 1 && mapPlayStats.count <= 16 && mapPlayStats.minGap >= 65, `minimapa redesenha durante jogo com intervalo de throttling (10 Hz alvo; ${mapPlayStats.count} desenhos)`)
+  await page.click('#pb')
+  const pauseDialog = await page.evaluate(() => ({ modal: document.getElementById('pz').getAttribute('aria-modal'), focus: document.activeElement.id, hudInert: document.getElementById('hud').inert }))
+  const webglAtPause = await page.evaluate(() => window.__webglRenderProbe.count)
+  await page.setViewportSize({ width: 560, height: 1000 })
+  await page.waitForFunction((before) => window.__webglRenderProbe.count === before + 1, webglAtPause, { timeout: 5000 })
+  const pauseResizeOne = await page.evaluate(() => window.__webglRenderProbe.count)
+  await page.setViewportSize({ width: 1000, height: 560 })
+  await page.waitForFunction((before) => window.__webglRenderProbe.count === before + 1, pauseResizeOne, { timeout: 5000 })
+  const pauseResizeTwo = await page.evaluate(() => window.__webglRenderProbe.count)
+  const redundantHudMutations = await page.evaluate(async () => {
+    let count = 0
+    const observer = new MutationObserver(records => { count += records.length })
+    const droneState = document.getElementById('drstate'), sideRead = document.getElementById('sideRead')
+    observer.observe(droneState, { childList: true, characterData: true, subtree: true })
+    observer.observe(sideRead, { attributes: true, attributeFilter: ['title'] })
+    for (let i = 0; i < 100; i++) {
+      setTxt(droneState, droneState.textContent)
+      setAttr(sideRead, 'title', sideRead.getAttribute('title'))
+    }
+    await new Promise(resolve => setTimeout(resolve, 0))
+    observer.disconnect()
+    return count
+  })
+  ok(redundantHudMutations === 0, 'setters do HUD evitam escritas idênticas em texto e atributos')
+  const mapAtPause = await page.evaluate(() => window.__mapProbe.times.length)
+  await page.waitForTimeout(350)
+  const mapWhilePaused = await page.evaluate(() => window.__mapProbe.times.length)
+  const webglWhilePaused = await page.evaluate(() => window.__webglRenderProbe.count)
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(() => state === 'play' && document.getElementById('pz').hidden, null, { timeout: 3000 })
+  await page.waitForTimeout(160)
+  const resumedProbe = await page.evaluate(() => {
+    const result = { count: window.__mapProbe.times.length, focus: document.activeElement.id }
+    drawMap = window.__mapProbe.original
+    delete window.__mapProbe
+    fxSystem.render = window.__webglRenderProbe.original
+    delete window.__webglRenderProbe
+    return result
+  })
+  await page.keyboard.press('Enter')
+  const enterSafe = await page.evaluate(() => state === 'play' && document.getElementById('pz').hidden && document.activeElement.id === 'gameCanvas')
+  ok(pauseDialog.modal === 'true' && pauseDialog.focus === 'pzc' && pauseDialog.hudInert && mapWhilePaused <= mapAtPause + 1 && pauseResizeOne === webglAtPause + 1 && pauseResizeTwo === pauseResizeOne + 1 && webglWhilePaused === pauseResizeTwo && resumedProbe.count > mapWhilePaused && resumedProbe.focus === 'gameCanvas' && enterSafe, 'pausa suspende WebGL e minimapa, renderiza só um quadro por resize e Enter não reaciona Pausar ao retomar')
+  const routeDescriptions = await page.evaluate(() => {
+    const previousLevel = lvl, previousRoute = routeMode
+    const samples = {}
+    for (const [level, mode] of [[0, 'fast'], [5, 'fast'], [0, 'tech']]) {
+      lvl = level; routeMode = mode; renderRoute()
+      samples[`${level}:${mode}`] = document.getElementById('routeText').textContent
+    }
+    lvl = previousLevel; routeMode = previousRoute; renderRoute()
+    return samples
+  })
+  ok(routeDescriptions['0:fast'].includes('vel. +18%') && routeDescriptions['5:fast'].includes('vel. +10%') && routeDescriptions['0:tech'].includes('cooldown −18%'), 'descrições das rotas refletem os multiplicadores reais por fase')
+  const objectivePunctuation = await page.evaluate(() => ({ target: formatObjectiveAnnouncement('Hackear PetroNegra Ltda.', 'target', false), boss: formatObjectiveAnnouncement('Derrube PetroNegra Ltda.', 'danger', true) }))
+  ok(objectivePunctuation.target === 'Próximo objetivo: Hackear PetroNegra Ltda.' && objectivePunctuation.boss === 'Objetivo do chefão: Derrube PetroNegra Ltda.', 'anúncio do objetivo mantém um único ponto após nomes jurídicos já pontuados')
   const restrictedSkill = await page.evaluate(() => {
     const feedback = [], originalFeedback = playHackFeedback, originalSkin = skinAtual
     playHackFeedback = kind => feedback.push(kind)
@@ -65,6 +264,7 @@ try {
     ok(r.s === 'play' && r.lv === `NÍVEL ${i + 1}/6` && r.p === 3 && r.boss === (i === 5), `fase ${i + 1}/6 carrega (${r.lv}, chefão: ${r.boss})`)
   }
   await page.waitForFunction(() => boss?.cfg?.model === 'banqueiro' && !!boss.g.userData.art, null, { timeout: 15000 })
+  ok(jsChunkRequests.filter(pathname => pathname.includes('anarco-boss-loader')).length === 1, 'chunk GLTF/Meshopt é transferido sob demanda ao carregar o primeiro chefe')
   const bossOne = await page.evaluate(() => {
     let rig = false
     boss.g.userData.art.traverse(node => { if (node.isSkinnedMesh) rig = true })
@@ -113,13 +313,26 @@ try {
   ok(await page.evaluate(() => document.getElementById('hackState').textContent === 'ACESSO ROOT'), 'barra completa e começa a autenticação root')
   const audioReady = await page.waitForFunction(() => customAudioBuffers.music && customAudioBuffers.connect && customAudioBuffers.stream && customAudioBuffers.error && customAudioBuffers.root, null, { timeout: 15000 }).then(() => true).catch(() => false)
   ok(audioReady, 'trilha e quatro efeitos originais são decodificados localmente')
-  await page.evaluate(() => miniKey((mini.seq[mini.pos] + 1) % 4))
+  const hackErrorAlert = await page.evaluate(() => {
+    const before = alert_, gain = routeTune().alertGain
+    miniKey((mini.seq[mini.pos] + 1) % 4)
+    return { before, gain, after: alert_ }
+  })
   await page.waitForFunction(() => document.getElementById('hackPanel').dataset.state === 'error', null, { timeout: 3000 })
+  const expectedAlert = Math.min(0.98, hackErrorAlert.before + 0.2 * hackErrorAlert.gain)
+  ok(Number.isFinite(hackErrorAlert.after) && hackErrorAlert.after > hackErrorAlert.before && Math.abs(hackErrorAlert.after - expectedAlert) < 1e-9, 'erro de hack aplica uma penalidade de alerta finita')
   const erroVisual = await page.evaluate(() => ({ state: document.getElementById('hackPanel').dataset.state, color: getComputedStyle(document.getElementById('hackPanel')).borderLeftColor, particle: hackFlowMaterial.color.getHexString() }))
   ok(erroVisual.state === 'error' && erroVisual.color === 'rgb(255, 63, 208)' && erroVisual.particle === 'ff3fd0', 'sequência incorreta aciona glitch magenta no HUD e no fluxo de dados')
-  await page.evaluate(() => { let n = 0; while (mini && n++ < 10) miniKey(mini.seq[mini.pos]) })
+  const hackSequence = await page.evaluate(() => [...mini.seq])
+  const hackPadButtons = [14, 12, 15, 13]
+  for (const direction of hackSequence) {
+    await setPadButton(hackPadButtons[direction], true)
+    await page.waitForTimeout(70)
+    await setPadButton(hackPadButtons[direction], false)
+    await page.waitForTimeout(70)
+  }
   await page.waitForFunction(() => document.getElementById('hackPanel').dataset.state === 'committed', null, { timeout: 5000 })
-  ok(await page.evaluate(() => document.getElementById('hackState').textContent === 'VIGILÂNCIA TOTAL // COMPROMETIDA'), 'sequência validada concede root e compromete a Vigilância Total')
+  ok(await page.evaluate(() => document.getElementById('hackState').textContent === 'VIGILÂNCIA TOTAL // COMPROMETIDA'), 'D-pad reproduz sequência correta, concede root e compromete a Vigilância Total')
   await page.screenshot({ path: '/tmp/anarco-hack-desktop.png' })
 
   // O mesmo fluxo em viewport touch: HUD compacto acima do minigame e fora dos botões inferiores.
@@ -141,6 +354,24 @@ try {
   await mobilePage.screenshot({ path: '/tmp/anarco-intro-mobile.png' })
   await mobilePage.mouse.click(195, 300)
   await mobilePage.waitForFunction(() => state === 'play', null, { timeout: 30000 })
+  const touchTargetsPortrait = await mobilePage.evaluate(() => {
+    const height = selector => [...document.querySelectorAll(selector)].filter(el => getComputedStyle(el).display !== 'none').map(el => Math.round(el.getBoundingClientRect().height))
+    return { actions: height('#touchActions button'), routes: height('#routePicker button'), hud: height('#hudActions button') }
+  })
+  ok([...touchTargetsPortrait.actions, ...touchTargetsPortrait.routes, ...touchTargetsPortrait.hud].every(height => height >= 44), 'alvos touch visíveis têm pelo menos 44px em retrato')
+  await mobilePage.setViewportSize({ width: 844, height: 390 })
+  const touchTargetsLandscape = await mobilePage.evaluate(() => {
+    const height = selector => [...document.querySelectorAll(selector)].filter(el => getComputedStyle(el).display !== 'none').map(el => Math.round(el.getBoundingClientRect().height))
+    return { actions: height('#touchActions button'), routes: height('#routePicker button'), hud: height('#hudActions button'), pageWidth: document.documentElement.scrollWidth }
+  })
+  ok([...touchTargetsLandscape.actions, ...touchTargetsLandscape.routes, ...touchTargetsLandscape.hud].every(height => height >= 44) && touchTargetsLandscape.pageWidth === 844, 'alvos touch mantêm 44px em paisagem sem rolagem horizontal')
+  await mobilePage.evaluate(() => { tut = 0; tutShow() })
+  const compactLandscape = await mobilePage.evaluate(() => {
+    const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height } }
+    return { hud: rect('#hud'), tutorial: rect('#tut'), actions: rect('#touchActions'), heights: [...document.querySelectorAll('#touchActions button')].map(button => button.getBoundingClientRect().height) }
+  })
+  ok(compactLandscape.hud.height <= 64 && compactLandscape.tutorial.bottom < compactLandscape.actions.top && compactLandscape.heights.every(height => height >= 44), 'HUD de 844×390 ocupa faixa compacta e tutorial não cobre BREACH, EMP ou VÍRUS')
+  await mobilePage.setViewportSize({ width: 390, height: 844 })
   await mobilePage.evaluate(() => {
     tut = -1; tutShow(); const t = towers[2]; drones.forEach(d => d.position.set(90, 5, 90));
     P.position.set(t.x + 4.75, 0, t.z + 0.2); vel.set(0, 0, 0); t.p = 0.995; grace = 120;
@@ -173,8 +404,11 @@ try {
       await offlinePage.reload({ waitUntil: 'domcontentloaded' })
       await offlinePage.waitForSelector('#st', { state: 'visible', timeout: 15000 })
       await offlinePage.click('#st')
-      const cachedAudio = await offlinePage.waitForFunction(() => Object.keys(customAudioBuffers).length === 5, null, { timeout: 20000 }).then(() => true).catch(() => false)
-      ok(cachedAudio, 'jogo e os cinco sons carregados anteriormente funcionam offline após Invadir')
+      await offlinePage.waitForFunction(() => ['connect', 'stream', 'error', 'root'].every(key => !!customAudioBuffers[key]), null, { timeout: 20000 })
+      await offlinePage.mouse.click(500, 300)
+      await offlinePage.waitForFunction(() => state === 'play', null, { timeout: 15000 })
+      const cachedAudio = await offlinePage.waitForFunction(() => !!customAudioBuffers.music, null, { timeout: 20000 }).then(() => true).catch(() => false)
+      ok(cachedAudio, 'jogo, quatro efeitos e trilha previamente carregados funcionam offline após iniciar')
     } catch (error) {
       ok(false, `shell/áudio offline após primeira carga: ${String(error).slice(0, 140)}`)
     } finally {

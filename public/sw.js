@@ -1,5 +1,5 @@
 /* ÂNCORA: cache do shell na primeira visita; arquivos grandes só entram quando o jogo realmente precisa deles. */
-const VERSAO = "anarco-v4.1.1-lazy-menu-largo";
+const VERSAO = "anarco-v4.2.2-adaptive-fxaa";
 // O shell é pequeno e mantém o jogo iniciável offline. Áudio, notebook e chefes são buscados sob demanda.
 const BASICO = ["./", "index.html", "style.css", "script.js", "manifest.webmanifest", "assets/dados/manifesto.js",
   "assets/share/favicon-192.png", "assets/share/favicon-512.png", "assets/img/skins/vanta.png",
@@ -15,7 +15,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== VERSAO).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
-// Rede primeiro: uma resposta bem-sucedida é armazenada para a próxima sessão offline.
+// Rede primeiro: falhas no cache não podem invalidar uma resposta válida da rede.
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -25,8 +25,10 @@ self.addEventListener("fetch", (event) => {
     try {
       const response = await fetch(request);
       if (response.ok) {
-        const cache = await caches.open(VERSAO);
-        await cache.put(request, response.clone());
+        try {
+          const cache = await caches.open(VERSAO);
+          await cache.put(request, response.clone());
+        } catch { /* quota/erro de armazenamento: a resposta online continua válida */ }
       }
       return response;
     } catch {

@@ -1,0 +1,5 @@
+Special Elite — designed by Astigmatic.
+Source: Google Fonts (https://fonts.google.com/specimen/Special+Elite)
+Font file: SpecialElite-Latin.woff2 (Latin subset, served by the Google Fonts CSS API)
+License: Apache License 2.0; see SpecialElite-LICENSE.txt.
+The font file is redistributed unmodified.

@@ -26,6 +26,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://anarcoexe.vercel.app/assets/share/og.jpg">
+<link rel="preload" href="./fonts/SpecialElite-Latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -59,7 +60,8 @@
 <div id="msg" role="status" aria-live="polite"></div>
 <div id="fxFlash" aria-hidden="true"></div>
 <div id="leakcard" hidden><b>VAZAMENTO CAPTURADO</b><span id="lcc"></span><small id="lcd"></small></div>
-<div id="obj" role="status" aria-live="polite"></div>
+<div id="obj" aria-hidden="true"></div>
+<div id="objAnnounce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="hackPanel" class="hack-panel" hidden role="region" aria-live="off" aria-label="Progresso contextual do hack">
   <div class="hack-panel-head"><span class="hack-panel-corp">VIGILÂNCIA TOTAL CORP.</span><span class="hack-live"><i></i> LINK ATIVO</span></div>
   <strong class="hack-building" id="hackBuilding">ALVO // TORRE</strong>
@@ -68,12 +70,12 @@
   <div class="hack-trace" aria-hidden="true"><span id="hackTrace">CAM-07 // UPLINK AGUARDANDO</span><span class="hack-trace-cursor">▌</span></div>
   <div id="hackRoot" class="hack-root"><span>◈</span><b>ROOT // BLOQUEADO</b><small>SEQUÊNCIA NECESSÁRIA</small></div>
 </div>
-<div id="pz" hidden><div><h2>PAUS<span>A</span></h2><p>P ou Esc para voltar.</p><button id="pzc">Continuar</button> <button id="pzm">Menu</button></div></div>
+<div id="pz" hidden role="dialog" aria-modal="false" aria-labelledby="pzTitle" tabindex="-1"><div><h2 id="pzTitle">PAUS<span>A</span></h2><p>P ou Esc para voltar.</p><button id="pzc">Continuar</button> <button id="pzm">Menu</button></div></div>
 <div id="bf" hidden><div><p class="eyebrow">BRIEFING // REDE ANARQUISTA</p><h2 id="bfh"></h2><p id="bft"></p><div class="brief-grid"><span><b>OBJETIVO</b><strong id="bfo"></strong></span><span><b>AMEAÇA</b><strong id="bfa"></strong></span><span><b>RECOMENDAÇÃO</b><strong id="bfr"></strong></span></div></div></div>
 <div id="mini" hidden><b id="miniTitle">BREACH — digite a sequência</b><small id="miniRule">PROTOCOLO // SETAS</small><div id="seq"></div><div class="mb"><u id="mt"></u></div><div id="mk"></div></div>
 <div id="tut" hidden><span id="tutx"></span><button id="tuts">pular</button></div>
-<div id="lk" hidden><div><h2>VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul><button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
-<div id="rk" hidden><div><h2>MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul><button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
+<div id="lk" hidden role="dialog" aria-modal="false" aria-labelledby="lkTitle" tabindex="-1"><div><h2 id="lkTitle">VAZAMENTOS <span>COLETADOS</span></h2><p id="lkc"></p><ul id="lkl"></ul><button id="lkx">Fechar</button> <button id="lkz">Apagar tudo</button></div></div>
+<div id="rk" hidden role="dialog" aria-modal="false" aria-labelledby="rkTitle" tabindex="-1"><div><h2 id="rkTitle">MELHORES <span>TEMPOS</span></h2><p id="rkc"></p><ul id="rkl"></ul><button id="rkx">Fechar</button> <button id="rkz">Apagar</button></div></div>
 <div id="map-wrap"><canvas id="map" width="130" height="130" aria-label="Minimapa"></canvas><div id="mapLegend"><span><i class="legend-dot tower"></i>torre</span><span><i class="legend-dot drone"></i>drone</span><span><i class="legend-dot item"></i>item</span></div></div>
 <div id="touchActions" aria-label="Habilidades e movimento">
   <button id="bz" aria-label="Usar BREACH; tecla Espaço">BREACH · Espaço</button>
@@ -85,11 +87,11 @@
 </div>
 <div id="routePicker" aria-label="Escolher rota"><button id="routeFast" type="button" aria-label="Escolher rota rápida">1 RÁPIDA</button><button id="routeSafe" type="button" aria-label="Escolher rota protegida">2 PROTEGIDA</button><button id="routeTech" type="button" aria-label="Escolher rota técnica">3 TÉCNICA</button></div>
 <div id="joy"><b id="nub"></b></div>
-<div id="ov"><div class="ov-card">
+<div id="ov" role="dialog" aria-modal="true" aria-labelledby="ot" tabindex="-1"><div class="ov-card">
   <div class="ov-kicker">OPERAÇÃO // REDE ANARQUISTA</div>
   <h2 id="ot">ANARCO<span>.EXE</span></h2>
   <p id="od">Você é o capuz sem chefe. Chegue perto de cada torre corporativa e fique no círculo vermelho até o hack completar. Fuja das luzes dos drones: se o alerta encher, o rastreio te acha.</p>
-  <p class="ov-copy">Mova com WASD ou setas, segure Shift para correr. Use BREACH, EMP e VÍRUS para controlar a rede e sobreviver aos chefões. Tudo é ficção.</p>
+  <p class="ov-copy">Mova com WASD/setas ou analógico esquerdo; Shift ou L3 corre. Controle padrão: A confirma/B volta, Start pausa, X EMP, Y VÍRUS, LB esquiva. BREACH e habilidades também têm botões touch. Tudo é ficção.</p>
   <p id="rkres" hidden></p>
   <label class="fx-settings" for="fxQuality"><span>QUALIDADE DOS EFEITOS</span><select id="fxQuality"><option value="low">Baixa · máximo desempenho</option><option value="medium">Média · bloom seletivo</option><option value="high">Alta · bloom completo opcional</option></select><small id="fxQualityStatus" aria-live="polite">FX · MÉDIA</small><small>Se o desempenho cair, o jogo reduz efeitos e resolução automaticamente.</small></label>
   <label class="fx-settings" for="codeRainMode"><span>CHUVA DE CÓDIGO // BREACH</span><select id="codeRainMode"><option value="on">Ativa no BREACH · padrão PC</option><option value="auto">Automática · respeita reduzir movimento</option><option value="off">Desativada</option></select><small id="codeRainStatus" aria-live="polite">Chuva de códigos ao ativar BREACH.</small></label>

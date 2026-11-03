@@ -70,6 +70,5 @@
   "leaderboard.time": "Time",
   "touch.jump": "JUMP",
   "touch.dash": "DASH",
-  "touch.pause": "Pause",
-  "credits.fonts": "Fonts: ManusCC0 (CC0 1.0)"
+  "touch.pause": "Pause"
 }

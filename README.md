@@ -1,16 +1,95 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.1.1)
+# ANARCO.EXE 3D — Breach Protocol (v4.2.3)
 
-Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica no módulo de efeitos (`src/anarco-fx.ts`), no carregador (`src/anarco-entry.ts`) e no coletor de desempenho opt-in (`src/anarco-perf.ts`).
+## v4.2.3 — decisão de arquitetura e entrega Brotli verificada
+
+`src/game` e `src/engine` ficam deliberadamente como scaffold independente do protótipo de plataforma em ilhas; não serão fundidos com a campanha cyberpunk do `script.js` nesta revisão. Seus testes são preservados e `src/game/tuning.ts` continua servindo somente à ponte de Tweak em modo de desenvolvimento. A campanha ativa continua tendo sua própria configuração de gameplay em `src/anarco-gameplay-config.ts`.
+
+O domínio público `anarcoexe.vercel.app` foi consultado em 2026-11-03: `anarco.mdl`, `cachos.mdl` e `laptop.mdl` responderam com `Content-Encoding: br`, e os bytes descomprimidos coincidiram com as fontes. A economia medida nesses três recursos foi de 232.831 bytes no total. O projeto mantém os arquivos-fonte e as URLs existentes; `pnpm verify:production-models -- https://anarcoexe.vercel.app` permite repetir a verificação depois de publicar esta árvore. A evidência do domínio atual não identifica a release servida como v4.2.3; ainda é necessário publicar esta cópia e verificar novamente.
+
+## v4.2.2 — antialias FXAA adaptativo
+
+O contexto WebGL agora inicia sem MSAA, que não podia ser alternado depois da criação. O jogo usa FXAA como pass de pós-processamento em qualidade Média/Alta e o remove em Baixa; assim, a queda adaptativa de qualidade pode desativar o antialias sem recriar o renderer, e uma mudança manual para Média/Alta o reativa. A resolução do shader acompanha o DPR do renderer e o redimensionamento da janela.
+
+O chunk do FXAA é carregado sob demanda e separado do Bloom. Média recebe o antialias sem baixar Bloom; Alta carrega Bloom somente quando solicitada. Se um chunk pós-processado falhar, o jogo continua em render direto, sem bloquear a partida. Como a estratégia troca MSAA por FXAA, a imagem pode ficar um pouco mais suave; validar nitidez e custo em aparelhos reais continua recomendado. O E2E verifica a alternância Baixa↔Média e o split de chunks.
+
+## v4.2.1 — save resiliente e HUD de paisagem
+
+No boot, chaves legadas existentes que divergirem do envelope passam a prevalecer; o envelope é reparado com o valor encontrado. Isso recupera gravações feitas por rollback ou por outra aba numa versão antiga. Uma chave legada ausente não apaga o valor do envelope. Testes cobrem os dois casos.
+
+Em celulares com toque e orientação paisagem de até 500 px de altura, o HUD vira uma faixa essencial de uma linha e os seis botões táteis ficam num dock horizontal na base. A bolha do tutorial permanece abaixo do HUD e acima do dock, sem cobrir BREACH, EMP ou VÍRUS. O ajuste é automatizado, mas ainda precisa de validação em aparelho físico.
+
+A limpeza remove os metadados genéricos do starter e fontes ManusCC0 sem uso, junto com seus créditos obsoletos. A integração de preview/ajuste da plataforma foi preservada.
+
+Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
+
+## v4.2.0 — gamepad e Bloom sob demanda
+
+O runtime publicado agora detecta gamepads de mapeamento `standard`, sem exigir controle conectado e preservando teclado/touch. Analógico esquerdo move; A confirma/usa BREACH; B volta ou pausa/retoma; Start pausa/retoma; X ativa EMP; Y ativa VÍRUS; LB esquiva; RB ativa o nó VANTA; L3 corre. O D-pad navega os diálogos e insere as direções do minigame BREACH. A validação E2E usa um controle simulado em Chromium, não é homologação em controle físico.
+
+`EffectComposer`, `RenderPass`, `UnrealBloomPass` e `OutputPass` saíram do chunk inicial e são carregados sob demanda quando a qualidade efetiva é Alta. Qualidade Baixa/Média pode iniciar e jogar sem baixar o chunk de Bloom; em Alta, a cena é renderizada diretamente enquanto o chunk carrega e depois recebe Bloom. Se o chunk falhar, o jogo continua sem Bloom. A qualidade padrão e os presets não mudaram.
+
+O antialias MSAA só pode ser escolhido na criação do contexto WebGL: Alta/Média preservam o comportamento anterior, baixa explícita inicia sem MSAA e dispositivos touch de alta densidade também ficam sem MSAA. **O MSAA não é desligado dinamicamente** quando a qualidade adaptativa rebaixa o preset; para essa economia durante a sessão seria necessário adotar um antialias pós-processado que possa ser habilitado/desabilitado sem recriar o contexto.
+
+## v4.1.9 — save, code splitting e controles touch
+
+Um registro `anarco_save_v1` agora versiona os saves ativos. Na primeira abertura, copia sem apagar as chaves antigas; novas gravações são mantidas no envelope v1 e espelhadas para as chaves anteriores para compatibilidade/rollback. O runtime legado e as preferências FX usam o adaptador. O migrador lida com storage bloqueado em memória e não sobrescreve um envelope de versão futura desconhecida.
+
+O GLTFLoader/Meshopt saiu do bundle inicial e foi para um chunk carregado sob demanda quando o primeiro modelo de chefe é pedido. Na v4.1.9 o entry tinha cerca de 785 KB raw/201 KB gzip; na v4.2.0 passou a aproximadamente 767 KB raw/197 KB gzip, e tanto o loader de chefe como o pipeline de Bloom são carregados apenas quando usados.
+
+Em dispositivos com ponteiro touch, botões de habilidades, seletor de rota, pausa e áudio têm alvos de pelo menos 44px; o E2E valida retrato e paisagem sem rolagem horizontal em Chromium emulado. Isso não substitui testes com aparelhos físicos.
+
+## v4.1.8 — áudio, regras e Brotli
+
+Os quatro efeitos curtos são buscados e decodificados após a primeira interação. A trilha MP3 só é solicitada depois que a partida entra em `play`/`brief` e os efeitos curtos terminam; até a trilha ficar pronta, a música procedural serve de fallback. O E2E verifica essa ordem, o início da trilha e o funcionamento offline depois que os cinco arquivos foram armazenados.
+
+Os níveis e multiplicadores das rotas usados pelo runtime ativo agora vêm de `src/anarco-gameplay-config.ts`, que os testes unitários também importam. Os valores de balanceamento não mudaram. Isso é um passo de centralização do runtime ativo; os módulos `src/game`/`src/engine` ainda descrevem uma arquitetura scaffold diferente e não foram fundidos nesta versão.
+
+O build registra tamanhos locais gzip e Brotli (q5) dos assets textuais. É uma estimativa da build, não comprova `Content-Encoding` no CDN; a verificação de produção e o Lighthouse continuam dependendo de URL publicada.
+
+## Hotfix v4.1.7 — fonte Special Elite
+
+A v4.1.6 havia colocado ManusCC0 na pilha ativa, alterando a identidade monoespaçada da interface. A v4.1.7 restaura a pilha `"Special Elite", "Courier New", monospace` e inclui o arquivo real Special Elite em WOFF2, servido localmente e pré-carregado.
+
+O arquivo veio do Google Fonts; licença Apache 2.0 e aviso de atribuição acompanham o asset em `public/fonts/`. O preload ManusCC0 foi substituído pelo preload da fonte correta; o `modulepreload` do script continua ativo.
+
+## v4.1.6 — resize pausado e entrega
+
+Um redimensionamento no menu ou na pausa agora coalesce eventos e desenha um único quadro WebGL, preservando a cena após girar o celular ou alterar a janela. O E2E mede que não há quadros extras até a partida retomar.
+
+O build aplica budgets por categoria e a CI os executa via `pnpm verify`: JS gzip ≤ 1,25 MiB; CSS gzip ≤ 0,50 MiB; fontes ≤ 0,25 MiB; áudio ≤ 3,25 MiB; modelos ≤ 3,25 MiB; imagens ≤ 0,75 MiB; outros ≤ 0,50 MiB; transferência total ≤ 8 MiB. Fontes e arquivos binários são medidos como enviados; textos são medidos em gzip.
+
+O `vercel.json` revalida HTML, não armazena o Service Worker, usa cache curto para assets de nome estável e `immutable` por um ano só nos bundles/imagens hashados. A v4.1.6 deixou o `modulepreload` da entrada JavaScript e o preload de fonte, mas ativou ManusCC0 por engano; a v4.1.7 substitui a fonte pelo arquivo Special Elite real e licenciado.
+
+O primeiro clique em **Invadir** abre o terminal narrativo; a partida só entra em `play` quando esse terminal é fechado por clique ou tecla, conforme a introdução termina. Um teste que espere `play` logo após o primeiro clique precisa também descartar o terminal.
+
+O relatório da v4.1.5 registrava render em menu/pausa como item global **8** (não 7), com 15/20 concluídos naquele snapshot. O split inicial do loader/Bloom e a integração de gamepad no runtime publicado foram concluídos depois; o antialias adaptativo foi resolvido na v4.2.2. Na v4.2.3, o destino do scaffold foi decidido e Brotli dos `.mdl` foi observado no domínio público. Continuam pendentes a publicação desta árvore, Lighthouse da release publicada, medições com PC/celular/controle físicos e validação manual em leitores de tela reais; veja `docs/STATUS-OTIMIZACOES-V4.2.3.md` e o roteiro de teste manual.
+
+## Hotfix v4.1.5 — foco seguro e render em pausa
+
+Ao iniciar ou retomar, o foco vai para o canvas neutro, não para o botão Pausar; assim, pressionar Enter não pausa a partida por ativar acidentalmente esse botão. O canvas tem nome acessível e indicador de foco visível. O anúncio do objetivo evita duplicar o ponto quando o nome da torre já termina em pontuação.
+
+As chamadas WebGL de render são suspensas nos estados de menu e pausa e retomadas na partida. O callback de `requestAnimationFrame` continua agendado para a lógica existente; portanto, este hotfix interrompe o render da cena 3D, não é uma suspensão completa do loop de CPU.
+
+Os testes de acessibilidade cobrem semântica e fluxo de foco de forma automatizada. Ainda não houve validação com leitores de tela reais como NVDA, VoiceOver ou TalkBack.
+
+## Lote v4.1.4 — minimapa, HUD e acessibilidade
+
+O minimapa redesenha no máximo a cada 100 ms durante a partida e a cada 500 ms fora dela, refrescando imediatamente quando o estado muda e congelando com a pausa. O limite efetivo depende da taxa de quadros do aparelho; a medição em Chromium headless não representa FPS de GPU física.
+
+Os rótulos discretos do HUD agora só alteram o DOM quando o valor realmente muda. A distância visual do objetivo continua atualizada, enquanto um anúncio acessível separado é emitido apenas quando muda o alvo/estado, evitando anúncios por metro.
+
+Menu, pausa, vazamentos, ranking e terminal introdutório passaram a ter nomes de diálogo, foco inicial e retorno, contenção de Tab, Escape nas listas e conteúdo de fundo inerte. Os painéis de vazamentos/ranking ficam acima do menu. Dados persistidos nessas listas são montados como texto seguro, não como HTML.
 
 ## Rodar no computador
 
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000 (ou a porta que o Vite mostrar)
-pnpm test         # 13 arquivos / 83 testes
-pnpm build        # gera dist/ (typecheck + Vite + assets + limite de tamanho)
+pnpm test         # 17 arquivos / 95 testes
+pnpm build        # gera dist/ (typecheck + Vite + assets + budgets por categoria)
 pnpm smoke        # depois do build: confere os arquivos e modelos da dist/
 pnpm e2e          # gameplay, modelos, áudio/offline, desktop e celular (Chromium)
+pnpm verify       # typecheck, testes, build, smoke e E2E em sequência
 pnpm perf         # depois do build: benchmark SwiftShader e salva JSON em docs/performance/
 ```
 
@@ -18,7 +97,7 @@ pnpm perf         # depois do build: benchmark SwiftShader e salva JSON em docs/
 
 Opcional: `pnpm compress:bosses` repete a compressão dos três GLBs dos chefes. O pipeline usa glTF Transform/Meshopt, preserva e valida rigs/animações e não substitui os arquivos se a checagem falhar.
 
-Este pacote inclui o projeto editável e uma build pronta em `dist/`. Para abrir a build: `python3 -m http.server 4173 --directory dist` e acessar `http://localhost:4173`.
+`pnpm build` gera a build de produção em `dist/`. Para abri-la: `python3 -m http.server 4173 --directory dist` e acessar `http://localhost:4173`.
 Não abra o `index.html` da raiz com duplo clique nem com Live Server: ele é o código-fonte (chama `src/anarco-entry.ts`, TypeScript) e só funciona via `pnpm dev` ou depois do `pnpm build` (use a pasta `dist/`).
 
 No Windows (PowerShell), se o `npm` reclamar de scripts desabilitados: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. É preciso ter o Node.js LTS (nodejs.org) e depois `npm install -g pnpm`.
@@ -61,6 +140,7 @@ A build final (`dist/`) tem 7,05 MiB; os 83 testes, smoke e E2E em Chromium pass
 ## Documentação
 - `docs/RELATORIO-MESCLA-V4.1.1.md` — mescla da v4.1.0 com a nossa v4.0.1 (menu, painéis, correções).
 - `docs/RELATORIO-OTIMIZACOES-DIFICIL-V4.1.0.md` — checklist, metodologia, limitações e resultados antes/depois.
+- `docs/STATUS-OTIMIZACOES-V4.2.0.md` — pendências ordenadas por dificuldade, auditoria da arquitetura scaffold e medição sem perdas dos modelos `.mdl`.
 - `docs/performance/` — JSON bruto do baseline e do pós-otimização em SwiftShader.
 - `docs/RELATORIO-UPGRADE-V4.0.0-VIGILANCIA-TOTAL.md` — relatório v4.0.0 e checklist histórica atualizada.
 - `docs/RELATORIO-historico-A-a-P.md` — relatórios anteriores (itens A a P, mais o item Q da mescla v3.9).

@@ -1,10 +1,15 @@
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+type FxaaModules = typeof import('./anarco-fxaa')
+type BloomModules = typeof import('./anarco-postprocessing')
+type Composer = InstanceType<FxaaModules['EffectComposer']>
+type FxaaPass = InstanceType<FxaaModules['ShaderPass']>
+type BloomPass = InstanceType<BloomModules['UnrealBloomPass']>
 
 export type FxQuality = 'low' | 'medium' | 'high'
+type SaveStorageBridge = Pick<Storage, 'getItem' | 'setItem'>
+function saveStorageBridge(): SaveStorageBridge {
+  return (window as Window & { ANARCO_SAVE_STORAGE?: SaveStorageBridge }).ANARCO_SAVE_STORAGE ?? localStorage
+}
 export const FX_QUALITY_ORDER: FxQuality[] = ['low', 'medium', 'high']
 
 export function lowerQuality(value: FxQuality): FxQuality {
@@ -28,10 +33,10 @@ export function resolveFxPixelRatio(nativeDpr: number, presetDpr: number, coarse
   return Math.max(0.75, cappedDpr * resolutionScale)
 }
 
-export const FX_QUALITY_PRESETS: Record<FxQuality, { particles: number; dpr: number; lights: number; fullBloom: boolean; shadows: boolean }> = {
-  low: { particles: 100, dpr: 1, lights: 0, fullBloom: false, shadows: false },
-  medium: { particles: 280, dpr: 1.35, lights: 4, fullBloom: false, shadows: false },
-  high: { particles: 520, dpr: 2, lights: 7, fullBloom: true, shadows: true },
+export const FX_QUALITY_PRESETS: Record<FxQuality, { particles: number; dpr: number; lights: number; fxaa: boolean; fullBloom: boolean; shadows: boolean }> = {
+  low: { particles: 100, dpr: 1, lights: 0, fxaa: false, fullBloom: false, shadows: false },
+  medium: { particles: 280, dpr: 1.35, lights: 4, fxaa: true, fullBloom: false, shadows: false },
+  high: { particles: 520, dpr: 2, lights: 7, fxaa: true, fullBloom: true, shadows: true },
 }
 
 export interface FxFrameState {
@@ -127,8 +132,14 @@ export class AnarcoFxSystem {
   private bloomStrength = 1
   private frameCount = 0
   private slowFrames = 0
-  private composer?: EffectComposer
-  private bloom?: UnrealBloomPass
+  private composer?: Composer
+  private fxaaPass?: FxaaPass
+  private bloom?: BloomPass
+  private fxaaLoading?: Promise<void>
+  private bloomLoading?: Promise<void>
+  private fxaaModules?: FxaaModules
+  private bloomModules?: BloomModules
+  private postprocessingFailed = false
   private readonly lights: TimedLight[] = []
   private readonly echoes: Echo[] = []
   private echoDodgeWasActive = false
@@ -234,9 +245,13 @@ export class AnarcoFxSystem {
 
   get selectedQuality(): FxQuality { return this.quality }
   get effectiveQuality(): FxQuality { return FX_QUALITY_ORDER[Math.max(0, FX_QUALITY_ORDER.indexOf(this.quality) - this.adaptiveLoss)] }
+  private get contextUsesMsaa(): boolean { return this.renderer.getContext().getContextAttributes()?.antialias === true }
+  private get needsFxaa(): boolean { return FX_QUALITY_PRESETS[this.effectiveQuality].fxaa && !this.contextUsesMsaa }
 
   getDiagnostics(): {
     quality: { selected: FxQuality; effective: FxQuality; resolutionScale: number }
+    antialias: { contextMsaa: boolean; fxaa: boolean }
+    postprocessing: { fxaa: boolean; bloom: boolean }
     pixelRatio: number
     canvas: { backingWidth: number; backingHeight: number; cssWidth: number; cssHeight: number }
     render: { calls: number; triangles: number; points: number; lines: number }
@@ -250,6 +265,8 @@ export class AnarcoFxSystem {
     for (let i = 0; i < this.activeParticleLimit; i += 1) if (this.slots[i].active) active += 1
     return {
       quality: { selected: this.quality, effective: this.effectiveQuality, resolutionScale: this.resolutionScale },
+      antialias: { contextMsaa: this.contextUsesMsaa, fxaa: Boolean(this.fxaaPass) },
+      postprocessing: { fxaa: Boolean(this.fxaaPass), bloom: Boolean(this.bloom) },
       pixelRatio: this.renderer.getPixelRatio(),
       canvas: { backingWidth: canvas.width, backingHeight: canvas.height, cssWidth: rect.width, cssHeight: rect.height },
       render: { calls: render.calls, triangles: render.triangles, points: render.points, lines: render.lines },
@@ -260,7 +277,7 @@ export class AnarcoFxSystem {
 
   private readSavedQuality(): FxQuality {
     try {
-      const saved = localStorage.getItem('anarco_fx_quality')
+      const saved = saveStorageBridge().getItem('anarco_fx_quality')
       if (saved === 'low' || saved === 'medium' || saved === 'high') return saved
     } catch { /* private browsing: use device hints */ }
     const coarse = matchMedia('(pointer: coarse)').matches
@@ -284,8 +301,9 @@ export class AnarcoFxSystem {
     this.quality = quality
     this.adaptiveLoss = 0
     this.resolutionScale = 1
-    if (persist) try { localStorage.setItem('anarco_fx_quality', quality) } catch { /* keep session setting */ }
+    if (persist) try { saveStorageBridge().setItem('anarco_fx_quality', quality) } catch { /* keep session setting */ }
     this.applyQuality()
+    requestAnimationFrame(() => this.render())
   }
 
   private applyTweak(id: string, value: number): void {
@@ -336,10 +354,12 @@ export class AnarcoFxSystem {
     })
     this.composer?.dispose()
     this.composer = undefined
+    this.fxaaPass = undefined
     this.bloom = undefined
     if (this.qualitySelect) this.qualitySelect.value = this.quality
     document.body.dataset.fxQuality = effective
     document.body.dataset.fxBaseQuality = this.quality
+    document.body.dataset.fxAntialias = this.needsFxaa ? 'fxaa' : this.contextUsesMsaa ? 'msaa' : 'off'
     const label = effective === this.quality ? this.labelQuality(effective) : `${this.labelQuality(this.quality)} → ${this.labelQuality(effective)} · AUTO`
     if (this.qualityStatus) this.qualityStatus.textContent = `FX · ${label}`
   }
@@ -357,20 +377,71 @@ export class AnarcoFxSystem {
     if (this.composer) {
       this.composer.setPixelRatio(this.renderer.getPixelRatio())
       this.composer.setSize(width, height)
+      this.updateFxaaResolution()
     }
   }
 
-  private ensureComposer(): EffectComposer | undefined {
-    if (!FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom) return undefined
+  private ensureComposer(): Composer | undefined {
+    const needsFxaa = this.needsFxaa
+    const needsBloom = FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom
+    if ((!needsFxaa && !needsBloom) || this.postprocessingFailed) return undefined
     if (this.composer) return this.composer
-    this.composer = new EffectComposer(this.renderer)
-    this.composer.setPixelRatio(this.renderer.getPixelRatio())
-    this.composer.setSize(window.innerWidth, window.innerHeight)
-    this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.58 * this.bloomStrength, 0.42, 0.82)
-    this.composer.addPass(this.bloom)
-    this.composer.addPass(new OutputPass())
-    return this.composer
+    if (!this.fxaaModules && !this.fxaaLoading) {
+      this.fxaaLoading = import('./anarco-fxaa').then(modules => {
+        this.fxaaModules = modules
+        this.fxaaLoading = undefined
+        requestAnimationFrame(() => this.render())
+      }).catch(error => {
+        this.fxaaLoading = undefined
+        this.postprocessingFailed = true
+        console.warn('FXAA indisponível; renderizando sem antialias pós-processado.', error)
+      })
+    }
+    if (needsBloom && !this.bloomModules && !this.bloomLoading) {
+      this.bloomLoading = import('./anarco-postprocessing').then(modules => {
+        this.bloomModules = modules
+        this.bloomLoading = undefined
+        requestAnimationFrame(() => this.render())
+      }).catch(error => {
+        this.bloomLoading = undefined
+        this.postprocessingFailed = true
+        console.warn('Bloom indisponível; renderizando sem pós-processamento.', error)
+      })
+    }
+    if (!this.fxaaModules || (needsBloom && !this.bloomModules)) return undefined
+    return this.createComposer(needsFxaa, needsBloom)
+  }
+
+  private createComposer(useFxaa: boolean, useBloom: boolean): Composer {
+    const modules = this.fxaaModules
+    if (!modules) throw new Error('FXAA composer modules are not loaded')
+    const composer = new modules.EffectComposer(this.renderer)
+    composer.setPixelRatio(this.renderer.getPixelRatio())
+    composer.setSize(window.innerWidth, window.innerHeight)
+    composer.addPass(new modules.RenderPass(this.scene, this.camera))
+    let fxaa: FxaaPass | undefined
+    if (useFxaa) {
+      fxaa = new modules.ShaderPass(modules.FXAAShader)
+      composer.addPass(fxaa)
+    }
+    let bloom: BloomPass | undefined
+    if (useBloom && this.bloomModules) {
+      bloom = new this.bloomModules.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.58 * this.bloomStrength, 0.42, 0.82)
+      composer.addPass(bloom)
+    }
+    composer.addPass(new modules.OutputPass())
+    this.composer = composer
+    this.fxaaPass = fxaa
+    this.bloom = bloom
+    this.updateFxaaResolution()
+    return composer
+  }
+
+  private updateFxaaResolution(): void {
+    const resolution = this.fxaaPass?.material.uniforms['resolution']?.value as THREE.Vector2 | undefined
+    if (!resolution) return
+    const pixelRatio = this.renderer.getPixelRatio()
+    resolution.set(1 / (window.innerWidth * pixelRatio), 1 / (window.innerHeight * pixelRatio))
   }
 
   render(): void {
