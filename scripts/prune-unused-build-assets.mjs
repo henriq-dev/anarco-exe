@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 // files are not used by the active runtime; prune only the production artifact,
 // never the source tree, so this remains safe and reversible.
 export const UNUSED_BUILD_ASSETS = Object.freeze([
+  'manus-routes.json',
   'fonts/ManusCC0-Bold.ttf',
   'fonts/ManusCC0-LICENSE.txt',
   'fonts/ManusCC0-Medium.ttf',

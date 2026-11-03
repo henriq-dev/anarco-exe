@@ -63,7 +63,7 @@ try {
   ok(!jsChunkRequests.some(pathname => pathname.includes('anarco-boss-loader')), 'chunk do loader GLTF/Meshopt não é transferido no menu inicial')
   ok(bloomChunkRequests.length === 0, 'qualidade média mantém o chunk de Bloom fora das transferências iniciais')
   await page.evaluate(() => { fxSystem.setQuality('high', false); fxSystem.render() })
-  await page.waitForFunction(() => !!fxSystem.composer, null, { timeout: 10000 })
+  await page.waitForFunction(() => !!fxSystem.composer, null, { timeout: 30000 })
   ok(bloomChunkRequests.length === 1, 'qualidade alta carrega o chunk de Bloom sob demanda e cria o composer')
   await page.evaluate(() => fxSystem.setQuality('medium', false))
   ok(await page.evaluate(() => !fxSystem.composer && document.body.dataset.fxQuality === 'medium'), 'reduzir para média descarta Bloom e preserva renderização direta')

@@ -1,6 +1,10 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.2.5)
+# ANARCO.EXE 3D — Breach Protocol (v4.2.6)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
+
+## v4.2.6 — remover manifesto antigo de dist
+
+Quando o pacote 4.2.5 é copiado por cima de um repositório mais antigo, `public/manus-routes.json` pode continuar no checkout embora não esteja no ZIP. O Vite copia esse arquivo para `dist`, mas o smoke já exige que ele não seja publicado. O pruner agora remove `manus-routes.json` somente de `dist`, antes do smoke; o arquivo-fonte legado não é apagado.
 
 ## v4.2.5 — pacote completo e limpo (v4.2.1 + proteção contra sobras)
 
