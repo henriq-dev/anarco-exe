@@ -1,5 +1,5 @@
 /* ÂNCORA: cache do shell na primeira visita; arquivos grandes só entram quando o jogo realmente precisa deles. */
-const VERSAO = "anarco-v4.2.2-adaptive-fxaa";
+const VERSAO = "anarco-v4.2.0-gamepad-bloom";
 // O shell é pequeno e mantém o jogo iniciável offline. Áudio, notebook e chefes são buscados sob demanda.
 const BASICO = ["./", "index.html", "style.css", "script.js", "manifest.webmanifest", "assets/dados/manifesto.js",
   "assets/share/favicon-192.png", "assets/share/favicon-512.png", "assets/img/skins/vanta.png",

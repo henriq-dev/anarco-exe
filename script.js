@@ -273,10 +273,14 @@ const rnd = () => {
 $("ic_d").src = ICON.data;
 $("ic_h").src = ICON.hack;
 $("ic_a").src = ICON.drone;
-// FXAA substitui o MSAA imutável do contexto para que os perfis/adaptação possam alternar antialias em runtime.
+// O MSAA é definido na criação do contexto WebGL e não pode ser desligado depois pela adaptação automática.
+// Uma preferência explícita Baixa evita MSAA já no startup; a adaptação em sessão segue reduzindo efeitos/resolução.
 let fxSystem = null;
 const toque = matchMedia("(pointer: coarse)").matches;
-const R = new T.WebGLRenderer({ antialias: false });
+let savedFxQuality = null;
+try { savedFxQuality = saveStorage?.getItem("anarco_fx_quality"); } catch (e) {}
+const antialiasInicial = savedFxQuality === "low" ? false : !(toque && devicePixelRatio >= 2);
+const R = new T.WebGLRenderer({ antialias: antialiasInicial });
 let pixelRatio = Math.min(devicePixelRatio, toque ? 1.25 : 2);
 R.setPixelRatio(pixelRatio);
 R.domElement.id = "gameCanvas";

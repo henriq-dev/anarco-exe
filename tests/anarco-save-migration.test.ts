@@ -41,21 +41,11 @@ describe('active legacy save migration', () => {
     expect(JSON.parse(values.get(VERSIONED_SAVE_KEY)!).values).not.toHaveProperty('anarco_tut')
   })
 
-  it('prefers a changed legacy key on boot and repairs the envelope after a rollback or older tab write', () => {
+  it('uses a valid v1 record on subsequent boots instead of re-importing stale legacy data', () => {
     const { storage, values } = memoryStorage({ anarco_skin: 'capuz' })
     const first = new VersionedSaveStorage(storage)
     first.setItem('anarco_skin', 'vanta')
     values.set('anarco_skin', 'capuz')
-    const second = new VersionedSaveStorage(storage)
-    expect(second.getItem('anarco_skin')).toBe('capuz')
-    expect(JSON.parse(values.get(VERSIONED_SAVE_KEY)!).values.anarco_skin).toBe('capuz')
-  })
-
-  it('keeps the envelope value when a legacy key is absent rather than treating absence as a deletion', () => {
-    const { storage, values } = memoryStorage({ anarco_skin: 'capuz' })
-    const first = new VersionedSaveStorage(storage)
-    first.setItem('anarco_skin', 'vanta')
-    values.delete('anarco_skin')
     const second = new VersionedSaveStorage(storage)
     expect(second.getItem('anarco_skin')).toBe('vanta')
   })

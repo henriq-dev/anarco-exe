@@ -22,13 +22,11 @@ try {
   const lazyAssetRequests = []
   const jsChunkRequests = []
   const bloomChunkRequests = []
-  const fxaaChunkRequests = []
   page.on('request', request => {
     const pathname = new URL(request.url()).pathname
     if (/\/assets\/(?:audio\/[^/]+\.mp3|models\/(?:laptop\.mdl|boss-[^/]+\.glb))$/i.test(pathname)) lazyAssetRequests.push(pathname)
     if (/\/assets\/[^/]+\.js$/i.test(pathname)) jsChunkRequests.push(pathname)
     if (/\/assets\/[^/]*postprocessing[^/]*\.js$/i.test(pathname)) bloomChunkRequests.push(pathname)
-    if (/\/assets\/[^/]*anarco-fxaa[^/]*\.js$/i.test(pathname)) fxaaChunkRequests.push(pathname)
   })
   const erros = []
   page.on('pageerror', (e) => erros.push(String(e).slice(0, 160)))
@@ -61,23 +59,14 @@ try {
   const saveMigration = await page.evaluate(() => ({ version: JSON.parse(localStorage.getItem('anarco_save_v1') || 'null')?.version, bridge: typeof ANARCO_SAVE_STORAGE?.getItem === 'function', legacySkinReadable: ANARCO_SAVE_STORAGE?.getItem('anarco_skin') === localStorage.getItem('anarco_skin') }))
   ok(saveMigration.version === 1 && saveMigration.bridge && saveMigration.legacySkinReadable, 'saves antigos migram para schema v1 e permanecem compatíveis com as chaves legadas')
   const startupAntialias = await page.evaluate(() => R.getContext().getContextAttributes()?.antialias)
-  ok(startupAntialias === false, 'contexto WebGL dispensa MSAA imutável para permitir antialias adaptativo em runtime')
+  ok(startupAntialias === true, 'qualidade média inicia MSAA no desktop; o preset Baixa pode dispensá-lo antes da criação do contexto')
   ok(!jsChunkRequests.some(pathname => pathname.includes('anarco-boss-loader')), 'chunk do loader GLTF/Meshopt não é transferido no menu inicial')
-  await page.waitForFunction(() => fxSystem.getDiagnostics().antialias.fxaa, null, { timeout: 30000 })
-  ok(fxaaChunkRequests.length === 1 && (await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa)), 'qualidade média carrega o pass FXAA e o mantém ativo')
   ok(bloomChunkRequests.length === 0, 'qualidade média mantém o chunk de Bloom fora das transferências iniciais')
   await page.evaluate(() => { fxSystem.setQuality('high', false); fxSystem.render() })
-  await page.waitForFunction(() => !!fxSystem.composer, null, { timeout: 30000 })
-  ok(bloomChunkRequests.length === 1 && (await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa)), 'qualidade alta carrega Bloom sob demanda e preserva FXAA no composer')
+  await page.waitForFunction(() => !!fxSystem.composer, null, { timeout: 10000 })
+  ok(bloomChunkRequests.length === 1, 'qualidade alta carrega o chunk de Bloom sob demanda e cria o composer')
   await page.evaluate(() => fxSystem.setQuality('medium', false))
-  await page.waitForFunction(() => fxSystem.getDiagnostics().antialias.fxaa && !fxSystem.getDiagnostics().postprocessing.bloom, null, { timeout: 5000 })
-  ok(await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa && !fxSystem.getDiagnostics().postprocessing.bloom && document.body.dataset.fxQuality === 'medium'), 'reduzir para média mantém FXAA e remove Bloom')
-  await page.evaluate(() => { for (let frame = 0; frame < 60; frame++) fxSystem.samplePerformance(0.03, true) })
-  await page.waitForFunction(() => fxSystem.getDiagnostics().quality.effective === 'low' && !fxSystem.getDiagnostics().antialias.fxaa, null, { timeout: 5000 })
-  ok(await page.evaluate(() => fxSystem.getDiagnostics().quality.selected === 'medium' && fxSystem.getDiagnostics().quality.effective === 'low' && document.body.dataset.fxAntialias === 'off'), 'adaptação automática rebaixa para Baixa e desativa FXAA em runtime')
-  await page.evaluate(() => fxSystem.setQuality('medium', false))
-  await page.waitForFunction(() => fxSystem.getDiagnostics().antialias.fxaa, null, { timeout: 5000 })
-  ok(await page.evaluate(() => fxSystem.getDiagnostics().antialias.fxaa), 'qualidade Média reativa FXAA em runtime')
+  ok(await page.evaluate(() => !fxSystem.composer && document.body.dataset.fxQuality === 'medium'), 'reduzir para média descarta Bloom e preserva renderização direta')
   ok(lazyAssetRequests.length === 0, 'menu inicial não baixa MP3s, notebook ou modelos de chefão')
   await page.evaluate(() => {
     window.__webglRenderProbe = { count: 0, original: fxSystem.render }
@@ -365,12 +354,6 @@ try {
     return { actions: height('#touchActions button'), routes: height('#routePicker button'), hud: height('#hudActions button'), pageWidth: document.documentElement.scrollWidth }
   })
   ok([...touchTargetsLandscape.actions, ...touchTargetsLandscape.routes, ...touchTargetsLandscape.hud].every(height => height >= 44) && touchTargetsLandscape.pageWidth === 844, 'alvos touch mantêm 44px em paisagem sem rolagem horizontal')
-  await mobilePage.evaluate(() => { tut = 0; tutShow() })
-  const compactLandscape = await mobilePage.evaluate(() => {
-    const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height } }
-    return { hud: rect('#hud'), tutorial: rect('#tut'), actions: rect('#touchActions'), heights: [...document.querySelectorAll('#touchActions button')].map(button => button.getBoundingClientRect().height) }
-  })
-  ok(compactLandscape.hud.height <= 64 && compactLandscape.tutorial.bottom < compactLandscape.actions.top && compactLandscape.heights.every(height => height >= 44), 'HUD de 844×390 ocupa faixa compacta e tutorial não cobre BREACH, EMP ou VÍRUS')
   await mobilePage.setViewportSize({ width: 390, height: 844 })
   await mobilePage.evaluate(() => {
     tut = -1; tutShow(); const t = towers[2]; drones.forEach(d => d.position.set(90, 5, 90));

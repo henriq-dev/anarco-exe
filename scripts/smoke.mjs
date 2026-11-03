@@ -66,6 +66,9 @@ const required = [
   'fonts/SpecialElite-Latin.woff2',
   'fonts/SpecialElite-LICENSE.txt',
   'fonts/SpecialElite-NOTICE.txt',
+  'fonts/ManusCC0-Regular.ttf',
+  'fonts/ManusCC0-Medium.ttf',
+  'fonts/ManusCC0-Bold.ttf',
 ]
 for (const path of required) assert.ok(existsSync(join(root, path)), `required local game asset is missing: ${path}`)
 const bossModels = [
@@ -115,8 +118,7 @@ assert.ok(html.includes('id="hackPanel"') && html.includes('id="hackProgressBar"
 assert.ok(html.includes('https://anarcoexe.vercel.app/assets/share/og.jpg') && html.includes('image/jpeg'), 'absolute JPEG social-image metadata is missing')
 assert.ok(statSync(join(root, 'assets/share/og.jpg')).size < 200 * 1024, 'social JPEG should remain below 200 KiB')
 assert.ok(!readdirSync(join(root, 'assets')).some(name => /^og-[^/]+\.(?:png|jpe?g)$/i.test(name)), 'Vite must not emit a duplicate hashed OG image')
-assert.ok(!existsSync(join(root, 'fonts/ManusCC0-Regular.ttf')) && !existsSync(join(root, 'fonts/ManusCC0-Medium.ttf')) && !existsSync(join(root, 'fonts/ManusCC0-Bold.ttf')), 'unused ManusCC0 starter fonts must not be copied into dist')
-assert.ok(css.includes('repeat(6,minmax(0,1fr)') && css.includes('max-height:500px') && css.includes('orientation:landscape'), 'compact touch landscape HUD must be present in the production CSS')
+assert.ok(!existsSync(join(root, 'fonts/ManusCC0SansCJKSC-Regular.woff2')), 'unused CJK font should not be copied into dist')
 const serviceWorker = readFileSync(join(root, 'sw.js'), 'utf8')
 assert.ok(!serviceWorker.includes('assets/audio/') && !serviceWorker.includes('assets/models/laptop.mdl'), 'large audio and laptop assets must not be precached')
 assert.ok(serviceWorker.includes('status: 503') && serviceWorker.includes('cache.put(request, response.clone())'), 'lazy assets must be cached on successful use and fail safely offline')

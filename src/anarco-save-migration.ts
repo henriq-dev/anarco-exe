@@ -51,19 +51,6 @@ export class VersionedSaveStorage {
     if (validEnvelope(parsed)) {
       this.values = { ...parsed.values }
       this.readOnlyFutureSchema = false
-      // A rollback or another tab running an older build may have written only
-      // the legacy key. On boot, that write wins and repairs the envelope.
-      let reconciled = false
-      for (const key of LEGACY_SAVE_KEYS) {
-        try {
-          const legacyValue = storage?.getItem(key)
-          if (legacyValue !== null && legacyValue !== undefined && this.values[key] !== legacyValue) {
-            this.values[key] = legacyValue
-            reconciled = true
-          }
-        } catch { /* inaccessible legacy key is left untouched */ }
-      }
-      if (reconciled) this.persistEnvelope()
       return
     }
 

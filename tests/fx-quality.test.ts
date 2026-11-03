@@ -14,7 +14,6 @@ describe('ANARCO.EXE adaptive FX quality', () => {
 
   it('keeps the expensive full bloom and dynamic shadows limited to high', () => {
     const profiles: FxQuality[] = ['low', 'medium', 'high']
-    expect(profiles.map(quality => FX_QUALITY_PRESETS[quality].fxaa)).toEqual([false, true, true])
     expect(profiles.map(quality => FX_QUALITY_PRESETS[quality].fullBloom)).toEqual([false, false, true])
     expect(profiles.map(quality => FX_QUALITY_PRESETS[quality].shadows)).toEqual([false, false, true])
     expect(FX_QUALITY_PRESETS.low.particles).toBeLessThan(FX_QUALITY_PRESETS.medium.particles)

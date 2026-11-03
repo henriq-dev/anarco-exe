@@ -1,24 +1,4 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.2.3)
-
-## v4.2.3 — decisão de arquitetura e entrega Brotli verificada
-
-`src/game` e `src/engine` ficam deliberadamente como scaffold independente do protótipo de plataforma em ilhas; não serão fundidos com a campanha cyberpunk do `script.js` nesta revisão. Seus testes são preservados e `src/game/tuning.ts` continua servindo somente à ponte de Tweak em modo de desenvolvimento. A campanha ativa continua tendo sua própria configuração de gameplay em `src/anarco-gameplay-config.ts`.
-
-O domínio público `anarcoexe.vercel.app` foi consultado em 2026-11-03: `anarco.mdl`, `cachos.mdl` e `laptop.mdl` responderam com `Content-Encoding: br`, e os bytes descomprimidos coincidiram com as fontes. A economia medida nesses três recursos foi de 232.831 bytes no total. O projeto mantém os arquivos-fonte e as URLs existentes; `pnpm verify:production-models -- https://anarcoexe.vercel.app` permite repetir a verificação depois de publicar esta árvore. A evidência do domínio atual não identifica a release servida como v4.2.3; ainda é necessário publicar esta cópia e verificar novamente.
-
-## v4.2.2 — antialias FXAA adaptativo
-
-O contexto WebGL agora inicia sem MSAA, que não podia ser alternado depois da criação. O jogo usa FXAA como pass de pós-processamento em qualidade Média/Alta e o remove em Baixa; assim, a queda adaptativa de qualidade pode desativar o antialias sem recriar o renderer, e uma mudança manual para Média/Alta o reativa. A resolução do shader acompanha o DPR do renderer e o redimensionamento da janela.
-
-O chunk do FXAA é carregado sob demanda e separado do Bloom. Média recebe o antialias sem baixar Bloom; Alta carrega Bloom somente quando solicitada. Se um chunk pós-processado falhar, o jogo continua em render direto, sem bloquear a partida. Como a estratégia troca MSAA por FXAA, a imagem pode ficar um pouco mais suave; validar nitidez e custo em aparelhos reais continua recomendado. O E2E verifica a alternância Baixa↔Média e o split de chunks.
-
-## v4.2.1 — save resiliente e HUD de paisagem
-
-No boot, chaves legadas existentes que divergirem do envelope passam a prevalecer; o envelope é reparado com o valor encontrado. Isso recupera gravações feitas por rollback ou por outra aba numa versão antiga. Uma chave legada ausente não apaga o valor do envelope. Testes cobrem os dois casos.
-
-Em celulares com toque e orientação paisagem de até 500 px de altura, o HUD vira uma faixa essencial de uma linha e os seis botões táteis ficam num dock horizontal na base. A bolha do tutorial permanece abaixo do HUD e acima do dock, sem cobrir BREACH, EMP ou VÍRUS. O ajuste é automatizado, mas ainda precisa de validação em aparelho físico.
-
-A limpeza remove os metadados genéricos do starter e fontes ManusCC0 sem uso, junto com seus créditos obsoletos. A integração de preview/ajuste da plataforma foi preservada.
+# ANARCO.EXE 3D — Breach Protocol (v4.2.0)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
 
@@ -62,7 +42,7 @@ O `vercel.json` revalida HTML, não armazena o Service Worker, usa cache curto p
 
 O primeiro clique em **Invadir** abre o terminal narrativo; a partida só entra em `play` quando esse terminal é fechado por clique ou tecla, conforme a introdução termina. Um teste que espere `play` logo após o primeiro clique precisa também descartar o terminal.
 
-O relatório da v4.1.5 registrava render em menu/pausa como item global **8** (não 7), com 15/20 concluídos naquele snapshot. O split inicial do loader/Bloom e a integração de gamepad no runtime publicado foram concluídos depois; o antialias adaptativo foi resolvido na v4.2.2. Na v4.2.3, o destino do scaffold foi decidido e Brotli dos `.mdl` foi observado no domínio público. Continuam pendentes a publicação desta árvore, Lighthouse da release publicada, medições com PC/celular/controle físicos e validação manual em leitores de tela reais; veja `docs/STATUS-OTIMIZACOES-V4.2.3.md` e o roteiro de teste manual.
+O relatório da v4.1.5 também foi corrigido: render em menu/pausa é o item global **8** (não 7). O split inicial do loader/Bloom e a integração de gamepad no runtime publicado estão concluídos. A contagem operacional fica em **15/20 concluídos**; fonte única da arquitetura e antialias adaptativo continuam parciais. Medição em hardware real, leitor de tela físico, Lighthouse/Brotli de produção e compressão HTTP dos modelos `.mdl` continuam pendentes.
 
 ## Hotfix v4.1.5 — foco seguro e render em pausa
 

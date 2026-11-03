@@ -70,5 +70,6 @@
   "leaderboard.time": "用时",
   "touch.jump": "跳跃",
   "touch.dash": "冲刺",
-  "touch.pause": "暂停"
+  "touch.pause": "暂停",
+  "credits.fonts": "字体：ManusCC0（CC0 1.0）"
 }
