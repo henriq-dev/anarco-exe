@@ -1,6 +1,10 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.2.1)
+# ANARCO.EXE 3D — Breach Protocol (v4.2.5)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
+
+## v4.2.5 — pacote completo e limpo (v4.2.1 + proteção contra sobras)
+
+Este pacote junta as mudanças da v4.2.1 (save com chave legada, HUD de celular deitado, limpeza do template) com a proteção do overlay v4.2.4: o build remove da pasta `dist` nove arquivos conhecidos de versões antigas (fontes ManusCC0, cópias `.bin` dos modelos e `og.png`) antes de medir os budgets. A árvore-fonte deste pacote já não tem esses arquivos; se você copiar por cima de um repositório antigo, apague as sobras (veja `limpar-sobras.mjs`, fornecido à parte) ou deixe o build podar. Os limites de tamanho não foram relaxados.
 
 ## v4.2.1 — save com chave legada, HUD de celular deitado e limpeza do template
 
@@ -75,7 +79,7 @@ Menu, pausa, vazamentos, ranking e terminal introdutório passaram a ter nomes d
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000 (ou a porta que o Vite mostrar)
-pnpm test         # 16 arquivos / 94 testes
+pnpm test         # 17 arquivos / 96 testes
 pnpm build        # gera dist/ (typecheck + Vite + assets + budgets por categoria)
 pnpm smoke        # depois do build: confere os arquivos e modelos da dist/
 pnpm e2e          # gameplay, modelos, áudio/offline, desktop e celular (Chromium)
