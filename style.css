@@ -1686,6 +1686,8 @@ body[data-hud="discreto"] #hud:hover { opacity: 1; }
   body #hudActions { position: fixed; top: calc(4px + env(safe-area-inset-top, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); z-index: 9; gap: 6px; }
   body #hudActions button { flex: 0 0 44px; width: 44px; height: 44px; opacity: .9; }
 
+  /* a barra de rotas fica logo abaixo do objetivo; o JS (syncHudClearance) reserva o espaço dela para o tutorial */
+  body #routePicker { top: var(--anarco-route-top); bottom: auto; }
   #obj { top: var(--anarco-objective-top); max-width: calc(100vw - 232px); padding: 4px 10px; font-size: .7rem; }
   #tut, .boss-telegraph { top: var(--anarco-event-top); }
   #tut { max-width: min(560px, calc(100vw - 232px)); padding: 5px 10px; gap: 8px; font-size: .7rem; line-height: 1.25; border-width: 2px; box-shadow: 3px 3px 0 var(--red); }

@@ -1,6 +1,28 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.2.6)
+# ANARCO.EXE 3D — Breach Protocol (v4.3.1)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
+
+## v4.3.1 — pacote realmente igual ao que o README descreve
+
+A v4.3.0 partiu do ZIP da branch `main`, e copiar um pacote por cima de um checkout **não apaga arquivos**: as sobras do template que o README já dava como removidas continuavam no ZIP. Esta versão apaga de fato:
+
+- `game-sharing.json`, `assets.lock.json` (4 links para `files.manuscdn.com`) e `public/manus-routes.json`;
+- `scripts/manus-game-assets/`, `scripts/manus-game-sharing/`, `scripts/__manus__/`, `scripts/manus-tuning/vite.mjs`, `vite.d.mts` e `identity.mjs`;
+- `tests/game-sharing-assets.test.mjs` (testava o metadado de compartilhamento do template).
+
+Permanecem de propósito: `scripts/manus-tuning/adapter.js` e `adapter.d.ts` (importados por `src/main.ts`, a entrada do scaffold) e a proteção `prune-unused-build-assets` / `smoke`, que continuam impedindo que `manus-routes.json` e as fontes ManusCC0 sejam publicados caso reapareçam num checkout antigo.
+
+**Item 3 (scaffold `src/game` + `src/engine`):** decisão registrada em `docs/STATUS-OTIMIZACOES-V4.2.3.md` — mantido isolado, porque implementa outro jogo (plataforma com ilhas procedurais), não uma cópia do runtime. O jogo publicado é o `script.js`. Remover o scaffold inteiro (~7 mil linhas, com a suíte de testes dele) é uma decisão de projeto ainda em aberto.
+
+## v4.3.0 — mescla da linha v4.2.6 com o antialias adaptativo (v4.2.2)
+
+Base: v4.2.6 (limpeza do template, `prune-unused-build-assets`, verificação de produção, documentos de status). Por cima dela entram:
+
+- **FXAA real** (antes `anarco-fxaa.ts` era um arquivo sem uso e foi removido): `resolveAntialiasMode` decide `msaa` / `fxaa` / `none`; o `FXAAPass` vive no chunk `anarco-postprocessing` e só é baixado quando há Bloom (Alta) ou FXAA (contexto sem MSAA em Média/Alta). Diagnóstico em `fxSystem.antialiasMode` e `body[data-fx-aa]`. O e2e cobre Baixa → Média → Baixa.
+- **Tutorial, rotas e objetivo no celular deitado:** `syncHudClearance` agora empilha objetivo → rotas → tutorial também em celular deitado, e `#routePicker` usa `--anarco-route-top` nesse layout. Corrige o balão do tutorial cobrindo os botões de rota em 667×375.
+- **HUD fino da v4.2.6 mantido** (8–9% da altura, leituras secundárias acessíveis a leitores de tela), com a barra do chefão na mesma faixa.
+- **Cache do service worker:** `VERSAO` passa a `anarco-v4.3.0-merge` (a v4.2.6 ainda dizia `v4.2.0`).
+- **Limpeza final:** removidos `.manus-starter-init.json`, `template.json`, `app.config.ts`, `bun.lock` e, pelo `limpar-sobras.mjs` (já executado; o script não acompanha o pacote), as fontes ManusCC0, as cópias `.bin` dos modelos e `og.png`.
 
 ## v4.2.6 — remover manifesto antigo de dist
 
@@ -16,7 +38,7 @@ Este pacote junta as mudanças da v4.2.1 (save com chave legada, HUD de celular 
 
 **HUD em celular deitado (844×390 e similares).** Em `pointer: coarse`, até 980 px de largura e 500 px de altura em paisagem, o HUD vira uma faixa única de ~33 px (nível, tempo, torres, HACK, ALERTA e chefão); antes ocupava ~130 px (≈33% da altura). Fase, drones, operação secundária e rota deixam de aparecer, mas continuam no DOM e são anunciados por leitores de tela. Pausa e som saem da faixa e ficam fixos no canto, mantendo alvos de 44 px. O objetivo, o tutorial e o aviso de chefão seguem a altura real da faixa e ficam abaixo dela, sem cobrir BREACH/EMP/VÍRUS. O E2E valida 844×390, 667×375 e 932×430. Nenhuma regra de desktop ou retrato mudou. Não foi testado em aparelho físico.
 
-**Limpeza.** Removidos arquivos do template Manus que não faziam parte do jogo: `.manus-starter-init.json`, `template.json`, `app.config.ts`, `game-sharing.json`, `assets.lock.json` (apontava para `/manus-storage`), `bun.lock` (o projeto usa pnpm), `scripts/manus-*`, `scripts/__manus__`, `public/manus-routes.json`, as fontes ManusCC0 (não eram usadas pela interface) e o teste do metadado de compartilhamento. O `vite.config.ts` perdeu o plugin de tuning e os hosts `*.manus*`; o bloco de registro do Tweak em desenvolvimento saiu de `anarco-entry.ts`; o gancho `__ANARCO_PLAYTEST__` agora só existe em `localhost`/`127.0.0.1`. O `smoke` passou a exigir que esses arquivos não sejam publicados. `src/game` e `src/engine` (item 3) não foram tocados.
+**Limpeza.** Removidos arquivos do template Manus que não faziam parte do jogo: `.manus-starter-init.json`, `template.json`, `app.config.ts`, `game-sharing.json`, `assets.lock.json` (apontava para `/manus-storage`), `bun.lock` (o projeto usa pnpm), `scripts/manus-game-assets`, `scripts/manus-game-sharing`, `scripts/__manus__`, `scripts/manus-tuning/vite.mjs` (só `scripts/manus-tuning/adapter.js` permanece: o `src/main.ts` do scaffold o importa), `public/manus-routes.json`, as fontes ManusCC0 (não eram usadas pela interface) e o teste do metadado de compartilhamento. O `vite.config.ts` perdeu o plugin de tuning e os hosts `*.manus*`; o bloco de registro do Tweak em desenvolvimento saiu de `anarco-entry.ts`; o gancho `__ANARCO_PLAYTEST__` agora só existe em `localhost`/`127.0.0.1`. O `smoke` passou a exigir que esses arquivos não sejam publicados. `src/game` e `src/engine` (item 3) não foram tocados.
 
 Itens que continuam abertos: fonte única de verdade (destino do scaffold `src/game`/`src/engine`), antialias adaptativo por pós-processamento (FXAA), compressão dos `.mdl`, medição em aparelhos reais com `?perf=1`, Brotli/Lighthouse em produção e leitor de tela real.
 

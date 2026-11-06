@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FX_ADAPTIVE_WINDOW_FRAMES, FX_QUALITY_ORDER, FX_QUALITY_PRESETS, FX_SLOW_FRAME_RATIO, isSlowFxFrame, lowerQuality, resolveFxPixelRatio, shouldDegradeFxPerformance, type FxQuality } from '../src/anarco-fx'
+import { FX_ADAPTIVE_WINDOW_FRAMES, resolveAntialiasMode, FX_QUALITY_ORDER, FX_QUALITY_PRESETS, FX_SLOW_FRAME_RATIO, isSlowFxFrame, lowerQuality, resolveFxPixelRatio, shouldDegradeFxPerformance, type FxQuality } from '../src/anarco-fx'
 
 describe('ANARCO.EXE adaptive FX quality', () => {
   it('keeps a stable low → medium → high order', () => {
@@ -38,5 +38,15 @@ describe('ANARCO.EXE adaptive FX quality', () => {
 
   it('keeps all dynamic lights disabled on low quality', () => {
     expect([FX_QUALITY_PRESETS.low.lights, FX_QUALITY_PRESETS.medium.lights, FX_QUALITY_PRESETS.high.lights]).toEqual([0, 4, 7])
+  })
+  it('uses MSAA whenever the context was created with it, regardless of quality', () => {
+    const profiles: FxQuality[] = ['low', 'medium', 'high']
+    expect(profiles.map(quality => resolveAntialiasMode(quality, true))).toEqual(['msaa', 'msaa', 'msaa'])
+  })
+
+  it('falls back to FXAA on medium/high when the context has no MSAA, and stays off on low', () => {
+    expect(resolveAntialiasMode('low', false)).toBe('none')
+    expect(resolveAntialiasMode('medium', false)).toBe('fxaa')
+    expect(resolveAntialiasMode('high', false)).toBe('fxaa')
   })
 })

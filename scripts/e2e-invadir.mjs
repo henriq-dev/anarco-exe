@@ -368,12 +368,12 @@ try {
       return {
         hudRatio: hud.bottom / innerHeight, tutBelowHud: tut.top >= hud.bottom, tutInside: tut.left >= 0 && tut.right <= innerWidth && tut.bottom <= innerHeight,
         coveredSkills: skills.filter(([, r]) => hit(tut, r)).map(([id]) => id),
-        objClear: !hit(rect('obj'), tut), pageWidth: document.documentElement.scrollWidth, viewport: innerWidth,
+        objClear: !hit(rect('obj'), tut), routesClear: !hit(rect('routePicker'), tut), pageWidth: document.documentElement.scrollWidth, viewport: innerWidth,
         readoutsStillAnnounced: ['drread', 'sideRead', 'routeRead'].every(id => document.getElementById(id).getBoundingClientRect().width <= 2 && getComputedStyle(document.getElementById(id)).display !== 'none'),
       }
     })
-    ok(landscapeHud.hudRatio <= 0.15 && landscapeHud.tutBelowHud && landscapeHud.tutInside && landscapeHud.coveredSkills.length === 0 && landscapeHud.objClear && landscapeHud.pageWidth === landscapeHud.viewport,
-      `HUD enxuto (${(landscapeHud.hudRatio * 100).toFixed(0)}% da altura) e tutorial sem cobrir BREACH/EMP/VÍRUS em ${width}×${height}`)
+    ok(landscapeHud.hudRatio <= 0.15 && landscapeHud.tutBelowHud && landscapeHud.tutInside && landscapeHud.coveredSkills.length === 0 && landscapeHud.objClear && landscapeHud.routesClear && landscapeHud.pageWidth === landscapeHud.viewport,
+      `HUD enxuto (${(landscapeHud.hudRatio * 100).toFixed(0)}% da altura) e tutorial sem cobrir BREACH/EMP/VÍRUS nem a barra de rotas em ${width}×${height}`)
     ok(landscapeHud.readoutsStillAnnounced, `leituras secundárias do HUD continuam acessíveis a leitores de tela em ${width}×${height}`)
   }
   await mobilePage.evaluate(() => { tut = -1; tutShow() })
@@ -421,6 +421,27 @@ try {
       await context.setOffline(false)
       await offlinePage.close()
     }
+  }
+  // ÂNCORA: contexto SEM MSAA (preferência Baixa salva) — o FXAA assume só quando a qualidade sobe, e sai quando desce
+  {
+    const noMsaaContext = await browser.newContext({ viewport: { width: 900, height: 560 } })
+    await noMsaaContext.addInitScript(() => localStorage.setItem('anarco_fx_quality', 'low'))
+    const noMsaaPage = await noMsaaContext.newPage()
+    noMsaaPage.on('pageerror', e => erros.push('fxaa pageerror: ' + String(e).slice(0, 160)))
+    await noMsaaPage.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
+    await noMsaaPage.waitForSelector('#st', { state: 'visible', timeout: 60000 })
+    const aa = () => noMsaaPage.evaluate(() => ({ msaa: R.getContextAttributes().antialias, mode: fxSystem.antialiasMode, composer: !!fxSystem.composer, passes: fxSystem.composer ? fxSystem.composer.passes.length : 0 }))
+    const inicio = await aa()
+    ok(inicio.msaa === false && inicio.mode === 'none' && !inicio.composer, 'preferência Baixa inicia sem MSAA e sem FXAA (perfil mais barato)')
+    await noMsaaPage.evaluate(() => { fxSystem.setQuality('medium', false); fxSystem.render() })
+    await noMsaaPage.waitForFunction(() => !!fxSystem.composer, null, { timeout: 10000 })
+    const medio = await aa()
+    // ÂNCORA: no build os nomes de classe são minificados; contamos os passes (Render + Output + FXAA, sem Bloom na Média)
+    ok(medio.mode === 'fxaa' && medio.passes === 3, 'subir para Média em contexto sem MSAA liga o FXAA (Render + Output + FXAA, sem Bloom)')
+    await noMsaaPage.evaluate(() => fxSystem.setQuality('low', false))
+    const baixo = await aa()
+    ok(baixo.mode === 'none' && !baixo.composer, 'voltar para Baixa desliga o FXAA e descarta o composer')
+    await noMsaaContext.close()
   }
   ok(erros.length === 0, `nenhum erro no console/HTTP ${erros.length ? JSON.stringify(erros.slice(0, 3)) : ''}`)
   await browser.close()

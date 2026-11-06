@@ -26,6 +26,20 @@ export function shouldDegradeFxPerformance(frameCount: number, slowFrames: numbe
   return frameCount >= FX_ADAPTIVE_WINDOW_FRAMES && frameCount > 0 && slowFrames / frameCount > FX_SLOW_FRAME_RATIO
 }
 
+export type AntialiasMode = 'msaa' | 'fxaa' | 'none'
+
+/**
+ * ÂNCORA: o MSAA é fixado na criação do contexto WebGL e não pode ser ligado/desligado depois.
+ * Como a qualidade muda em sessão, o que dá para adaptar é o FXAA (passe de pós-processamento):
+ *  - contexto COM MSAA → 'msaa' (já suaviza; FXAA seria custo em dobro);
+ *  - contexto SEM MSAA e qualidade efetiva Baixa → 'none' (Baixa é o perfil mais barato);
+ *  - contexto SEM MSAA e qualidade Média/Alta → 'fxaa'.
+ */
+export function resolveAntialiasMode(effective: FxQuality, contextHasMsaa: boolean): AntialiasMode {
+  if (contextHasMsaa) return 'msaa'
+  return effective === 'low' ? 'none' : 'fxaa'
+}
+
 export function resolveFxPixelRatio(nativeDpr: number, presetDpr: number, coarse: boolean, resolutionScale = 1): number {
   const cappedDpr = Math.min(nativeDpr || 1, coarse ? Math.min(presetDpr, 1.25) : presetDpr)
   return Math.max(0.75, cappedDpr * resolutionScale)
@@ -135,6 +149,7 @@ export class AnarcoFxSystem {
   private postprocessing?: Promise<void>
   private postprocessingModules?: PostprocessingModules
   private postprocessingFailed = false
+  private readonly contextHasMsaa: boolean
   private readonly lights: TimedLight[] = []
   private readonly echoes: Echo[] = []
   private echoDodgeWasActive = false
@@ -157,6 +172,8 @@ export class AnarcoFxSystem {
   private readonly material: THREE.ShaderMaterial
 
   constructor(private readonly renderer: THREE.WebGLRenderer, private readonly scene: THREE.Scene, private readonly camera: THREE.PerspectiveCamera) {
+    // ÂNCORA: lido uma vez — o MSAA do contexto nunca muda depois da criação
+    this.contextHasMsaa = renderer.getContextAttributes()?.antialias === true
     this.positions.fill(0)
     this.colors.fill(0)
     this.alphas.fill(0)
@@ -239,10 +256,15 @@ export class AnarcoFxSystem {
   }
 
   get selectedQuality(): FxQuality { return this.quality }
+  get antialiasMode(): AntialiasMode { return resolveAntialiasMode(this.effectiveQuality, this.contextHasMsaa) }
+  /** Bloom (Alta) e FXAA (sem MSAA, Média/Alta) dependem do composer; fora isso renderiza direto. */
+  private wantsPostprocessing(): boolean {
+    return FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom || this.antialiasMode === 'fxaa'
+  }
   get effectiveQuality(): FxQuality { return FX_QUALITY_ORDER[Math.max(0, FX_QUALITY_ORDER.indexOf(this.quality) - this.adaptiveLoss)] }
 
   getDiagnostics(): {
-    quality: { selected: FxQuality; effective: FxQuality; resolutionScale: number }
+    quality: { selected: FxQuality; effective: FxQuality; resolutionScale: number; antialias: AntialiasMode }
     pixelRatio: number
     canvas: { backingWidth: number; backingHeight: number; cssWidth: number; cssHeight: number }
     render: { calls: number; triangles: number; points: number; lines: number }
@@ -255,7 +277,7 @@ export class AnarcoFxSystem {
     let active = 0
     for (let i = 0; i < this.activeParticleLimit; i += 1) if (this.slots[i].active) active += 1
     return {
-      quality: { selected: this.quality, effective: this.effectiveQuality, resolutionScale: this.resolutionScale },
+      quality: { selected: this.quality, effective: this.effectiveQuality, resolutionScale: this.resolutionScale, antialias: this.antialiasMode },
       pixelRatio: this.renderer.getPixelRatio(),
       canvas: { backingWidth: canvas.width, backingHeight: canvas.height, cssWidth: rect.width, cssHeight: rect.height },
       render: { calls: render.calls, triangles: render.triangles, points: render.points, lines: render.lines },
@@ -346,6 +368,7 @@ export class AnarcoFxSystem {
     if (this.qualitySelect) this.qualitySelect.value = this.quality
     document.body.dataset.fxQuality = effective
     document.body.dataset.fxBaseQuality = this.quality
+    document.body.dataset.fxAa = this.antialiasMode
     const label = effective === this.quality ? this.labelQuality(effective) : `${this.labelQuality(this.quality)} → ${this.labelQuality(effective)} · AUTO`
     if (this.qualityStatus) this.qualityStatus.textContent = `FX · ${label}`
   }
@@ -367,28 +390,28 @@ export class AnarcoFxSystem {
   }
 
   private ensureComposer(): Composer | undefined {
-    if (!FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom || this.postprocessingFailed) return undefined
+    if (!this.wantsPostprocessing() || this.postprocessingFailed) return undefined
     if (this.composer) return this.composer
     if (this.postprocessingModules) return this.createComposer(this.postprocessingModules)
     if (!this.postprocessing) {
       this.postprocessing = import('./anarco-postprocessing').then(modules => {
         this.postprocessingModules = modules
         this.postprocessing = undefined
-        if (FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom) {
+        if (this.wantsPostprocessing()) {
           try {
             const composer = this.createComposer(modules)
             requestAnimationFrame(() => {
-              if (this.composer === composer && FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom) this.render()
+              if (this.composer === composer && this.wantsPostprocessing()) this.render()
             })
           } catch (error) {
             this.postprocessingFailed = true
-            console.warn('Bloom indisponível; renderizando sem pós-processamento.', error)
+            console.warn('Pós-processamento indisponível; renderizando sem Bloom/FXAA.', error)
           }
         }
       }).catch(error => {
         this.postprocessing = undefined
         this.postprocessingFailed = true
-        console.warn('Chunk de Bloom indisponível; renderizando sem pós-processamento.', error)
+        console.warn('Chunk de pós-processamento indisponível; renderizando sem Bloom/FXAA.', error)
       })
     }
     return undefined
@@ -399,9 +422,14 @@ export class AnarcoFxSystem {
     composer.setPixelRatio(this.renderer.getPixelRatio())
     composer.setSize(window.innerWidth, window.innerHeight)
     composer.addPass(new modules.RenderPass(this.scene, this.camera))
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.58 * this.bloomStrength, 0.42, 0.82)
-    composer.addPass(bloom)
+    let bloom: BloomPass | undefined
+    if (FX_QUALITY_PRESETS[this.effectiveQuality].fullBloom) {
+      bloom = new modules.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.58 * this.bloomStrength, 0.42, 0.82)
+      composer.addPass(bloom)
+    }
     composer.addPass(new modules.OutputPass())
+    // ÂNCORA: o FXAA precisa de cores já em sRGB, por isso vem DEPOIS do OutputPass
+    if (this.antialiasMode === 'fxaa') composer.addPass(new modules.FXAAPass())
     this.composer = composer
     this.bloom = bloom
     return composer

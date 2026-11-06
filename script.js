@@ -170,7 +170,9 @@ function syncHudClearance() {
   const objTop = hudBottom + 8;
   const routeTop = objTop + objHeight + 8;
   const routeHeight = Math.ceil(routes.getBoundingClientRect().height) || 38;
-  const portraitControls = matchMedia("(max-width: 980px) and (orientation: portrait)").matches;
+  // ÂNCORA: celular deitado também empilha objetivo → rotas → tutorial (antes só valia em retrato,
+  // e o tutorial era posto em cima da barra de rotas)
+  const portraitControls = matchMedia("(max-width: 980px) and (orientation: portrait), (pointer: coarse) and (max-height: 500px) and (orientation: landscape)").matches;
   const eventTop = portraitControls ? routeTop + routeHeight + 10 : objTop + objHeight + 12;
   const style = document.documentElement.style;
   style.setProperty("--anarco-objective-top", `${objTop}px`);
