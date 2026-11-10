@@ -444,6 +444,103 @@ try {
     await noMsaaContext.close()
   }
   ok(erros.length === 0, `nenhum erro no console/HTTP ${erros.length ? JSON.stringify(erros.slice(0, 3)) : ''}`)
+  // ÂNCORA (v4.4.1): auditoria — transições, pausa, end idempotente, dispose, save inválido, joystick, celular pequeno
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1000, height: 560 }, serviceWorkers: 'block' })
+    await ctx.addInitScript(() => { localStorage.setItem('anarco_fx_quality', 'low'); localStorage.setItem('anarco_progress', 'null'); localStorage.setItem('anarco_tut', '1') })
+    const p = await ctx.newPage()
+    const errosAuditoria = []
+    p.on('pageerror', (e) => errosAuditoria.push(String(e).slice(0, 160)))
+    await p.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
+    await p.waitForSelector('#st', { state: 'visible', timeout: 30000 })
+    ok(await p.evaluate(() => Number.isFinite(progression.wins) && Array.isArray(progression.skins)), 'save "null" válido em JSON não quebra o boot')
+    await p.click('#st')
+    for (let i = 0; i < 20 && (await p.evaluate(() => state)) !== 'play'; i++) { await p.mouse.click(500, 300); await p.waitForTimeout(500) } // a intro em terminal pede um clique para pular
+    await p.waitForFunction(() => state === 'play', null, { timeout: 10000 })
+    // 1) pausar no intervalo pós-3ª torre não trava a fase
+    const antes = await p.evaluate(() => { scheduleTransition(300, 'brief', brief); return lvl })
+    await p.evaluate(() => togglePause())
+    await p.waitForTimeout(700)
+    ok(await p.evaluate(() => state === 'pause' && pendingAdvance !== null && $('bf').hidden), 'transição vencida durante a pausa fica pendente (não é perdida)')
+    await p.evaluate(() => togglePause())
+    ok(await p.evaluate(() => state === 'brief' && !$('bf').hidden), 'ao despausar a fase concluída segue para o briefing')
+    await p.waitForFunction((l) => lvl === l + 1 && state === 'play', antes, { timeout: 8000 })
+    ok(true, 'briefing avança para a fase seguinte')
+    // 2) timer de partida antiga não avança a partida nova; 3) endT zerado no reset
+    await p.evaluate(() => { scheduleTransition(300, 'brief', brief); endT = 5; reset(false) })
+    await p.waitForTimeout(700)
+    ok(await p.evaluate(() => $('bf').hidden && lvl === 0 && endT === 0 && transTimer === 0), 'reset cancela timers pendentes e zera endT (sem vitória instantânea)')
+    // 4) end() idempotente
+    const idem = await p.evaluate(() => { end(false); const t = $('ot').textContent; end(true); return t === $('ot').textContent && won === false && state === 'over' })
+    ok(idem, 'end() é idempotente: derrota não é sobrescrita por vitória no mesmo quadro')
+    // 5) ataque do chefão libera geometria e material
+    const dispose = await p.evaluate(() => {
+      reset(false); bossHazards = []
+      createBossHazard(0, 0, 3, 0xff0000, 1, 2, 'teste')
+      const h = bossHazards[0]; let n = 0
+      ;[h.ring.geometry, h.core.geometry, h.pillar.geometry, h.ring.material, h.core.material, h.pillar.material].forEach((o) => { const d = o.dispose.bind(o); o.dispose = () => { n++; d() } })
+      clearBossHazards()
+      return { n, left: bossHazards.length }
+    })
+    ok(dispose.n === 6 && dispose.left === 0, 'ataque do chefão libera 3 geometrias e 3 materiais ao sair')
+    const bossDispose = await p.evaluate(() => {
+      __ANARCO_PLAYTEST__.startLevel(4)
+      if (!boss) return { skip: true }
+      const geo = boss.g.children[0].geometry; let n = 0; const d = geo.dispose.bind(geo); geo.dispose = () => { n++; d() }
+      destroyBoss()
+      return { n, nulo: boss === null }
+    })
+    ok(bossDispose.skip || (bossDispose.n === 1 && bossDispose.nulo), 'destroyBoss libera a malha do chefão')
+    // 6) voltar ao menu limpa ataques; joystick solta em blur; 7) aba oculta pausa
+    await p.evaluate(() => { reset(false); createBossHazard(0, 0, 3, 0xff0000, 1, 2, 'x'); togglePause(); $('pzm').click() })
+    ok(await p.evaluate(() => bossHazards.length === 0 && state === 'menu'), 'voltar ao menu durante a luta limpa os ataques do chefão')
+    await p.evaluate(() => { reset(false); jx = 0.8; jz = 0.5 })
+    await p.evaluate(() => dispatchEvent(new Event('blur')))
+    ok(await p.evaluate(() => jx === 0 && jz === 0), 'joystick touch zera em blur')
+    await p.evaluate(() => { reset(false); Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')) })
+    ok(await p.evaluate(() => state === 'pause'), 'aba oculta pausa a partida')
+    // v4.4.2: troca de DPR (monitor/zoom) recalcula a resolução interna sem redimensionar a janela
+    {
+      await p.evaluate(() => { fxSystem.setQuality('high', false) })
+      const cdp = await ctx.newCDPSession(p)
+      const lido = () => p.evaluate(() => R.getPixelRatio())
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 560, deviceScaleFactor: 1, mobile: false })
+      await p.waitForTimeout(400)
+      const d1 = await lido()
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 560, deviceScaleFactor: 2, mobile: false })
+      await p.waitForTimeout(600)
+      const d2 = await lido()
+      ok(d1 === 1 && d2 > d1, `trocar o DPR (1→2) atualiza o pixel ratio do renderer (${d1} → ${d2})`)
+      await cdp.send('Emulation.clearDeviceMetricsOverride')
+    }
+    ok(errosAuditoria.length === 0, 'auditoria v4.4.1 sem erros de página ' + errosAuditoria.join('|'))
+    await ctx.close()
+    // celular deitado pequeno: rótulos curtos, sem sobreposição
+    for (const [w, h] of [[568, 320], [640, 360]]) {
+      const mctx = await browser.newContext({ viewport: { width: w, height: h }, screen: { width: w, height: h }, isMobile: true, hasTouch: true, serviceWorkers: 'block' })
+      await mctx.addInitScript(() => { localStorage.setItem('anarco_fx_quality', 'low'); localStorage.setItem('anarco_tut', '1') })
+      const mp = await mctx.newPage()
+      await mp.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'domcontentloaded' })
+      await mp.waitForSelector('#st', { state: 'visible', timeout: 30000 })
+      await mp.click('#st')
+      for (let i = 0; i < 20 && (await mp.evaluate(() => state)) !== 'play'; i++) { await mp.touchscreen.tap(Math.round(w / 2), Math.round(h / 2)); await mp.waitForTimeout(500) }
+      await mp.waitForFunction(() => state === 'play', null, { timeout: 10000 })
+      await mp.waitForTimeout(600)
+      const r = await mp.evaluate(() => {
+        const rect = (sel) => { const e = document.querySelector(sel); if (!e || e.hidden || !e.offsetParent && getComputedStyle(e).position !== 'fixed') return null; const b = e.getBoundingClientRect(); return b.width ? { l: b.left, t: b.top, r: b.right, b: b.bottom } : null }
+        const acts = [...document.querySelectorAll('#touchActions button')]
+        const texto = acts.filter((b) => b.id !== 'rn').map((b) => b.textContent)
+        const cortado = acts.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => b.id)
+        const boxes = { obj: rect('#obj'), rotas: rect('#routePicker'), acoes: rect('#touchActions'), joy: rect('#joy'), tut: rect('#tut') }
+        const cruza = (a, b) => a && b && a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1
+        const pares = [['obj', 'rotas'], ['rotas', 'acoes'], ['obj', 'acoes'], ['tut', 'rotas'], ['tut', 'acoes'], ['acoes', 'joy']].filter(([x, y]) => cruza(boxes[x], boxes[y])).map((x) => x.join('×'))
+        return { texto, cortado, pares, scrollW: document.documentElement.scrollWidth, w: innerWidth }
+      })
+      ok(r.texto.every((t) => !t.includes('·')) && r.cortado.length === 0 && r.scrollW <= r.w, `${w}×${h}: rótulos curtos, sem corte e sem rolagem horizontal ` + JSON.stringify(r))
+      ok(r.pares.length === 0, `${w}×${h}: sem sobreposição entre objetivo/rotas/ações/joystick ` + r.pares.join(','))
+      await mctx.close()
+    }
+  }
   await browser.close()
 } finally {
   server.kill()

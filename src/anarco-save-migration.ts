@@ -85,6 +85,25 @@ export class VersionedSaveStorage {
     return changed
   }
 
+  /**
+   * Multi-abas: relê o envelope gravado por outra aba e traz as chaves dela para a memória desta.
+   * Retorna as chaves cujo valor mudou, para o jogo recarregar só o que importa.
+   */
+  refreshFromStorage(): string[] {
+    if (this.readOnlyFutureSchema) return []
+    let parsed: unknown
+    try {
+      const raw = this.storage?.getItem(VERSIONED_SAVE_KEY)
+      parsed = raw ? JSON.parse(raw) : null
+    } catch { return [] }
+    if (!validEnvelope(parsed)) return []
+    const changed: string[] = []
+    for (const [key, value] of Object.entries(parsed.values)) {
+      if (this.values[key] !== value) { this.values[key] = value; changed.push(key) }
+    }
+    return changed
+  }
+
   getItem(key: string): string | null {
     if (Object.prototype.hasOwnProperty.call(this.values, key)) return this.values[key]
     try { return this.storage?.getItem(key) ?? null } catch { return null }
@@ -92,12 +111,14 @@ export class VersionedSaveStorage {
 
   setItem(key: string, value: string): void {
     const text = String(value)
+    this.refreshFromStorage() // não deixa uma aba antiga sobrescrever o progresso gravado por outra
     this.values[key] = text
     if (!this.readOnlyFutureSchema) this.persistEnvelope()
     try { this.storage?.setItem(key, text) } catch { /* retain in memory when storage is unavailable */ }
   }
 
   removeItem(key: string): void {
+    this.refreshFromStorage()
     delete this.values[key]
     if (!this.readOnlyFutureSchema) this.persistEnvelope()
     try { this.storage?.removeItem(key) } catch { /* retain in memory when storage is unavailable */ }

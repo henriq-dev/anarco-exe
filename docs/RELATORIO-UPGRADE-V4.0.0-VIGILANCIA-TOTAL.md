@@ -18,23 +18,23 @@
 
 Estado de acesso root concluído em desktop:
 
-![Painel contextual de hack desktop](capturas/v4.0.0-hack-desktop.png)
+![Painel contextual de hack desktop](capturas/v4.0.0-hack-desktop.webp)
 
 Painel touch acima da sequência, sem cobrir as ações inferiores:
 
-![Painel contextual de hack em telefone](capturas/v4.0.0-hack-mobile.png)
+![Painel contextual de hack em telefone](capturas/v4.0.0-hack-mobile.webp)
 
 Chuva de códigos visível após ativar BREACH no desktop:
 
-![Efeito de chuva de código no desktop](capturas/v4.0.0-breach-desktop.png)
+![Efeito de chuva de código no desktop](capturas/v4.0.0-breach-desktop.webp)
 
 Nova abertura hacker com emblema ASCII no desktop:
 
-![Terminal ANARCO.EXE CAPUZ desktop](capturas/v4.0.0-intro-desktop.png)
+![Terminal ANARCO.EXE CAPUZ desktop](capturas/v4.0.0-intro-desktop.webp)
 
 Emblema ASCII e narração ajustados à largura do celular:
 
-![Terminal ANARCO.EXE CAPUZ mobile](capturas/v4.0.0-intro-mobile.png)
+![Terminal ANARCO.EXE CAPUZ mobile](capturas/v4.0.0-intro-mobile.webp)
 
 ## Arquivos centrais alterados
 

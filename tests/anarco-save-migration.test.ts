@@ -103,4 +103,18 @@ describe('active legacy save migration', () => {
     expect(() => migrated.removeItem('anarco_skin')).not.toThrow()
     expect(migrated.getItem('anarco_skin')).toBeNull()
   })
+
+  it('multi-abas: uma aba antiga não sobrescreve o progresso gravado por outra', () => {
+    const { storage, values } = memoryStorage({ anarco_progress: '{"wins":0}' })
+    const abaA = new VersionedSaveStorage(storage)
+    const abaB = new VersionedSaveStorage(storage)
+    abaA.setItem('anarco_progress', '{"wins":3}')
+    abaB.setItem('anarco_hud', 'minimo') // aba B ainda "via" wins=0
+    const envelope = JSON.parse(values.get(VERSIONED_SAVE_KEY)!).values
+    expect(envelope.anarco_progress).toBe('{"wins":3}')
+    expect(envelope.anarco_hud).toBe('minimo')
+    expect(abaB.refreshFromStorage()).toEqual([])
+    expect(abaA.refreshFromStorage()).toEqual(['anarco_hud'])
+    expect(abaA.getItem('anarco_hud')).toBe('minimo')
+  })
 })

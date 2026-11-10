@@ -12,9 +12,6 @@ importers:
         specifier: ^0.186.1
         version: 0.186.1
     devDependencies:
-      '@dimforge/rapier3d-compat':
-        specifier: ^0.21.0
-        version: 0.21.0
       '@gltf-transform/cli':
         specifier: 4.5.1
         version: 4.5.1(@types/node@26.6.6)
@@ -52,9 +49,6 @@ packages:
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
-
-  '@dimforge/rapier3d-compat@0.21.0':
-    resolution: {integrity: sha512-tCl1HPGwOhn5aCQbgqWbOH+Nx/5fnr3IPAnzQuR7zIhC/raqi2yxC6LhvZqjdI2El5hQgY5RDAwDrAjAi2FdPA==}
 
   '@donmccurdy/caporal@0.0.10':
     resolution: {integrity: sha512-VdaJjOqYFYcDTM5We2x8cL+B+U9UFQvq0iW2ypqEGX31SDf2oYFjEg7INEJorBwJJnFNXV8jXoYGzJyLeYl1EQ==}
@@ -1327,8 +1321,6 @@ snapshots:
       kuler: 2.0.0
 
   '@dimforge/rapier3d-compat@0.12.0': {}
-
-  '@dimforge/rapier3d-compat@0.21.0': {}
 
   '@donmccurdy/caporal@0.0.10':
     dependencies:

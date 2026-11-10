@@ -1,17 +1,17 @@
 {
   "name": "anarco-exe-3d",
   "private": true,
-  "version": "4.3.1",
+  "version": "4.4.2",
   "type": "module",
   "scripts": {
-  "dev": "vite",
-  "build": "tsc --noEmit && vite build && node scripts/copy-game-assets.mjs && node scripts/prune-unused-build-assets.mjs && node scripts/check-size.mjs && node scripts/check-brotli.mjs",
-  "compress:bosses": "node scripts/compress-boss-models.mjs",
-  "brotli": "node scripts/check-brotli.mjs",
-  "perf": "node scripts/perf-benchmark.mjs",
-  "preview": "vite preview --port 4173 --strictPort",
-  "typecheck": "tsc --noEmit",
-  "test": "vitest run",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/copy-game-assets.mjs && node scripts/prune-unused-build-assets.mjs && node scripts/check-size.mjs && node scripts/check-brotli.mjs",
+    "compress:bosses": "node scripts/compress-boss-models.mjs",
+    "brotli": "node scripts/check-brotli.mjs",
+    "perf": "node scripts/perf-benchmark.mjs",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
     "e2e": "node scripts/e2e-invadir.mjs",
     "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm e2e"
@@ -20,7 +20,6 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "@dimforge/rapier3d-compat": "^0.21.0",
     "@gltf-transform/cli": "4.5.1",
     "@types/three": "^0.186.0",
     "esbuild": "^0.28.2",

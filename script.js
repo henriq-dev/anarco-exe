@@ -174,7 +174,17 @@ function syncHudClearance() {
   // e o tutorial era posto em cima da barra de rotas)
   const portraitControls = matchMedia("(max-width: 980px) and (orientation: portrait), (pointer: coarse) and (max-height: 500px) and (orientation: landscape)").matches;
   const eventTop = portraitControls ? routeTop + routeHeight + 10 : objTop + objHeight + 12;
+  // ÂNCORA: mede também os controles de baixo (ações + joystick); se sobrar pouca altura livre, o tutorial recolhe (CSS: body[data-low-space])
+  const acts = $("touchActions"), joyBox = $("joy");
+  let bottomClear = 0;
+  [acts, joyBox].forEach((el) => {
+    if (!el || !el.offsetParent) return;
+    const r = el.getBoundingClientRect();
+    if (r.height) bottomClear = Math.max(bottomClear, innerHeight - r.top);
+  });
   const style = document.documentElement.style;
+  style.setProperty("--anarco-bottom-clear", `${Math.ceil(bottomClear)}px`);
+  document.body.dataset.lowSpace = bottomClear > 0 && innerHeight - eventTop - bottomClear < 120 ? "1" : "0";
   style.setProperty("--anarco-objective-top", `${objTop}px`);
   style.setProperty("--anarco-route-top", `${routeTop}px`);
   style.setProperty("--anarco-event-top", `${eventTop}px`);
@@ -321,6 +331,7 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 fxSystem = new window.ANARCO_FX.AnarcoFxSystem(R, S, C);
+fxSystem.watchDevicePixelRatio(); // troca de monitor / zoom recalcula o DPR sem precisar redimensionar a janela
 if (window.__ANARCO_DEBUG__) window.__ANARCO_FX_INSTANCE__ = fxSystem;
 
 const ground = new T.Mesh(new T.PlaneGeometry(90, 90), new T.MeshStandardMaterial({ color: 0x111114 }));
@@ -882,6 +893,8 @@ const SKINS = {
 const PROGRESS_KEY = "anarco_progress";
 let progression;
 try { progression = JSON.parse(ler(PROGRESS_KEY) || "{}"); } catch (e) { progression = {}; }
+// ÂNCORA: JSON válido não é save válido — "null", "[]" ou "7" parseiam sem erro e quebrariam o boot
+if (!progression || typeof progression !== "object" || Array.isArray(progression)) progression = {};
 progression.wins = Number.isFinite(progression.wins) ? progression.wins : 0;
 progression.skins = Array.isArray(progression.skins) ? progression.skins.filter((id) => SKINS[id]) : ["capuz", "vanta"];
 if (!progression.skins.includes("capuz")) progression.skins.unshift("capuz");
@@ -890,6 +903,18 @@ if (!progression.skins.includes("vanta")) progression.skins.push("vanta");
 // Para voltar a ser prêmio de vitória: apague esta linha (o destravamento em end() continua lá).
 if (SKINS.cachos && !progression.skins.includes("cachos")) progression.skins.push("cachos");
 const saveProgress = () => guardar(PROGRESS_KEY, JSON.stringify(progression));
+// ÂNCORA: multi-abas — se outra aba gravou progresso, absorvemos (vitórias = maior valor; skins = união) em vez de sobrescrever
+addEventListener("storage", () => {
+  if (!saveStorage || !saveStorage.refreshFromStorage) return;
+  if (!saveStorage.refreshFromStorage().includes(PROGRESS_KEY)) return;
+  try {
+    const outro = JSON.parse(ler(PROGRESS_KEY) || "{}");
+    if (!outro || typeof outro !== "object" || Array.isArray(outro)) return;
+    if (Number.isFinite(outro.wins)) progression.wins = Math.max(progression.wins, outro.wins);
+    if (Array.isArray(outro.skins)) outro.skins.forEach((id) => SKINS[id] && !progression.skins.includes(id) && progression.skins.push(id));
+    applyRewardCosmetic();
+  } catch (e) {}
+});
 function applyRewardCosmetic() {
   document.body.dataset.reward = progression.wins >= 3 ? "glitch" : progression.wins >= 2 ? "neon" : "base";
 }
@@ -1451,9 +1476,13 @@ function pollGamepad() {
   return { connected: true };
 }
 // ÂNCORA: se a janela perde o foco (ou a aba some), o "soltar tecla" nunca chega — então zeramos tudo, senão o personagem anda sozinho
-const soltarTeclas = () => { Object.keys(keys).forEach((k) => (keys[k] = 0)); gamepadMoveX = gamepadMoveZ = 0; gamepadSprint = false; gamepadPrevious = []; };
+const soltarTeclas = () => { Object.keys(keys).forEach((k) => (keys[k] = 0)); gamepadMoveX = gamepadMoveZ = 0; gamepadSprint = false; gamepadPrevious = []; if (typeof jend === "function") jend(); correr(false); };
 addEventListener("blur", soltarTeclas);
-document.addEventListener("visibilitychange", () => document.hidden && soltarTeclas());
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  soltarTeclas();
+  if (state === "play") togglePause(); // aba oculta = jogo pausado (o rAF para, mas o tempo e o áudio seguiriam)
+});
 addEventListener("keydown", (e) => (keys[e.key.toLowerCase()] = 1));
 addEventListener("keyup", (e) => (keys[e.key.toLowerCase()] = 0));
 let jx = 0,
@@ -1482,12 +1511,11 @@ joy.addEventListener("pointerdown", (e) => {
 joy.addEventListener("pointermove", (e) => {
   if (e.buttons || e.pressure) jmove(e);
 });
-const jend = () => {
+function jend() {
   jx = jz = 0;
   nub.style.transform = "";
-};
-joy.addEventListener("pointerup", jend);
-joy.addEventListener("pointercancel", jend);
+}
+["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => joy.addEventListener(ev, jend));
 
 // ÂNCORA: botão CORRER (celular) — segurar = Shift apertado (mesmo caminho do teclado)
 const btnCorrer = $("rn");
@@ -1505,6 +1533,35 @@ btnCorrer.addEventListener("pointerdown", (e) => {
 );
 
 // state
+// ÂNCORA: transições (fim de fase, vitória) NÃO são setTimeout soltos: guardamos o handle e o runId da partida.
+// reset()/menu/end() cancelam; um timer de partida antiga nunca avança a partida nova.
+const toqueCurto = matchMedia("(pointer: coarse)");
+let runId = 0,
+  transTimer = 0,
+  pendingAdvance = null; // "brief" | "level" — transição que venceu durante a pausa e roda ao voltar
+function cancelTransitions() {
+  clearTimeout(transTimer);
+  transTimer = 0;
+  pendingAdvance = null;
+  endT = 0;
+  const bf = document.getElementById("bf");
+  if (bf) bf.hidden = true;
+}
+function scheduleTransition(ms, kind, fn) {
+  clearTimeout(transTimer);
+  const id = runId;
+  transTimer = setTimeout(() => {
+    transTimer = 0;
+    if (id !== runId) return;
+    if (state === "pause") pendingAdvance = { kind, fn };
+    else if (state === "play" || state === "brief") fn(); // durante o briefing o estado é "brief"
+  }, ms);
+}
+function resumePendingTransition() {
+  const p = pendingAdvance;
+  pendingAdvance = null;
+  if (p) p.fn();
+}
 let state = "menu",
   cnt = 0,
   alert_ = 0,
@@ -1586,6 +1643,10 @@ function cameraShot(kind, x, z) {
   return shot;
 }
 function reset(keep) {
+  cancelTransitions();
+  runId++;
+  jend();
+  clearBossHazards();
   const menuWasOpen = getActiveModal()?.id === "ov";
   if (!keep) {
     lvl = 0;
@@ -1676,6 +1737,10 @@ function registerCampaignProgress() {
   applyRewardCosmetic();
 }
 function end(win) {
+  if (state === "over") return; // idempotente: derrota e vitória no mesmo quadro não se sobrescrevem
+  cancelTransitions();
+  clearBossHazards();
+  jend();
   $("ch").hidden = true;
   $("st").hidden = false;
   state = "over";
@@ -1753,9 +1818,7 @@ function hackDone(t) {
   if (cnt === 3) {
     if (lvl < LV.length - 1) {
       $("msg").textContent = "Nível " + (lvl + 1) + " completo!";
-      setTimeout(() => {
-        if (state === "play") brief();
-      }, 1600);
+      scheduleTransition(1600, "brief", brief);
     } else endT = 1.4;
   }
 }
@@ -1795,7 +1858,7 @@ function introTerm(done) {
   o.setAttribute("aria-modal", "false");
   o.setAttribute("aria-label", "Terminal clandestino CAPUZ — clique ou pressione qualquer tecla para iniciar");
   o.tabIndex = -1;
-  o.style.cssText = "position:fixed;inset:0;z-index:9999;overflow:auto;display:grid;place-items:center;box-sizing:border-box;padding:5vh 5vw;background:radial-gradient(ellipse at 50% 42%,#071509 0%,#020603 48%,#000 100%);color:#48ff72;font:clamp(12px,2vw,18px)/1.45 'Special Elite',monospace;cursor:pointer";
+  o.style.cssText = "position:fixed;inset:0;z-index:9999;overflow:auto;display:grid;place-items:center;box-sizing:border-box;padding:max(5dvh,env(safe-area-inset-top)) max(5vw,env(safe-area-inset-right)) max(5dvh,env(safe-area-inset-bottom)) max(5vw,env(safe-area-inset-left));background:radial-gradient(ellipse at 50% 42%,#071509 0%,#020603 48%,#000 100%);color:#48ff72;font:clamp(12px,2vw,18px)/1.45 'Special Elite',monospace;cursor:pointer";
   const shell = document.createElement("div");
   shell.style.cssText = "box-sizing:border-box;width:min(900px,100%);padding:clamp(16px,4vw,38px);border-left:2px solid #39ff6a;background:linear-gradient(90deg,#07120b88,transparent 78%);box-shadow:-12px 0 36px #39ff6a16";
   const tag = document.createElement("div");
@@ -2536,7 +2599,7 @@ function requestGameMusic() {
 // Música procedural leve: motivos diferentes para menu, infiltração, tensão e encerramento.
 // Tudo passa pelo master existente, portanto mute e o volume geral continuam funcionando.
 function playMusicTick() {
-  if (!actx || !audioLayers) return;
+  if (!actx || !audioLayers || state === "pause") return; // pausa = silêncio musical
   if ((state === "play" || state === "brief") && customAudioRequested && !customMusicRequested) requestGameMusic();
   if (mute || customAudioBuffers.music) return;
   const now = actx.currentTime;
@@ -2645,11 +2708,11 @@ function brief() {
   $("bfa").textContent = data.threat || "Alerta";
   $("bfr").textContent = data.recommend || "Leia o ambiente";
   $("bf").hidden = false;
-  setTimeout(() => {
+  scheduleTransition(3200, "level", () => {
     $("bf").hidden = true;
     lvl++;
     reset(true);
-  }, 3200);
+  });
 }
 // fase 4: esconderijo
 const BASE = towers.map((t) => [t.x, t.z, t.h, t.n]),
@@ -2898,10 +2961,7 @@ function applyLevel() {
   bz = 0;
   bi = 0;
   if (lvl === 4) preloadBossModel(0);
-  if (boss) {
-    S.remove(boss.g, boss.disc);
-    boss = null;
-  }
+  destroyBoss();
   $("bb").hidden = !bs;
   if (bs) spawnBoss(0);
 }
@@ -2985,8 +3045,36 @@ function loadBossModel(index) {
   }
   return beginBossModelLoad(index);
 }
+// ÂNCORA: liberar memória de GPU. S.remove só tira da cena; geometria, material e textura continuam na placa de vídeo
+// até alguém chamar dispose(). Todo objeto criado POR ataque/chefão passa por aqui (nunca os compartilhados da cena).
+function disposeObject3D(root) {
+  if (!root) return;
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    (Array.isArray(o.material) ? o.material : o.material ? [o.material] : []).forEach((m) => {
+      Object.values(m).forEach((v) => v && v.isTexture && v.dispose());
+      m.dispose();
+    });
+  });
+}
+function destroyHazard(h) {
+  S.remove(h.g);
+  disposeObject3D(h.g);
+}
+function destroyBoss() {
+  if (!boss) return;
+  const mixer = boss.g.userData.mixer;
+  if (mixer) {
+    mixer.stopAllAction();
+    mixer.uncacheRoot(mixer.getRoot());
+  }
+  S.remove(boss.g, boss.disc);
+  disposeObject3D(boss.g);
+  disposeObject3D(boss.disc);
+  boss = null;
+}
 function clearBossHazards() {
-  bossHazards.forEach((h) => S.remove(h.g));
+  bossHazards.forEach(destroyHazard);
   bossHazards = [];
   if (bossTelegraph) {
     bossTelegraph.remove();
@@ -3144,7 +3232,7 @@ function updateBossHazards(dt) {
       }
     }
     if (h.life <= 0) {
-      S.remove(h.g);
+      destroyHazard(h);
       bossHazards.splice(i, 1);
     }
   }
@@ -3156,7 +3244,7 @@ function updateBossHazards(dt) {
 function spawnBoss(i) {
   const c = BOSS[i];
   clearBossHazards();
-  if (boss) S.remove(boss.g, boss.disc);
+  destroyBoss();
   const g = new T.Group();
   g.add(
     new T.Mesh(
@@ -3205,7 +3293,8 @@ function spawnBoss(i) {
     const modelLoad = loadBossModel(i);
     if (i + 1 < BOSS.length) preloadBossModel(i + 1);
     modelLoad.then((res) => {
-      if (!res || !boss || boss.g !== g) return;
+      if (!res) return;
+      if (!boss || boss.g !== g) { disposeObject3D(res.scene); return; } // carga que chegou tarde: libera
       const art = res.scene;
       const box = new T.Box3().setFromObject(art);
       const size = box.getSize(new T.Vector3());
@@ -3251,9 +3340,10 @@ function spawnBoss(i) {
       } else if (bossClips) montar(bossClips.idle, bossClips.walk, true);
       else
         loadBossModel(0).then((r2) => {
-          if (!r2 || !boss || boss.g !== g) return;
+          if (!r2) return;
           bossClips = bossClips || { idle: achar(r2.animations, "idle") || r2.animations[0], walk: achar(r2.animations, "walk") };
-          montar(bossClips.idle, bossClips.walk, true);
+          if (boss && boss.g === g) montar(bossClips.idle, bossClips.walk, true);
+          disposeObject3D(r2.scene); // só queríamos os clipes; a malha extra nunca vai à cena
         });
       g.children.slice(0, 3).forEach((o) => (o.visible = false));
       g.userData.art = art;
@@ -3280,8 +3370,7 @@ function hitBoss(d) {
   sfx("bossDie", bi);
   sfx("win");
   clearBossHazards();
-  S.remove(boss.g, boss.disc);
-  boss = null;
+  destroyBoss();
   bi++;
   if (bi >= BOSS.length) {
     $("bh").style.width = "0%";
@@ -3521,20 +3610,22 @@ function fxTick(dt) {
     dodgeT = Math.max(0, dodgeT - dt);
   }
   const hx = $("hx"), vx = $("vx"), gx = $("gx"), dg = $("dg");
-  setTxt(hx, empCd > 0 ? "EMP · " + Math.ceil(empCd) + "s" : "EMP · E");
-  setTxt(vx, virusCd > 0 ? "VÍRUS · " + Math.ceil(virusCd) + "s" : "VÍRUS · Q");
+  // ÂNCORA: no toque (pointer: coarse) o rótulo é só a palavra curta; o atalho de teclado só aparece com mouse/teclado
+  const rot = (nome, tecla, cd) => (cd > 0 ? nome + " · " + Math.ceil(cd) + "s" : toqueCurto.matches ? nome : nome + " · " + tecla);
+  setTxt(hx, rot("EMP", "E", empCd));
+  setTxt(vx, rot("VÍRUS", "Q", virusCd));
   setCls(hx, "cooldown", empCd > 0);
   setCls(vx, "cooldown", virusCd > 0);
   setCls(hx, "ready", empCd <= 0 && state === "play");
   setCls(vx, "ready", virusCd <= 0 && state === "play");
-  setTxt(gx, skinAtual === "vanta" ? (ghostCd > 0 ? "NÓ · " + Math.ceil(ghostCd) + "s" : "NÓ FANTASMA · R") : "NÓ · VANTA");
+  setTxt(gx, skinAtual === "vanta" ? rot(toqueCurto.matches ? "FANTASMA" : "NÓ FANTASMA", "R", ghostCd) : toqueCurto.matches ? "FANTASMA" : "NÓ · VANTA");
   setCls(gx, "cooldown", ghostCd > 0 || skinAtual !== "vanta");
   setCls(gx, "ready", ghostCd <= 0 && skinAtual === "vanta" && state === "play");
-  setTxt(dg, dodgeCd > 0 ? "ESQUIVA · " + Math.ceil(dodgeCd) + "s" : "ESQUIVA · C");
+  setTxt(dg, rot("ESQUIVA", "C", dodgeCd));
   setCls(dg, "cooldown", dodgeCd > 0);
   setCls(dg, "ready", dodgeCd <= 0 && state === "play");
   // ÂNCORA: botão mostra os segundos restantes; ao zerar, avisa que está pronto (som + brilho)
-  const txt = bz > 0 ? "BREACH · " + Math.ceil(bz) + "s" : "BREACH · Espaço";
+  const txt = rot("BREACH", "Espaço", bz);
   if (txt !== bzShown) {
     bzShown = txt;
     $("bz").textContent = txt;
@@ -3602,7 +3693,9 @@ function loop(rafTimestamp) {
     dtReal = Math.min((agora - ultimoQuadro) / 1000, 1);
   ultimoQuadro = agora;
   ajustarResolucao(dtReal);
+  fxSystem.checkDevicePixelRatio(); // trocou de monitor/zoom? recalcula a resolução interna
   if (state === "pause") {
+    syncAudioLayers(); // chave inclui o estado: derruba osciladores de perigo/chefão durante a pausa
     if (mapState !== state) {
       mapState = state;
       mapAcc = 0;
@@ -4004,13 +4097,13 @@ function loop(rafTimestamp) {
     lapLight.intensity = hacking ? 1.2 + (calm ? 0 : Math.sin(time * 24) * 0.35) : 0;
     if (near) {
       setTxt($("msg"), mini ? "Digite a sequência de setas!" : "Hackeando " + near.n + "...");
-      if (near.p >= 1 && !mini) startMini(near);
+      if (near.p >= 1 && !mini && state === "play") startMini(near);
     } else if (cnt < 3 && !shake)
       setTxt($("msg"), inside ? "Drone te viu! Saia da luz." : noteT > 0 ? note : "");
     updObjective();
     if (endT > 0) {
       endT -= dt;
-      if (endT <= 0) end(true);
+      if (endT <= 0 && state === "play") end(true);
     }
   }
   if (state === "menu") animChar(dt, 0);
@@ -4334,12 +4427,14 @@ function togglePause() {
     setHackStream(false);
     $("pz").hidden = false;
     setTxt($("pb"), "▶");
+    jend();
     openModal("pz", "pzc");
   } else if (state === "pause") {
     state = "play";
     setTxt($("pb"), "⏸");
     clock.getDelta();
     closeModal("pz", "gameCanvas", true);
+    resumePendingTransition(); // fase concluída durante a pausa continua de onde parou
   }
 }
 addEventListener("keydown", (e) => {
@@ -4358,6 +4453,10 @@ $("pzm").onclick = () => {
   setTxt($("pb"), "⏸");
   $("hackPanel").hidden = true;
   setHackStream(false);
+  cancelTransitions();
+  runId++;
+  jend();
+  clearBossHazards();
   state = "menu";
   arrow.visible = false;
   setTxt($("obj"), "");

@@ -1,5 +1,7 @@
 # Status das pendências — ANARCO.EXE v4.2.3
 
+> **Atualização v4.4.0:** a decisão do item 3 foi superada — o scaffold `src/game` + `src/engine` (e `src/ui`, `src/i18n`, `src/styles`, `src/main.ts`) foi removido do repositório. O texto abaixo é o registro histórico da v4.2.3.
+
 ## Decisões e verificações concluídas
 
 **Item 3 — scaffold `src/game` e `src/engine`: mantido isolado.** A campanha cyberpunk publicada roda no `script.js`; o scaffold alternativo implementa outro jogo, de plataforma com ilhas procedurais, física e progressão próprias. Os módulos e seus testes continuam úteis para esse protótipo. Integrá-los seria substituir ou reescrever uma arquitetura diferente, não centralizar regras duplicadas. A ponte de ajuste FX em `src/game/tuning.ts` continua disponível somente no modo de desenvolvimento. Não apagar nem fundir esses módulos nesta revisão; se o protótipo for aposentado no futuro, migrar primeiro essa ponte e então remover sua suíte em lote.

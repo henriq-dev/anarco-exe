@@ -1,6 +1,26 @@
-# ANARCO.EXE 3D — Breach Protocol (v4.3.1)
+# ANARCO.EXE 3D — Breach Protocol (v4.4.0)
 
 Jogo 3D de infiltração cyberpunk. O jogo roda no `script.js` (JavaScript clássico, com comentários **ÂNCORA**); o TypeScript fica nos módulos de entrada, efeitos, configuração e ferramentas.
+
+## v4.4.2 — DPR dinâmico
+
+Trocar de monitor ou zoom recalcula a resolução interna do canvas (`checkDevicePixelRatio` + `matchMedia('(resolution)')`). Relatório e checklist de teste real em `docs/RELATORIO-V4.4.2.md`.
+
+## v4.4.1 — correções da auditoria
+
+Transições como estado (handle + `runId`, pendência na pausa), `end()` idempotente, `dispose` de ataques/chefões, pausa em aba oculta, joystick sem "preso", validação do save e multi-abas, rótulos curtos e safe-area no celular deitado. Detalhes em `docs/RELATORIO-V4.4.1.md`.
+
+## v4.4.0 — um só jogo no repositório
+
+O repositório tinha **dois jogos**: o que roda (`script.js` + módulos `src/anarco-*.ts`) e um scaffold de plataforma com ilhas procedurais que nenhum arquivo carregava. Quem abrisse `src/game/` podia editar código que não muda nada no jogo publicado. Esta versão remove o scaffold, que a decisão de `docs/STATUS-OTIMIZACOES-V4.2.3.md` (v4.2.3) mantinha isolado:
+
+- **Código:** `src/game/`, `src/engine/`, `src/ui/`, `src/i18n/` (en/zh-CN), `src/styles/`, `src/main.ts` e `scripts/manus-tuning/` (ponte de ajuste do scaffold).
+- **Testes:** 10 arquivos que só exercitavam o scaffold (67 testes). Ficam 7 arquivos / 31 testes, todos do jogo ativo.
+- **Dependência:** `@dimforge/rapier3d-compat` (física do scaffold; nada mais a usa).
+- **Peso:** `docs/capturas` convertido de PNG para WebP sem perda (4,45 → 2,93 MB, pixels idênticos); links dos relatórios atualizados.
+- **Não muda o jogo publicado:** o `dist` é byte a byte igual ao da v4.3.1, exceto `sw.js` (nome do cache). Textos em inglês/chinês existiam só no scaffold; o jogo ativo é em português.
+
+As seções anteriores deste README descrevem o estado de cada versão na época e continuam como histórico.
 
 ## v4.3.1 — pacote realmente igual ao que o README descreve
 

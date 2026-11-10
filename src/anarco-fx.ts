@@ -377,6 +377,30 @@ export class AnarcoFxSystem {
     return quality === 'low' ? 'BAIXA' : quality === 'medium' ? 'MÉDIA' : 'ALTA'
   }
 
+  private dprQuery: MediaQueryList | undefined
+  private appliedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
+  private readonly onDprChange = (): void => {
+    this.checkDevicePixelRatio()
+    this.watchDevicePixelRatio()
+  }
+
+  /** Barato (uma comparação): chamado a cada quadro, cobre navegadores que não disparam o evento da media query. */
+  checkDevicePixelRatio(): void {
+    const dpr = window.devicePixelRatio || 1
+    if (dpr === this.appliedDpr) return
+    this.appliedDpr = dpr
+    this.applyQuality() // novo DPR (outro monitor, zoom do navegador): recalcula resolução interna
+    this.resize()
+  }
+
+  /** Reage à troca de monitor/zoom: a query `(resolution: Xdppx)` dispara uma vez quando o DPR sai de X; depois rearmamos com o novo valor. */
+  watchDevicePixelRatio(): void {
+    this.dprQuery?.removeEventListener('change', this.onDprChange)
+    if (typeof matchMedia !== 'function') return
+    this.dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+    this.dprQuery.addEventListener('change', this.onDprChange, { once: true })
+  }
+
   resize(): void {
     const width = window.innerWidth
     const height = window.innerHeight
